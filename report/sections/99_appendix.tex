@@ -1,0 +1,114 @@
+\chapter{付録：LaTeX 記述チートシート}
+\label{ch:latex_cheatsheet}
+
+本付録は，チーム内で LaTeX に不慣れなメンバーが最低限書けるようになるための早見表である。必要に応じて削除・拡張して使うこと。
+
+\section{章・節・小節}
+
+\begin{lstlisting}[language=TeX]
+\chapter{章タイトル}       % 章（jex では大きな区切り）
+\section{節タイトル}       % 節
+\subsection{小節タイトル}  % 小節
+\subsubsection{小々節}     % さらに細かい
+\end{lstlisting}
+
+ラベル＆相互参照：
+
+\begin{lstlisting}[language=TeX]
+\section{処理方式}\label{sec:method}
+... 詳細は \ref{sec:method} 節を参照 ...
+\end{lstlisting}
+
+\section{表の書き方}
+
+短い表は \verb|tabular| + \verb|booktabs|，横幅を揃えたい場合は \verb|tabularx|，ページをまたぐ長い表は \verb|longtable| を使う。
+
+\begin{lstlisting}[language=TeX]
+\begin{table}[H]
+  \centering
+  \caption{サンプル表}\label{tbl:sample}
+  \begin{tabular}{lcr}
+    \toprule
+    項目 & 数値 & 単位 \\
+    \midrule
+    項目A & 5   & ms \\
+    項目B & 99  & \% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\end{lstlisting}
+
+\section{図・画像の挿入}
+
+\begin{lstlisting}[language=TeX]
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{fig/system_overview.pdf}
+  \caption{システム全体構成}\label{fig:overview}
+\end{figure}
+\end{lstlisting}
+
+本文から参照: 図\verb|\ref{fig:overview}|。
+画像は \verb|fig/| ディレクトリに配置する。推奨形式は PDF / PNG。
+
+\section{ソースコードの掲載}
+
+\verb|listings| パッケージを使う。日本語コメントを含む場合は \verb|plistings| を併用すること（本雛形では読み込み済み）。
+
+\begin{lstlisting}[language=C++,caption={コード掲載の例},label={lst:example}]
+#include <Arduino.h>
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  // 処理
+}
+\end{lstlisting}
+
+\section{数式}
+
+\verb|amsmath| を使う。インラインは \verb|$...$|，別行立ては \verb|\[...\]| または \verb|equation| 環境。
+
+\begin{lstlisting}[language=TeX]
+標本標準偏差を式 \eqref{eq:stddev} に示す。
+\begin{equation}
+  \sigma = \sqrt{\frac{1}{N}\sum_{i=1}^{N}(x_i - \bar{x})^2}
+  \label{eq:stddev}
+\end{equation}
+\end{lstlisting}
+
+\section{箇条書き・脚注・引用}
+
+\begin{lstlisting}[language=TeX]
+\begin{itemize}
+  \item 項目A
+  \item 項目B\footnote{脚注はこう書く}
+\end{itemize}
+
+% 参考文献 (refs.bib) から引用
+標準仕様\cite{example_spec} に従い…
+\end{lstlisting}
+
+\section{よく使う記号・単位}
+
+\begin{lstlisting}[language=TeX]
+$\mu$s, $\approx$, $\pm$, $\sim$, $\times$, $\cdot$
+% 単位付き: 10\,ms, 5\,V, 3.3\,V  (薄空白 \, を入れる)
+\end{lstlisting}
+
+\section{コンパイル手順}
+
+\subsection{Dev Container（推奨）}
+VSCode で本リポジトリを開き，\verb|Reopen in Container| を選ぶ。LaTeX Workshop が自動で \verb|latexmk| を走らせ，PDF を生成する。
+
+\subsection{Docker 直接実行}
+\begin{lstlisting}[language=bash]
+cd report
+docker run --rm \
+  -v "$(pwd):/workspace" -w /workspace \
+  ghcr.io/paperist/texlive-ja:debian \
+  latexmk main.tex
+\end{lstlisting}
+

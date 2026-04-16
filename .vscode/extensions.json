@@ -1,0 +1,13 @@
+{
+    "recommendations": [
+        "platformio.platformio-ide",
+        "ms-vscode.cpptools",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "James-Yu.latex-workshop",
+        "ms-vscode-remote.remote-containers",
+        "editorconfig.editorconfig",
+        "streetsidesoftware.code-spell-checker",
+        "eamodio.gitlens",
+        "bierner.markdown-mermaid"
+    ]
+}
