@@ -95,6 +95,7 @@ cd <新しいリポジトリ名>
 | [`tools/`](tools/) | 補助スクリプト | ベンチマーク・解析スクリプトの置き場 |
 | [`docs/`](docs/) | 設計ドキュメント・ADR | 開発中の設計判断を Markdown で残す（チーム内共有用） |
 | [`meetings/`](meetings/) | 議事録・WBS・ガント | 進捗管理ドキュメントのテンプレ |
+| [`references/`](references/) | 外部から与えられた参考資料 | 授業資料・データシート・論文など（著作権に注意） |
 | [`report/`](report/) | LaTeX 報告書 | 提出用 PDF 報告書の雛形（`docs/` とは別物。提出・印刷用） |
 | `.devcontainer/` | LaTeX コンパイル環境 | VSCode の Dev Container 設定 |
 | `.github/` | PR / Issue テンプレ、GitHub Actions | 自動化の例 |
