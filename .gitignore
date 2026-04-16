@@ -1,0 +1,91 @@
+# ===== AI ツール設定 =====
+.claude/
+
+# ===== PlatformIO =====
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+*.bin
+*.elf
+*.hex
+
+# ===== C/C++ =====
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+build/
+
+# ===== LaTeX =====
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.dvi
+*.idx
+*.ind
+*.ilg
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+# 生成 PDF（手元で Docker コンパイルして確認する運用）
+report/main.pdf
+
+# ===== Processing =====
+*.pde.bak
+out/
+
+# ===== Python (tools/) =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# ===== Node / 一般 =====
+node_modules/
+
+# ===== エディタ / IDE =====
+.idea/
+*.swp
+*.swo
+*~
+# VSCode は設定を追跡するが，ユーザー個別ファイルは除外
+.vscode/*.log
+.history/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== KiCad backups =====
+*-backups/
+*.bak
+*.kicad_prl
+
+# ===== その他 =====
+*.tmp

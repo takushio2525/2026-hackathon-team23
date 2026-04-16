@@ -1,0 +1,42 @@
+name: PlatformIO Build
+
+on:
+  push:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/pio-build.yml'
+  pull_request:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/pio-build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [node_01, node_02, node_03, node_04, node_05]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.cache/pip
+          key: ${{ runner.os }}-pio-${{ matrix.node }}
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Build firmware/${{ matrix.node }}
+        working-directory: firmware/${{ matrix.node }}
+        run: pio run
