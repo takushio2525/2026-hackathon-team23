@@ -11,12 +11,15 @@
 |---|---|
 | [`overview.md`](overview.md) | プロジェクト概要・目標・評価軸・スケジュール |
 | [`roles.md`](roles.md) | 役割分担（確定 / 未決） |
-| [`design/architecture.md`](design/architecture.md) | システム全体アーキテクチャ |
-| [`design/protocol.md`](design/protocol.md) | UDP 通信プロトコル仕様 |
-| [`design/conductor_gesture.md`](design/conductor_gesture.md) | IMU → 指揮コマンドの写像 |
-| [`design/score_format.md`](design/score_format.md) | 楽譜データフォーマット |
-| [`design/data_flow.md`](design/data_flow.md) | データフロー（補足） |
+| [`design/architecture.md`](design/architecture.md) | システム全体構成（概略） |
+| [`design/protocol.md`](design/protocol.md) | 通信方針（概略） |
+| [`design/conductor_gesture.md`](design/conductor_gesture.md) | 指揮ジェスチャの方針 |
+| [`design/score_format.md`](design/score_format.md) | 楽譜データの扱い（方針） |
 | [`decisions/`](decisions/) | 設計判断記録（ADR） |
+
+> 現時点では各設計ドキュメントは「大枠の方針」までを扱う。パケット構造・
+> アルゴリズム・具体的なデータ構造などは、方針合意のあと実装フェーズで
+> 各ドキュメントに追記する。
 
 ## ADR（Architecture Decision Record）
 
@@ -35,4 +38,4 @@
 
 - 設計を変更したら、対応するドキュメントを**同じ PR で**更新する
 - 大きな設計判断は ADR を新規追加（既存 ADR は履歴として残す）
-- 仕様変更は `protocol.md` の変更履歴テーブルに必ず追記
+- 方針から詳細に落とすときは、該当ドキュメントの「未定」節を詰める形で更新する
