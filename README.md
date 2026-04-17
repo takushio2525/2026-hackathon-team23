@@ -1,10 +1,52 @@
-# hackathon-template
+# hackathon-team23 — Arduino オーケストラ
 
-ハッカソン・チーム開発用のテンプレートリポジトリ。
+2026年度 千葉工大 ハッカソン1 **チーム23** のリポジトリ。
 
-このテンプレートは「**共同開発のためのフォルダ構成と進め方の教材**」として作られている。
-使うテーマ（音楽・ゲーム・ロボット・Web アプリ…）は問わない。必要なフォルダだけを
-使い、いらないフォルダは**丸ごと削除してよい**。
+## 本チームの取り組み
+
+**テーマ**: Arduino UNO R4 WiFi × 5台による **Arduino オーケストラ**
+
+**システム構成**:
+
+- **指揮者マイコン × 1**（IMU でジェスチャ認識・UDP で楽器へコマンド配信）
+- **楽器マイコン × 4**（音符データ送出、金管楽器4声の輪唱）
+- **PC (Processing)**（楽器マイコンから音符を受け取り音色合成・再生）
+
+**独創性のポイント**: 指揮者 Arduino 内蔵の IMU で指揮棒ジェスチャを認識し、
+**振る速度でテンポ・振幅で強弱・振動でビブラート**を表現する。
+
+**通信方式**: UDP ベースの独自プロトコル（設計は [`docs/design/protocol.md`](docs/design/protocol.md)）
+
+### チームメンバーと役割
+
+| メンバー | 担当 |
+|---|---|
+| 塩澤匠生 | 指揮者マイコン（IMU ジェスチャ認識） |
+| 齋藤翔太 | 音階生成（ドレミファソラシド） |
+| 梅澤颯太 | Processing（音色合成・演奏再生） |
+| 片岡聖・地曵賢人・御代川稜 | 議事録（持ち回り）／楽器コード |
+
+詳細・未決事項は [`docs/roles.md`](docs/roles.md) を参照。
+
+### 主要ドキュメント
+
+| パス | 内容 |
+|---|---|
+| [`docs/overview.md`](docs/overview.md) | プロジェクト概要・目標・評価軸 |
+| [`docs/design/architecture.md`](docs/design/architecture.md) | システム全体アーキテクチャ |
+| [`docs/design/protocol.md`](docs/design/protocol.md) | UDP 通信プロトコル仕様 |
+| [`docs/design/conductor_gesture.md`](docs/design/conductor_gesture.md) | IMU→指揮コマンドの写像 |
+| [`docs/design/score_format.md`](docs/design/score_format.md) | 楽譜データフォーマット |
+| [`docs/decisions/`](docs/decisions/) | 重要な設計判断（ADR） |
+| [`meetings/`](meetings/) | 議事録（PDF） |
+| [`references/lectures/`](references/lectures/) | 授業資料 |
+
+---
+
+## このリポジトリの土台について
+
+本リポジトリは「共同開発のためのフォルダ構成」テンプレートを土台にしている。
+以下はテンプレートとしての説明（Git/共同開発が初めてのメンバー向けの読み物）。
 
 ---
 
