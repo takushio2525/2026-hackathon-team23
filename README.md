@@ -15,7 +15,7 @@
 **独創性のポイント**: 指揮者 Arduino 内蔵の IMU で指揮棒ジェスチャを認識し、
 **振る速度でテンポ・振幅で強弱・振動でビブラート**を表現する。
 
-**通信方式**: UDP ベースの独自プロトコル（設計は [`docs/design/protocol.md`](docs/design/protocol.md)）
+**通信方式**: UDP ベース（大枠の方針は [`docs/design/protocol.md`](docs/design/protocol.md)、詳細は今後詰める）
 
 ### チームメンバーと役割
 
@@ -33,10 +33,10 @@
 | パス | 内容 |
 |---|---|
 | [`docs/overview.md`](docs/overview.md) | プロジェクト概要・目標・評価軸 |
-| [`docs/design/architecture.md`](docs/design/architecture.md) | システム全体アーキテクチャ |
-| [`docs/design/protocol.md`](docs/design/protocol.md) | UDP 通信プロトコル仕様 |
-| [`docs/design/conductor_gesture.md`](docs/design/conductor_gesture.md) | IMU→指揮コマンドの写像 |
-| [`docs/design/score_format.md`](docs/design/score_format.md) | 楽譜データフォーマット |
+| [`docs/design/architecture.md`](docs/design/architecture.md) | システム全体構成（概略） |
+| [`docs/design/protocol.md`](docs/design/protocol.md) | 通信方針（概略） |
+| [`docs/design/conductor_gesture.md`](docs/design/conductor_gesture.md) | 指揮ジェスチャの方針 |
+| [`docs/design/score_format.md`](docs/design/score_format.md) | 楽譜データの扱い（方針） |
 | [`docs/decisions/`](docs/decisions/) | 重要な設計判断（ADR） |
 | [`meetings/`](meetings/) | 議事録（PDF） |
 | [`references/lectures/`](references/lectures/) | 授業資料 |

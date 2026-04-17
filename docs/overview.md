@@ -66,9 +66,9 @@ PC 側で金管楽器の音色合成・再生を行う。
 
 ## 関連ドキュメント
 
-- [`design/architecture.md`](design/architecture.md) — システム全体構成
-- [`design/protocol.md`](design/protocol.md) — UDP 通信プロトコル
-- [`design/conductor_gesture.md`](design/conductor_gesture.md) — 指揮ジェスチャ設計
-- [`design/score_format.md`](design/score_format.md) — 楽譜データフォーマット
+- [`design/architecture.md`](design/architecture.md) — システム全体構成（概略）
+- [`design/protocol.md`](design/protocol.md) — 通信方針（概略）
+- [`design/conductor_gesture.md`](design/conductor_gesture.md) — 指揮ジェスチャの方針
+- [`design/score_format.md`](design/score_format.md) — 楽譜データの扱い（方針）
 - [`decisions/`](decisions/) — 設計判断の記録（ADR）
 - [`roles.md`](roles.md) — 役割分担
