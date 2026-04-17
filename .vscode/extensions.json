@@ -8,6 +8,8 @@
         "editorconfig.editorconfig",
         "streetsidesoftware.code-spell-checker",
         "eamodio.gitlens",
-        "bierner.markdown-mermaid"
+        "bierner.markdown-mermaid",
+        "tobiah.language-pde",
+        "Luke-zhang-04.processing-vscode"
     ]
 }
