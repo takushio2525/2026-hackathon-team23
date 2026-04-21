@@ -1,0 +1,41 @@
+\section{解決策としての提案手法}
+\label{sec:proposal}
+
+\subsection{提案の概要}
+\label{subsec:overview}
+
+本提案の構成を以下に示す。
+
+\begin{itemize}
+  \item \textbf{指揮者マイコン}（Arduino UNO R4 WiFi）$\times\,1$ 台
+  \item \textbf{楽器マイコン}（Arduino UNO R4 WiFi）$\times\,4$ 台
+  \item \textbf{PC}（Processing による音響合成）$\times\,1$ 台
+\end{itemize}
+
+指揮者マイコンは内蔵 IMU で指揮棒の動作を読み取り，拍・テンポ・強弱などの演奏パラメータを推定して UDP ブロードキャストで楽器マイコンへ配信する。楽器マイコンは受信した拍情報に従って音符データを PC へ送出し，PC 側は Processing で金管楽器の音色を合成・出力する。
+
+\subsection{指揮者マイコンの要件}
+\label{subsec:requirements}
+
+筆者が担当する指揮者マイコン部に対して，次の要件を設定する。
+
+\begin{itemize}
+  \item IMU サンプリング周波数: 100\,Hz 以上（手振りの最短周期に対して十分な分解能）
+  \item 指揮者マイコンから楽器マイコンまでの UDP 片道遅延: 30\,ms 以下
+  \item 指揮動作から拍検出までの処理遅延: 50\,ms 以下
+\end{itemize}
+
+これらの数値の妥当性は次章で検討する。
+
+\subsection{処理方針}
+\label{subsec:processing}
+
+指揮者マイコンの処理は，入力・ロジック・出力の 3 段ループで構成する。
+
+\begin{enumerate}
+  \item \textbf{入力}: IMU から加速度・角速度を一定周期で取得する
+  \item \textbf{ロジック}: ノイズ除去後，加速度ノルムのピーク検出により拍を抽出し，拍間隔からテンポを推定する
+  \item \textbf{出力}: 拍タイミングとテンポを UDP で楽器マイコンへ送出する
+\end{enumerate}
+
+この 3 段構成は筆者が過去のプロジェクトで採用している Embedded-Module-Architecture に準拠する。段ごとのモジュール境界を明確にすることで，アルゴリズムの差し替えや単体テストを容易にする。
