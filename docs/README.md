@@ -33,6 +33,7 @@
 | [`decisions/0002-udp-original-protocol.md`](decisions/0002-udp-original-protocol.md) | 通信方式：UDP 独自プロトコル |
 | [`decisions/0003-conductor-imu.md`](decisions/0003-conductor-imu.md) | 指揮入力：IMU ジェスチャ |
 | [`decisions/0004-ensemble-structure.md`](decisions/0004-ensemble-structure.md) | 編成：指揮1+楽器4+輪唱曲 |
+| [`decisions/0005-firmware-embedded-module-architecture.md`](decisions/0005-firmware-embedded-module-architecture.md) | ファームウェア設計：Embedded-Module-Architecture に準拠 |
 
 ## 更新ルール
 

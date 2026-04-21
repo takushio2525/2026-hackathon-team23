@@ -6,6 +6,29 @@
 通信担当など）をチームで分担したい」というケースを想定した雛形。ハードウェアを
 使わない班は [`firmware/` ごと削除してよい](#使わない班は)。
 
+## コーディング方針（本チームの決定事項）
+
+本チームのファームウェアは、以下のリファレンス実装に**必ず**従って書く。
+
+> **Embedded-Module-Architecture**
+> <https://github.com/takushio2525/Embedded-Module-Architecture>
+
+- **3 フェーズループ**（入力 → ロジック → 出力）で `loop()` を構成する
+- 各機能は `IModule` インターフェース（`setup()` / `update()`）を実装した
+  モジュールとして書く
+- ノード内の共有状態は `SystemData` 構造体に集約する
+- ピン・定数・閾値などノード固有設定は `ProjectConfig` に集約する
+- 周期実行は `ModuleTimer` を使い、`delay()` でブロックしない
+- 新規モジュール追加時はリファレンスの `ARCHITECTURE.md` のチェックリストに従う
+
+共通コード（UDP 層・時間管理・共有プロトコル定義など）は [`common/lib/`](common/lib/) に置き、
+各ノードの `platformio.ini` から `lib_extra_dirs = ../common/lib` で参照する。
+
+詳細と判断の背景は [ADR-0005](../docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
+
+Arduino をベタ書きした経験しかないメンバーは、先にリファレンスの
+`ARCHITECTURE.md` と `example/` 系コードを読んでから実装を始めること。
+
 ## 構成
 
 ```
