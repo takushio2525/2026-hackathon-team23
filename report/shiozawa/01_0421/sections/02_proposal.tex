@@ -4,28 +4,44 @@
 \subsection{提案の概要}
 \label{subsec:overview}
 
-本提案の構成を以下に示す．
+前章の主張を実現するため，本提案は次の 3 種類のノードからなる構成を取る．
 
 \begin{itemize}
-  \item \textbf{指揮者マイコン}（Arduino UNO R4 WiFi）$\times\,1$ 台
+  \item \textbf{指揮者マイコン}（Arduino UNO R4 WiFi~\cite{arduino_uno_r4}）$\times\,1$ 台
   \item \textbf{楽器マイコン}（Arduino UNO R4 WiFi）$\times\,4$ 台
-  \item \textbf{PC}（Processing による音響合成）$\times\,1$ 台
+  \item \textbf{PC}（Processing による音響合成~\cite{processing_sound}）$\times\,1$ 台
 \end{itemize}
 
-指揮者マイコンは内蔵 IMU で指揮棒の動作を読み取り，拍・テンポ・強弱などの演奏パラメータを推定して UDP ブロードキャストで楽器マイコンへ配信する．楽器マイコンは受信した拍情報に従って音符データを PC へ送出し，PC 側は Processing で金管楽器の音色を合成・出力する．
+指揮者マイコンは内蔵 IMU で指揮棒の動作を読み取り，拍・テンポ・強弱などの演奏パラメータを推定して，WiFi 経由の UDP ブロードキャストで全楽器マイコンへ同時配信する．楽器マイコンは受信した拍情報に従って音符データを PC へ送出し，PC 側は Processing で金管楽器などの音色を合成・出力する．
+
+本稿は筆者が担当する**指揮者マイコン部**の設計方針に焦点を絞り，IMU によるジェスチャ取得（\ref{subsec:imu_gesture}）と WiFi/UDP ブロードキャストによる配信（\ref{subsec:wifi_udp}）という 2 つの技術選択を中心に述べる．
+
+\subsection{IMU によるジェスチャ取得}
+\label{subsec:imu_gesture}
+
+指揮動作のセンシングには，Arduino UNO R4 WiFi に内蔵されている 6 軸 IMU (LSM6DSOX~\cite{lsm6dsox}) を用いる．外付けセンサや追加配線を要さないため，指揮棒型の筐体に収める際の機構負担が小さい．
+
+加速度と角速度を 100\,Hz 以上でサンプリングし，ノイズ除去後に加速度ノルムのピーク検出によって拍タイミングを抽出する．拍間のインターバルを移動平均してテンポを推定し，ピーク時の加速度振幅から強弱パラメータを導出する．IMU 信号から身体動作を識別する手法は uWave~\cite{imu_gesture_survey} をはじめとして広く研究されており，本提案でも加速度ノルムに基づく簡便なアルゴリズムから着手し，必要に応じて学習ベース手法への置き換えを検討する．
+
+\subsection{WiFi/UDP ブロードキャストによる配信}
+\label{subsec:wifi_udp}
+
+指揮者マイコンから楽器マイコン群への拍情報配信には，WiFi 上の UDP ブロードキャスト~\cite{udp_realtime} を用いる．UNO R4 WiFi は ESP32-S3 を無線コプロセッサとして内蔵しているため，追加ハードウェアなしで同一サブネット上の全ノードに対し単一パケットで同時に送信できる．
+
+UDP はコネクションレスで再送を行わないため遅延が小さく，1 対多の同時配信に適する．パケットロスが発生した場合も拍は周期的に送出されるため，次拍で自然に復帰でき，合奏の継続性を損ないにくい．合奏におけるアンサンブル精度の観点からは，片道遅延は数十ミリ秒以下に抑えることが望ましく~\cite{music_latency}，本提案ではこれを要件として次節で数値化する．
 
 \subsection{指揮者マイコンの要件}
 \label{subsec:requirements}
 
-筆者が担当する指揮者マイコン部に対して，次の要件を設定する．
+以上の技術選択を踏まえ，指揮者マイコン部に対して次の要件を設定する．
 
 \begin{itemize}
   \item IMU サンプリング周波数: 100\,Hz 以上（手振りの最短周期に対して十分な分解能）
-  \item 指揮者マイコンから楽器マイコンまでの UDP 片道遅延: 30\,ms 以下
   \item 指揮動作から拍検出までの処理遅延: 50\,ms 以下
+  \item 指揮者マイコンから楽器マイコンまでの UDP 片道遅延: 30\,ms 以下
 \end{itemize}
 
-これらの数値の妥当性は次章で検討する．
+これらは合奏の許容同期ズレ~\cite{music_latency} を内訳として配分した目安であり，実機での実現可能性は次週以降の個人タスクにおいて計測・評価する．
 
 \subsection{処理方針}
 \label{subsec:processing}
@@ -34,8 +50,8 @@
 
 \begin{enumerate}
   \item \textbf{入力}: IMU から加速度・角速度を一定周期で取得する
-  \item \textbf{ロジック}: ノイズ除去後，加速度ノルムのピーク検出により拍を抽出し，拍間隔からテンポを推定する
-  \item \textbf{出力}: 拍タイミングとテンポを UDP で楽器マイコンへ送出する
+  \item \textbf{ロジック}: ノイズ除去後，加速度ノルムのピーク検出により拍を抽出し，拍間隔からテンポと強弱を推定する
+  \item \textbf{出力}: 拍タイミングとテンポ・強弱を UDP ブロードキャストで楽器マイコンへ送出する
 \end{enumerate}
 
-この 3 段構成は筆者が過去のプロジェクトで採用している Embedded-Module-Architecture に準拠する．段ごとのモジュール境界を明確にすることで，アルゴリズムの差し替えや単体テストを容易にする．
+この 3 段構成は筆者が過去に採用している Embedded-Module-Architecture~\cite{embedded_module_arch} に準拠する．段ごとのモジュール境界を明確にすることで，拍検出アルゴリズムの差し替えや，入力を IMU からシミュレータに切り替えた単体テストが容易になる．
