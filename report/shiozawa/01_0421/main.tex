@@ -1,0 +1,95 @@
+\documentclass[a4paper,12pt,oneside]{jex}
+
+\renewcommand{\baselinestretch}{1.1}
+\setlength{\textwidth}{16cm}
+\setlength{\textheight}{24cm}
+\setlength{\evensidemargin}{0cm}
+\setlength{\oddsidemargin}{0cm}
+\setlength{\topmargin}{-1.0cm}
+
+\usepackage[dvipdfmx]{graphicx}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage[cmex10]{amsmath}
+\usepackage[deluxe]{otf}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{ascmac}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage{colortbl}
+\usepackage{float}
+\usepackage{textcomp}
+\usepackage{url}
+\usepackage{multirow,multicol}
+\usepackage{wrapfig}
+\usepackage{listings,jvlisting}
+\usepackage{plistings}
+
+\captionsetup{format=hang}
+\lstset{
+  basicstyle={\ttfamily\small},
+  identifierstyle={\small},
+  commentstyle={\small\itshape\color{gray}},
+  keywordstyle={\small\bfseries\color{blue}},
+  stringstyle={\small\ttfamily\color{brown}},
+  showstringspaces=false,
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},
+  numbers=left,
+  numberstyle={\scriptsize},
+  stepnumber=1,
+  numbersep=1zw,
+  lineskip=-0.5ex
+}
+\renewcommand{\lstlistingname}{ソースコード}
+
+\makeatletter
+  \let\l@chapter@x=\l@chapter
+  \def\l@chapter#1#2{\l@chapter@x{#1}\@empty}
+\makeatother
+
+\pagestyle{headings}
+
+\title{
+  \bfseries\vskip30pt
+  ハッカソン1 事前課題\\
+  \Large Arduino オーケストラにおける\\
+  指揮者マイコンによるジェスチャ認識\\
+  \vspace{1cm}
+}
+
+\author{
+  \\
+  千葉工業大学 先進工学部 未来ロボティクス学科\\
+  \\
+  \vspace{.5cm}
+}
+
+\date{
+  \bfseries\Large\vskip10pt
+  {\hspace{2cm}}班{\hspace{0.5em}}番{\hspace{0.5em}}号 \underline{\makebox[8cm][c]{第 23 班}} \vskip50pt
+  {\hspace{2cm}}学番・氏名 \underline{\makebox[8cm][c]{塩澤 匠生}} \vskip50pt
+  {\hspace{2cm}}提\hspace{2em}出 \underline{\makebox[8cm][c]{\today}}
+}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\setcounter{tocdepth}{3}
+\tableofcontents
+\newpage
+
+\pagenumbering{arabic}
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_existing_systems}
+\input{sections/04_idea}
+\input{sections/05_conclusion}
+
+\bibliographystyle{junsrt}
+\bibliography{refs}
+
+\end{document}

@@ -1,0 +1,91 @@
+\chapter{自身のアイディア}
+\label{ch:idea}
+
+\section{提案の概要}
+
+本提案「Arduino オーケストラ」は，第\ref{ch:existing_systems}章で整理した既存システム群では満たせない「\textbf{指揮動作を入力として物理分散した楽器マイコンをリアルタイムに同期・表現制御する}」体験を実現するものである。具体的な構成は以下の通りである。
+
+\begin{itemize}
+  \item \textbf{指揮者マイコン} $\times\,1$ 台: Arduino UNO R4 WiFi。内蔵 IMU で指揮棒の動きを読み取り，テンポ・強弱・ビブラートなどの演奏パラメータを推定。UDP で楽器マイコンに配信する。
+  \item \textbf{楽器マイコン} $\times\,4$ 台: 各マイコンがそれぞれ独立したパート（主旋律 3 + リズム 1）を担当し，受信したテンポに合わせて音符データを PC へ送出する。
+  \item \textbf{PC 側音響合成（Processing）}: 受信した音符データから金管楽器の倍音構造・ADSR エンベロープを合成して出力する。
+\end{itemize}
+
+\section{担当範囲（指揮者マイコン）の詳細}
+
+筆者の担当は指揮者マイコン部分である。ここでは担当範囲に絞って具体的なアイディアを述べる。
+
+\subsection{ジェスチャ$\rightarrow$演奏パラメータの写像}
+
+指揮棒の動きから演奏表現への対応付けは表\ref{tbl:mapping}のように設計する。
+
+\begin{table}[H]
+  \centering
+  \caption{指揮ジェスチャと演奏パラメータの対応}
+  \label{tbl:mapping}
+  \begin{tabularx}{\textwidth}{l>{\small}X>{\small}X}
+    \toprule
+    指揮動作 & 抽出する特徴量 & 対応する演奏表現 \\
+    \midrule
+    振り下ろしのタイミング & 加速度ノルムのピーク検出 & 拍の同期トリガ \\
+    振る速さ               & 連続する拍間隔の逆数     & テンポ（BPM） \\
+    振りの大きさ           & 1 拍あたりの加速度変化幅 & 強弱（ベロシティ） \\
+    手先の細かい振動       & 高周波成分のパワー       & ビブラート深さ \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{処理パイプライン（案）}
+
+指揮者マイコンの処理は以下の 3 段階とする。
+
+\begin{enumerate}
+  \item \textbf{入力}: IMU から加速度・角速度を 100\,Hz 程度で取得
+  \item \textbf{ロジック}: ローパスフィルタで手ブレ成分を除去 $\rightarrow$ 加速度ノルムのピーク検出で拍を抽出 $\rightarrow$ 拍間隔からテンポ推定 $\rightarrow$ 振幅からベロシティ推定
+  \item \textbf{出力}: UDP ブロードキャストで BEAT / CTRL パケットを楽器ノードへ送出
+\end{enumerate}
+
+このパイプラインは既に塩澤が運用している組込向け設計パターン（入力$\rightarrow$ロジック$\rightarrow$出力の 3 フェーズループ）\cite{embedded_module_arch} を流用する。モジュール境界を明確に分けることで，アルゴリズム部分の差し替えや単体テストが容易になる。
+
+\subsection{アルゴリズムのフォールバック}
+
+指揮の精度は使用者の技能に依存するため，誤認識時のフォールバックとして以下を検討する。
+
+\begin{itemize}
+  \item 一定時間拍が検出できない場合: 直近の推定テンポを維持して自動演奏継続
+  \item ノイズ的な高周波加速度が閾値を超える場合: ジェスチャ入力を一時的に無視
+  \item 起動時キャリブレーション（重力方向の初期化）による個人差吸収
+\end{itemize}
+
+\section{通信・同期に関するアイディア}
+
+指揮者 $\rightarrow$ 楽器間は UDP ブロードキャストでコマンドを配信する。音楽用途では同期ズレを 30\,ms 以下に抑えることが求められるため\cite{music_latency}，以下の方針を取る。
+
+\begin{itemize}
+  \item \textbf{BEAT パケット}: 拍の瞬間にタイムスタンプ付きで送出。楽器側は直近 BEAT からの経過時間を自ノードで補間して音符を発火させる。
+  \item \textbf{CTRL パケット}: テンポ・強弱・ビブラート値を定期的に（例: 20\,Hz）送出。楽器側は線形補間でパラメータを平滑化。
+  \item パケットロス対策: CTRL は定期送信で自然に回復，BEAT はシーケンス番号を付与し欠損検出。
+\end{itemize}
+
+\section{期待される成果と拡張性}
+
+\subsection{必達目標}
+
+\begin{enumerate}
+  \item 指揮者 1 台 + 楽器 4 台の \textbf{5 台同期演奏}
+  \item 輪唱曲（主旋律 3 + リズム 1 以上）の演奏
+  \item 指揮の振り速度に追従する \textbf{可変テンポ}
+\end{enumerate}
+
+\subsection{ストレッチ目標}
+
+\begin{enumerate}
+  \setcounter{enumi}{3}
+  \item 指揮ジェスチャによる強弱制御（ベロシティ）
+  \item 指揮ジェスチャによるビブラート制御
+  \item LED 等による視覚演出
+\end{enumerate}
+
+\subsection{教育・応用への展開可能性}
+
+本システムはマイコン・IMU・無線通信・信号処理・音響合成といった複数の要素技術を統合しており，STEAM 教育向けの教材としての展開や，文化祭・ワークショップでの参加型音楽体験としての利用も想定できる。特に「振るだけで合奏が成立する」構成は，楽器経験のない参加者でも短時間で音楽を楽しむ体験を提供でき，第\ref{sec:social_background}節で述べた「合奏への参加障壁を下げる」という社会的要請とも整合する。

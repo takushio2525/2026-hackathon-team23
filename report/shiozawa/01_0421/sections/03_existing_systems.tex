@@ -1,0 +1,65 @@
+\chapter{既存システム}
+\label{ch:existing_systems}
+
+本章では，「ジェスチャによる演奏制御」「マイコンを用いた分散演奏」「合奏体験の民主化」という 3 つの観点から既存のシステム・研究事例を整理する。
+
+\section{ジェスチャで演奏を制御するシステム}
+
+\subsection{Wii Music（家庭用ゲーム機）}
+
+任天堂 Wii 向けタイトル「Wii Music」は，Wii リモコンに内蔵された加速度センサの振り動作を楽器演奏に対応付けた代表的な商用事例である\cite{nintendo_wiimusic}。ユーザはリモコンを振るだけで楽器音を鳴らすことができ，技能習得を前提としない合奏体験を提供した点で先駆的である。一方，入力はゲーム機内で完結しており，複数楽器が物理的に独立したデバイスで演奏する分散構成ではない。
+
+\subsection{バーチャル指揮者研究}
+
+IMU やカメラで指揮動作を取得し，MIDI や DAW 上の演奏テンポを制御する研究が 2000 年代から行われている\cite{virtual_conductor}。これらは PC 内の仮想音源を制御する形態が主流であり，物理的に分散した楽器デバイスを同期制御する構成は多くない。
+
+\subsection{スマートフォン・タブレットの指揮アプリ}
+
+iPad の「iSymphony」などでは，タッチ動作や端末の傾きでオーケストラ音源のテンポ・音量を操作できる\cite{isymphony}。単一端末内で完結するため，本提案のような「複数のマイコン楽器を連携させる」構成ではない。
+
+\section{マイコン・小型デバイスによる分散演奏システム}
+
+\subsection{ESP32 / Arduino によるネットワーク音楽演奏}
+
+ESP32 などの Wi-Fi 搭載マイコンを複数台接続し，UDP でテンポ信号を配信して合奏させる作品・プロジェクトが Hackaday や GitHub で多数公開されている\cite{esp32_orchestra}。これらは「同期」を主目的とすることが多く，指揮者デバイス側の入力は固定テンポや押しボタンが中心で，人間のジェスチャに追従する例は限られる。
+
+\subsection{Tube Orchestra / LED Matrix Orchestra 等の芸術作品}
+
+メディアアート分野では，多数の小型発音デバイスをネットワーク同期させて空間的な音響演出を行う作品が存在する\cite{media_art_orchestra}。本提案のように「リアルタイムの指揮動作」を入力とするものは少なく，多くはあらかじめ用意されたシーケンスを再生する形式である。
+
+\section{合奏・演奏体験を民主化するサービス}
+
+\subsection{JackTrip などの遠隔合奏システム}
+
+JackTrip は低遅延 UDP オーディオ伝送ライブラリであり，遠隔地の演奏者どうしがリアルタイムに合奏することを可能にする\cite{jacktrip}。既に楽器を演奏できる人向けのプロ志向ツールであり，合奏への参加障壁自体を下げるものではない。
+
+\subsection{リズムゲーム・音ゲーム系コンテンツ}
+
+太鼓の達人・Beat Saber などのリズムゲームは，技能を持たない初心者でも音楽に合わせて身体を動かす楽しさを提供する\cite{rhythm_games}。ただしこれらは「用意された譜面を正しくなぞる」ゲーム性であり，演奏テンポや強弱を自ら制御する体験ではない。
+
+\section{既存システムの整理と差別化点}
+\label{sec:differentiation}
+
+各既存システムを「指揮入力の有無」「演奏デバイスが物理分散しているか」「リアルタイム性」の 3 軸で整理すると表\ref{tbl:existing}のようになる。
+
+\begin{table}[H]
+  \centering
+  \caption{既存システムの比較と本提案の位置付け}
+  \label{tbl:existing}
+  \begin{tabularx}{\textwidth}{lccc>{\small}X}
+    \toprule
+    システム & 指揮入力 & 物理分散 & リアルタイム性 & 備考 \\
+    \midrule
+    Wii Music        & $\triangle$ & $\times$ & $\bigcirc$ & 単一コンソール内 \\
+    バーチャル指揮者研究 & $\bigcirc$ & $\times$ & $\bigcirc$ & PC 内音源が対象 \\
+    iSymphony        & $\triangle$ & $\times$ & $\bigcirc$ & タブレット単体 \\
+    ESP32 分散演奏   & $\times$ & $\bigcirc$ & $\bigcirc$ & 固定テンポ中心 \\
+    JackTrip         & $\times$ & $\bigcirc$ & $\bigcirc$ & 熟練演奏者向け \\
+    リズムゲーム     & $\times$ & $\times$ & $\bigcirc$ & 譜面追従型 \\
+    \midrule
+    \textbf{本提案}  & $\bigcirc$ & $\bigcirc$ & $\bigcirc$ & IMU 指揮＋UDP 分散 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+本提案の差別化点は，「\textbf{人間のジェスチャをリアルタイムに解釈する指揮者ノード}」と「\textbf{物理的に独立した複数の楽器ノード}」を，マイコンレベルの低レイヤで組み合わせる点にある。単にテンポ同期をするだけでなく，振りの速度・振幅・振動といった複数のジェスチャ特徴量を，テンポ・強弱・ビブラートという音楽表現に写像することで，指揮者が演奏体験そのものを変形できる構成を目指す。
