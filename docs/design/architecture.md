@@ -35,6 +35,19 @@ flowchart LR
 | 楽器ノード × 4 | 自分のパートを担当し、発音タイミングと音の情報を PC へ送る |
 | PC（Processing） | 受け取った音の情報から音色を合成しスピーカで鳴らす |
 
+## ファームウェア設計方針
+
+Arduino 側のコードは **Embedded-Module-Architecture**
+（<https://github.com/takushio2525/Embedded-Module-Architecture>）に準拠して書く。
+
+- `loop()` は **入力 → ロジック → 出力** の 3 フェーズで構成
+- 機能単位で `IModule`（`setup()` / `update()`）を実装
+- ノード内の状態は `SystemData` に、ノード固有設定は `ProjectConfig` に集約
+- 共通層は `firmware/common/lib/` に置いて全ノードで共有
+
+判断の背景と詳細は [ADR-0005](../decisions/0005-firmware-embedded-module-architecture.md) および
+[`../../firmware/README.md`](../../firmware/README.md) を参照。
+
 ## まだ決めていないこと
 
 以下は今後のミーティングや実装フェーズで詰める。
