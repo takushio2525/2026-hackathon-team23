@@ -1,0 +1,283 @@
+%% ============================================================
+%%  生成AI利用申告書 — 提出課題1 (HCK02_01.ino)
+%%  ハッカソン1 / 塩澤 拓海 / 2026
+%%  コンパイル: docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%%              ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+%% ============================================================
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+%% ─── レイアウト ─────────────────────────────
+\usepackage[top=25mm,bottom=25mm,left=20mm,right=20mm]{geometry}
+
+%% ─── 色定義（プロジェクト共通パレット）──────
+\usepackage{xcolor}
+\definecolor{headerblue}{HTML}{1B3A5C}
+\definecolor{accentblue}{HTML}{2E86C1}
+\definecolor{lightgray}{HTML}{F2F3F4}
+\definecolor{codebg}{HTML}{F7F9FB}
+\definecolor{warnred}{HTML}{E74C3C}
+\definecolor{noteyellow}{HTML}{F39C12}
+\definecolor{okgreen}{HTML}{27AE60}
+
+%% ─── 見出し ─────────────────────────────────
+\usepackage{titlesec}
+\usepackage{needspace}
+\titleformat{\section}
+  {\needspace{5\baselineskip}\Large\bfseries\color{headerblue}}
+  {\thesection}{1em}{}
+  [\vspace{-0.5em}\textcolor{accentblue}{\rule{\textwidth}{1.2pt}}]
+\titleformat{\subsection}
+  {\needspace{4\baselineskip}\large\bfseries\color{headerblue}}
+  {\thesubsection}{1em}{}
+
+%% ─── 改ページ制御 ───────────────────────────
+\widowpenalty=10000
+\clubpenalty=10000
+\predisplaypenalty=10000
+\interfootnotelinepenalty=10000
+\brokenpenalty=5000
+
+%% ─── tcolorbox ─────────────────────────────
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\tcbset{before={\par\medskip\needspace{2\baselineskip}\noindent}}
+
+\newtcolorbox{itembox}[1]{%
+  enhanced, breakable,
+  colback=codebg, colframe=accentblue,
+  boxrule=0.5pt, arc=2pt,
+  left=12pt, right=12pt, top=10pt, bottom=10pt,
+  fonttitle=\bfseries, coltitle=white, colbacktitle=accentblue,
+  attach boxed title to top left={xshift=10pt, yshift=-3mm},
+  boxed title style={sharp corners, boxrule=0pt, arc=2pt,
+                     left=6pt, right=6pt, top=2pt, bottom=2pt},
+  title={#1}
+}
+
+%% ─── ヘッダー／フッター ─────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{headerblue}生成AI利用申告書}
+\fancyhead[R]{\small\color{headerblue}\assignname}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+%% ─── リスト・表 ─────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{enumitem}
+\setlist{nosep, leftmargin=1.5em}
+
+%% ─── チェックボックス ───────────────────────
+\usepackage{amssymb}
+\newcommand{\cboxon}{$\boxtimes$\ }
+\newcommand{\cboxoff}{$\square$\ }
+
+%% ─── コードブロック（listings + plistings）──
+\usepackage{listings}
+\usepackage{plistings}
+
+\lstdefinestyle{promptstyle}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single, framerule=0.4pt, rulecolor=\color{accentblue!60},
+  breaklines=true, breakatwhitespace=false,
+  xleftmargin=8pt, xrightmargin=8pt,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+\lstdefinestyle{cppstyle}{
+  language=C++,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{accentblue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{okgreen},
+  numberstyle=\tiny\color{gray},
+  numbers=left, numbersep=8pt,
+  frame=single, framerule=0.5pt, rulecolor=\color{accentblue},
+  backgroundcolor=\color{codebg},
+  breaklines=true, breakatwhitespace=false,
+  tabsize=2, showstringspaces=false,
+  xleftmargin=15pt, framexleftmargin=15pt,
+  morekeywords={uint8_t,uint16_t,uint32_t,int16_t,int32_t,setup,loop,analogRead,Serial},
+}
+
+%% ─── 課題メタ情報 ───────────────────────────
+\newcommand{\assignname}{提出課題1 (HCK02\_01.ino)}
+
+%% ─── hyperref ───────────────────────────────
+\usepackage[dvipdfmx]{hyperref}
+\usepackage{pxjahyper}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=accentblue, urlcolor=accentblue, citecolor=accentblue,
+  pdftitle={生成AI利用申告書 提出課題1},
+  pdfauthor={Shiozawa Takumi}
+}
+
+%% ─── TODO 強調マクロ ────────────────────────
+\newcommand{\todo}[1]{\textcolor{warnred}{\textbf{[TODO: #1]}}}
+
+%% ============================================================
+\begin{document}
+
+%% ─── タイトル ───────────────────────────────
+\begin{center}
+  {\LARGE\bfseries\color{headerblue}生成AI利用申告書}\\[2pt]
+  {\small\color{accentblue}\assignname}
+\end{center}
+\vspace{2pt}
+\textcolor{accentblue}{\rule{\textwidth}{1.2pt}}
+\vspace{6pt}
+
+%% ─── 基本情報 ───────────────────────────────
+\noindent
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+  \textbf{氏\ 名}               & 塩澤 拓海 \\
+  \textbf{学籍番号}             & \todo{学籍番号を記入} \\
+  \textbf{プログラムファイル名} & \texttt{HCK02\_01.ino} \\
+  \textbf{使用したAIツール}     & Claude Code (Opus 4.7) \\
+\end{tabularx}
+
+\vspace{10pt}
+
+%% ============================================================
+%%  1. 何に使ったか
+%% ============================================================
+\begin{itembox}{1.\ 何に使ったか}
+例題2 (\texttt{work3.ino}) のシリアル出力プログラムについて、
+以下の3点で生成AIを利用した。
+\begin{itemize}
+  \item シリアルプロッタで音声波形がきれいに描画されない原因の診断
+  \item 修正方針（ボーレート・DCオフセット除去・サンプリング間隔・出力ラベル）の洗い出し
+  \item 修正後コードのコメント推敲
+\end{itemize}
+\end{itembox}
+
+%% ============================================================
+%%  2. AIへの指示（プロンプト）
+%% ============================================================
+\begin{itembox}{2.\ AIへの指示（プロンプト）}
+実際にAIへ送った指示のうち、主要なものを以下に示す。
+
+\begin{lstlisting}[style=promptstyle]
+例題2 (work3.ino) のコードを読んで、Arduinoのシリアルプロッタに
+音声波形がきれいに表示されない原因を診断してほしい。
+
+以下の観点で問題点を洗い出して、修正方針を箇条書きで出して:
+- ボーレート設定
+- DCオフセット除去の仕方
+- サンプリング間隔
+- シリアルプロッタに出力するデータの種類とスケール
+- 変数名やコメントで直すべきところ
+\end{lstlisting}
+
+\begin{lstlisting}[style=promptstyle]
+一緒に HCK02_01.ino として修正版を作りたい。
+例題2 からの変更点をコメントで明示して、
+あとで自分の言葉で説明できる形にしてほしい。
+\end{lstlisting}
+\end{itembox}
+
+%% ============================================================
+%%  3. AIの出力の使い方
+%% ============================================================
+\begin{itembox}{3.\ AIの出力の使い方}
+\cboxoff そのまま使った\quad
+\cboxon 一部修正して使った\quad
+\cboxoff 参考にしただけ
+
+\vspace{6pt}
+\textbf{選んだ理由：}
+AIが挙げた原因と修正方針のうち、以下は妥当と判断して採用した：
+\begin{itemize}
+  \item 実測値 (0--1023) と振幅 (V単位) を同時に出力しているため、
+        プロッタのY軸が整数側に引っ張られて振幅波形がつぶれる問題
+  \item DCオフセットを固定値 (1.65V) で引いているため、
+        実際のバイアスが違うと中心が0にならない問題 $\rightarrow$ EWMAによる動的追従に変更
+  \item \texttt{delay} がないためシリアル送信バッファが溢れ、
+        波形がガタつく問題 $\rightarrow$ \texttt{delayMicroseconds(500)} で 2\,kHz サンプリングに固定
+  \item ボーレート 921600 は Arduino IDE のシリアルプロッタで
+        取りこぼしが起きやすいので 115200 に下げる
+\end{itemize}
+一方で、以下は自分で調整・判断した：
+\begin{itemize}
+  \item EWMA の時定数 (\texttt{ALPHA\_DC}=0.001 / \texttt{ALPHA\_LP}=0.2) は
+        AIの提案値をそのまま採用せず、マイク回路の特性を見ながら決める方針にした
+  \item 出力ラベルは日本語だと環境依存で文字化けするリスクがあるので
+        英字 (\texttt{signal}, \texttt{ref\_hi}, \texttt{ref\_lo}) に変更
+  \item 参照電圧は基板依存（UNO なら 5.0V、XIAO/ESP32 なら 3.3V）なので、
+        \texttt{\#define VREF} で切り替えやすくしコメントで明示
+\end{itemize}
+\end{itembox}
+
+%% ============================================================
+%%  4. 正しいと確認した方法
+%% ============================================================
+\begin{itembox}{4.\ 正しいと確認した方法}
+\todo{実機テスト後に具体的な観測内容を記入する}
+
+想定している確認手順（実機テストで実施する）：
+\begin{itemize}
+  \item Arduino IDE でコンパイルが通ることを確認する
+  \item シリアルモニタを 115200\,bps で開き、数値が流れることを確認する
+  \item シリアルプロッタに切り替え、\texttt{signal} \texttt{ref\_hi} \texttt{ref\_lo} の3本が見えることを確認する
+  \item 無音時に \texttt{signal} が 0 付近に収束することを観察する（DC追従の確認）
+  \item マイクに声をかけると \texttt{signal} が上下に振動することを観察する
+  \item コードを1行ずつ読み、EWMA 式 \(y_n = \alpha x + (1-\alpha) y_{n-1}\) の意味を説明できる状態にする
+\end{itemize}
+\end{itembox}
+
+%% ============================================================
+%%  5. 問題や間違い
+%% ============================================================
+\begin{itembox}{5.\ 問題や間違い}
+\cboxoff あった\quad
+\cboxoff なかった
+
+\vspace{6pt}
+\todo{実機テスト後に、実際に気づいた問題や AI の誤り・自分が気づいた点を記入する}
+
+\textbf{検証予定ポイント（実機で確認する）：}
+\begin{itemize}
+  \item EWMA の初期値 \texttt{dc = 512.0f} が、
+        起動直後に実際のDCバイアスに収束するまで何秒かかるか
+  \item \texttt{ALPHA\_DC=0.001} で DC 追従が遅すぎて、
+        長めの声など低周波成分まで消してしまわないか
+  \item ボーレート 115200 + \texttt{delayMicroseconds(500)} + 3 トレース出力で
+        シリアル送信が間に合うか（取りこぼしが起きないか）
+\end{itemize}
+\end{itembox}
+
+%% ============================================================
+%%  6. 自分で工夫した点
+%% ============================================================
+\begin{itembox}{6.\ 自分で工夫した点}
+\begin{itemize}
+  \item \texttt{HCK02\_01.ino} の冒頭に「例題2 (\texttt{work3.ino}) からの変更点」を
+        コメントでまとめ、後から自分や他のメンバーが変更理由を追えるようにした
+  \item シリアルプロッタ用ラベルを英字にし、Arduino IDE のバージョンや OS が
+        変わっても文字化けしないようにした
+  \item 参照電圧を \texttt{\#define VREF} で定数化し、UNO / XIAO 等 どの基板でも
+        1行書き換えるだけで対応できる形にした
+  \item EWMA の係数は定数名 (\texttt{ALPHA\_DC}, \texttt{ALPHA\_LP}) を
+        目的別に分けて命名し、何を制御しているかが読んで分かるようにした
+  \item \texttt{ref\_hi} / \texttt{ref\_lo} をあえて出力に混ぜることで、
+        プロッタのY軸範囲が振幅レンジ（$\pm$1.65V など）に固定されるようにした
+\end{itemize}
+\end{itembox}
+
+%% ============================================================
+%%  参考文献
+%% ============================================================
+\section*{参考文献}
+\begin{itemize}
+  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料, \texttt{references/lectures/})
+  \item Arduino Reference: \texttt{analogRead}, \texttt{analogReadResolution}, \texttt{Serial}
+        \url{https://docs.arduino.cc/language-reference/}
+  \item 例題2 オリジナルコード: \texttt{work/shiozawa/work-0422/work3/work3.ino}
+\end{itemize}
+
+\end{document}
