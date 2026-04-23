@@ -1,30 +1,35 @@
-#define BAUD 921600    // ボーレート（速め）
-#define PIN 0          // A0 アナログ出⼒
-#define RESOLUTION 10  // 量⼦化10bit
+// マイク波形を 3 系列（生値・上限・下限）で出力。
+// Serial 出力を整数に圧縮し、等間隔サンプリングで sin 波の表示密度を確保する。
+
+#define BAUD       921600  // ボーレート
+#define PIN        0       // A0 アナログ入力
+#define RESOLUTION 10      // 量子化 10bit
+#define SAMPLE_US  150     // サンプリング周期 [µs] → 約 6.6 kHz
+
+static uint32_t nextSampleUs = 0;
+
 void setup() {
-  // マイクのポートを指定
   pinMode(PIN, INPUT);
-  // シリアル通信の速度を設定(bit per second)
   Serial.begin(BAUD);
-  // アナログ読み込みの量⼦化精度
   analogReadResolution(RESOLUTION);
+  nextSampleUs = micros();
 }
 
 void loop() {
-  // A0から読み込み
+  // 等間隔サンプリング：目標時刻まで busy wait。
+  // 符号付き比較で micros() の 32bit ラップアラウンドに耐える
+  while ((int32_t)(micros() - nextSampleUs) < 0) {
+    // 待機
+  }
+  nextSampleUs += SAMPLE_US;
+
   int d = analogRead(PIN);
-  // 読み込んだ値を量⼦化精度で規格化し，電圧を取得
-  float a = (float)d / (pow(2, RESOLUTION) - 1) * 5.0;
-  float maxa = 3.3 / 2.0; // 振幅最⼤値
-  a = a - maxa;           // 中⼼を0にする
-  float mina = -maxa;     // 振幅最⼩値
-  // シリアルモニタに出⼒
-  Serial.print("実測値:");
+
+  // ラベルなし・整数 3 系列（生値、上限ガイド、下限ガイド）
+  // プロッタ Y 軸を 0〜1023 に固定するためにガイド線を毎回出力
   Serial.print(d);
-  Serial.print(",振幅:");
-  Serial.print(a);
-  Serial.print(",最⼤振幅:");
-  Serial.print(maxa);
-  Serial.print(",最⼩振幅:");
-  Serial.println(mina);
+  Serial.print(',');
+  Serial.print((1 << RESOLUTION) - 1);
+  Serial.print(',');
+  Serial.println(0);
 }
