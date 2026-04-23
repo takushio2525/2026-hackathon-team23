@@ -2,6 +2,7 @@
 
 **ステータス**: Accepted
 **決定日**: 2026-04-21
+**決定の場**: チーム内オフライン検討（第1回と第2回の**間**）. 会議ベースではなく、第1回ミーティング（2026-04-15）で合意した 5 台構成（[ADR-0004](0004-ensemble-structure.md)）を前提に、firmware 実装方針としてリポジトリ上で確定したもの.
 **関連**: [ADR-0004](0004-ensemble-structure.md)（5台構成）、[`firmware/README.md`](../../firmware/README.md)
 
 ## 背景
