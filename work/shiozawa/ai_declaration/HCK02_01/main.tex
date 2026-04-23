@@ -6,163 +6,50 @@
 %% ============================================================
 \documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
 
-%% ─── レイアウト ─────────────────────────────
-\usepackage[top=25mm,bottom=25mm,left=20mm,right=20mm]{geometry}
-
-%% ─── 色定義（プロジェクト共通パレット）──────
-\usepackage{xcolor}
-\definecolor{headerblue}{HTML}{1B3A5C}
-\definecolor{accentblue}{HTML}{2E86C1}
-\definecolor{lightgray}{HTML}{F2F3F4}
-\definecolor{codebg}{HTML}{F7F9FB}
-\definecolor{warnred}{HTML}{E74C3C}
-\definecolor{noteyellow}{HTML}{F39C12}
-\definecolor{okgreen}{HTML}{27AE60}
-
-%% ─── 見出し ─────────────────────────────────
-\usepackage{titlesec}
-\usepackage{needspace}
-\titleformat{\section}
-  {\needspace{5\baselineskip}\Large\bfseries\color{headerblue}}
-  {\thesection}{1em}{}
-  [\vspace{-0.5em}\textcolor{accentblue}{\rule{\textwidth}{1.2pt}}]
-\titleformat{\subsection}
-  {\needspace{4\baselineskip}\large\bfseries\color{headerblue}}
-  {\thesubsection}{1em}{}
-
-%% ─── 改ページ制御 ───────────────────────────
-\widowpenalty=10000
-\clubpenalty=10000
-\predisplaypenalty=10000
-\interfootnotelinepenalty=10000
-\brokenpenalty=5000
-
-%% ─── tcolorbox ─────────────────────────────
-\usepackage[most]{tcolorbox}
-\tcbuselibrary{skins,breakable}
-\tcbset{before={\par\medskip\needspace{2\baselineskip}\noindent}}
-
-\newtcolorbox{itembox}[1]{%
-  enhanced, breakable,
-  colback=codebg, colframe=accentblue,
-  boxrule=0.5pt, arc=2pt,
-  left=12pt, right=12pt, top=10pt, bottom=10pt,
-  fonttitle=\bfseries, coltitle=white, colbacktitle=accentblue,
-  attach boxed title to top left={xshift=10pt, yshift=-3mm},
-  boxed title style={sharp corners, boxrule=0pt, arc=2pt,
-                     left=6pt, right=6pt, top=2pt, bottom=2pt},
-  title={#1}
-}
-
-%% ─── ヘッダー／フッター ─────────────────────
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small\color{headerblue}生成AI利用申告書}
-\fancyhead[R]{\small\color{headerblue}\assignname}
-\fancyfoot[C]{\small\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
-
-%% ─── リスト・表 ─────────────────────────────
-\usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{longtable}
-\usepackage{enumitem}
-\setlist{nosep, leftmargin=1.5em}
-
-%% ─── チェックボックス ───────────────────────
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
 \usepackage{amssymb}
-\newcommand{\cboxon}{$\boxtimes$\ }
-\newcommand{\cboxoff}{$\square$\ }
-
-%% ─── コードブロック（listings + plistings）──
 \usepackage{listings}
 \usepackage{plistings}
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+\usepackage{pxjahyper}
 
-\lstdefinestyle{promptstyle}{
+\lstset{
   basicstyle=\ttfamily\small,
-  backgroundcolor=\color{codebg},
-  frame=single, framerule=0.4pt, rulecolor=\color{accentblue!60},
-  breaklines=true, breakatwhitespace=false,
-  xleftmargin=8pt, xrightmargin=8pt,
+  frame=single,
+  breaklines=true,
+  xleftmargin=1em,
   aboveskip=6pt, belowskip=6pt,
   columns=flexible,
 }
-\lstdefinestyle{cppstyle}{
-  language=C++,
-  basicstyle=\ttfamily\footnotesize,
-  keywordstyle=\color{accentblue}\bfseries,
-  commentstyle=\color{gray}\itshape,
-  stringstyle=\color{okgreen},
-  numberstyle=\tiny\color{gray},
-  numbers=left, numbersep=8pt,
-  frame=single, framerule=0.5pt, rulecolor=\color{accentblue},
-  backgroundcolor=\color{codebg},
-  breaklines=true, breakatwhitespace=false,
-  tabsize=2, showstringspaces=false,
-  xleftmargin=15pt, framexleftmargin=15pt,
-  morekeywords={uint8_t,uint16_t,uint32_t,int16_t,int32_t,setup,loop,analogRead,Serial},
-}
 
-%% ─── 課題メタ情報 ───────────────────────────
-\newcommand{\assignname}{提出課題1 (HCK02\_01.ino)}
+\newcommand{\cboxon}{$\boxtimes$}
+\newcommand{\cboxoff}{$\square$}
+\newcommand{\todo}[1]{\textbf{[TODO: #1]}}
 
-%% ─── hyperref ───────────────────────────────
-\usepackage[dvipdfmx]{hyperref}
-\usepackage{pxjahyper}
-\hypersetup{
-  colorlinks=true,
-  linkcolor=accentblue, urlcolor=accentblue, citecolor=accentblue,
-  pdftitle={生成AI利用申告書 提出課題1},
-  pdfauthor={Shiozawa Takumi}
-}
-
-%% ─── TODO 強調マクロ ────────────────────────
-\newcommand{\todo}[1]{\textcolor{warnred}{\textbf{[TODO: #1]}}}
-
-%% ============================================================
 \begin{document}
 
-%% ─── タイトル ───────────────────────────────
-\begin{center}
-  {\LARGE\bfseries\color{headerblue}生成AI利用申告書}\\[2pt]
-  {\small\color{accentblue}\assignname}
-\end{center}
-\vspace{2pt}
-\textcolor{accentblue}{\rule{\textwidth}{1.2pt}}
-\vspace{6pt}
+{\LARGE\bfseries 生成AI利用申告書}
+\vspace{1em}
 
-%% ─── 基本情報 ───────────────────────────────
-\noindent
-\begin{tabularx}{\textwidth}{@{}l X@{}}
-  \textbf{氏\ 名}               & 塩澤 拓海 \\
-  \textbf{学籍番号}             & \todo{学籍番号を記入} \\
-  \textbf{プログラムファイル名} & \texttt{HCK02\_01.ino} \\
-  \textbf{使用したAIツール}     & Claude Code (Opus 4.7) \\
-\end{tabularx}
+\begin{itemize}
+  \item 氏名：塩澤 拓海
+  \item 学籍番号：\todo{学籍番号を記入}
+  \item プログラムファイル名：\texttt{HCK02\_01.ino}
+  \item 使用したAIツール：Claude Code (Opus 4.7)
+\end{itemize}
 
-\vspace{10pt}
-
-%% ============================================================
-%%  1. 何に使ったか
-%% ============================================================
-\begin{itembox}{1.\ 何に使ったか}
-例題2 (\texttt{work3.ino}) のシリアル出力プログラムについて、
-以下の3点で生成AIを利用した。
+\section*{1. 何に使ったか}
+例題2 (\texttt{work3.ino}) のシリアル出力プログラムについて、以下の3点で生成AIを利用した。
 \begin{itemize}
   \item シリアルプロッタで音声波形がきれいに描画されない原因の診断
-  \item 修正方針（ボーレート・DCオフセット除去・サンプリング間隔・出力ラベル）の洗い出し
+  \item 修正方針（DCオフセット除去・サンプリング間隔・出力内容）の洗い出し
   \item 修正後コードのコメント推敲
 \end{itemize}
-\end{itembox}
 
-%% ============================================================
-%%  2. AIへの指示（プロンプト）
-%% ============================================================
-\begin{itembox}{2.\ AIへの指示（プロンプト）}
-実際にAIへ送った指示のうち、主要なものを以下に示す。
+\section*{2. AIへの指示（プロンプト）}
+AIへ送った指示のうち、主要なものを以下に示す。
 
-\begin{lstlisting}[style=promptstyle]
+\begin{lstlisting}
 例題2 (work3.ino) のコードを読んで、Arduinoのシリアルプロッタに
 音声波形がきれいに表示されない原因を診断してほしい。
 
@@ -174,111 +61,69 @@
 - 変数名やコメントで直すべきところ
 \end{lstlisting}
 
-\begin{lstlisting}[style=promptstyle]
+\begin{lstlisting}
 一緒に HCK02_01.ino として修正版を作りたい。
 例題2 からの変更点をコメントで明示して、
 あとで自分の言葉で説明できる形にしてほしい。
 \end{lstlisting}
-\end{itembox}
 
-%% ============================================================
-%%  3. AIの出力の使い方
-%% ============================================================
-\begin{itembox}{3.\ AIの出力の使い方}
-\cboxoff そのまま使った\quad
-\cboxon 一部修正して使った\quad
-\cboxoff 参考にしただけ
+\section*{3. AIの出力の使い方}
+\begin{itemize}
+  \item \cboxoff そのまま使った
+  \item \cboxon 一部修正して使った
+  \item \cboxoff 参考にしただけ
+\end{itemize}
+$\rightarrow$ 上で選んだ理由：
 
-\vspace{6pt}
-\textbf{選んだ理由：}
 AIが挙げた原因と修正方針のうち、以下は妥当と判断して \texttt{HCK02\_01.ino} に採用した：
 \begin{itemize}
-  \item 実測値 (0--1023) と振幅 (V単位) を同時に出力しているため、
-        プロッタのY軸が整数側に引っ張られて振幅波形がつぶれる問題
-        $\rightarrow$ 実測値の出力を撤去し、振幅系の3トレースだけ出す
-  \item DCオフセットを固定値 (1.65V) で引いているため、
-        実際のバイアスが違うと中心が0にならない問題
-        $\rightarrow$ EWMA による動的追従 (\texttt{ALPHA\_DC}=0.001) に変更
-  \item \texttt{delay} がないためシリアル送信バッファが溢れ、
-        波形がガタつく問題
-        $\rightarrow$ \texttt{delayMicroseconds(500)} で 2\,kHz サンプリングに固定
+  \item 実測値 (0--1023) と振幅 (V単位) を同時出力しているためプロッタのY軸が整数側に引っ張られて振幅波形がつぶれる問題 $\rightarrow$ 実測値の出力を撤去し、振幅系の3トレースだけ出す
+  \item DCオフセットを固定値 (1.65V) で引いているため実際のバイアスが違うと中心が0にならない問題 $\rightarrow$ EWMA による動的追従 (\texttt{ALPHA\_DC}=0.001) に変更
+  \item \texttt{delay} がなくシリアル送信バッファが溢れて波形がガタつく問題 $\rightarrow$ \texttt{delayMicroseconds(500)} で 2\,kHz サンプリングに固定
 \end{itemize}
-一方で、AIから以下の追加提案もあったが、\textbf{実機で動作確認していない現段階では採用を保留}している：
-\begin{itemize}
-  \item ボーレート 921600 $\rightarrow$ 115200 への変更
-        （実機で取りこぼしが確認できてから判断する）
-  \item 出力ラベルを日本語から英字 (\texttt{signal}/\texttt{ref\_hi}/\texttt{ref\_lo}) へ変更
-        （手元環境で文字化けが実際に起きてから判断する）
-  \item 参照電圧を \texttt{\#define VREF} で定数化
-        （基板を切り替える必要が出たら導入する）
-\end{itemize}
-EWMA の時定数 (\texttt{ALPHA\_DC}=0.001 / \texttt{ALPHA\_LP}=0.2) は
-AIの提案値をそのまま採用せず、実機でマイク回路の特性を見ながら調整する方針にしている。
-\end{itembox}
+一方で、AIから追加提案された「ボーレート 921600 $\rightarrow$ 115200 への変更」「出力ラベルの英字化」「参照電圧の定数化」は、実機で動作確認していない現段階では採用を保留している。実機テストで実際に問題が起きた段階で判断する。
 
-%% ============================================================
-%%  4. 正しいと確認した方法
-%% ============================================================
-\begin{itembox}{4.\ 正しいと確認した方法}
+EWMA の時定数 (\texttt{ALPHA\_DC}=0.001 / \texttt{ALPHA\_LP}=0.2) はAIの提案値をそのまま採用せず、実機でマイク回路の特性を見ながら調整する方針。
+
+\section*{4. 正しいと確認した方法}
 \todo{実機テスト後に具体的な観測内容を記入する}
 
-想定している確認手順（実機テストで実施する）：
+想定している確認手順：
 \begin{itemize}
   \item Arduino IDE でコンパイルが通ることを確認する
   \item シリアルモニタを 921600\,bps で開き、数値が流れることを確認する
   \item シリアルプロッタに切り替え、「振幅 / 最大振幅 / 最小振幅」の3本が見えることを確認する
   \item 無音時に「振幅」が 0 付近に収束することを観察する（DC 追従の確認）
   \item マイクに声をかけると「振幅」が上下に振動することを観察する
-  \item コードを1行ずつ読み、EWMA 式 \(y_n = \alpha x + (1-\alpha) y_{n-1}\) の意味を説明できる状態にする
+  \item コードを1行ずつ読み、EWMA 式 $y_n = \alpha x + (1-\alpha) y_{n-1}$ の意味を説明できる状態にする
 \end{itemize}
-\end{itembox}
 
-%% ============================================================
-%%  5. 問題や間違い
-%% ============================================================
-\begin{itembox}{5.\ 問題や間違い}
-\cboxoff あった\quad
-\cboxoff なかった
-
-\vspace{6pt}
+\section*{5. 問題や間違い}
+\begin{itemize}
+  \item \cboxoff あった
+  \item \cboxoff なかった
+\end{itemize}
 \todo{実機テスト後に、実際に気づいた問題や AI の誤り・自分が気づいた点を記入する}
 
-\textbf{検証予定ポイント（実機で確認する）：}
+検証予定ポイント：
 \begin{itemize}
-  \item EWMA の初期値 \texttt{dc = 512.0f} が、
-        起動直後に実際の DC バイアスに収束するまで何秒かかるか
-  \item \texttt{ALPHA\_DC=0.001} で DC 追従が遅すぎて、
-        長めの声など低周波成分まで消してしまわないか
-  \item ボーレート 921600 + \texttt{delayMicroseconds(500)} + 3 トレース出力で
-        シリアル送信が間に合うか（取りこぼしが起きるようなら 115200 へ下げることを検討）
+  \item EWMA の初期値 \texttt{dc = 512.0f} が、起動直後に実際の DC バイアスに収束するまで何秒かかるか
+  \item \texttt{ALPHA\_DC=0.001} で DC 追従が遅すぎて、長めの声など低周波成分まで消してしまわないか
+  \item ボーレート 921600 + \texttt{delayMicroseconds(500)} + 3 トレース出力でシリアル送信が間に合うか（取りこぼしが起きるようなら 115200 へ下げることを検討）
 \end{itemize}
-\end{itembox}
 
-%% ============================================================
-%%  6. 自分で工夫した点
-%% ============================================================
-\begin{itembox}{6.\ 自分で工夫した点}
+\section*{6. 自分で工夫した点}
 \begin{itemize}
-  \item 例題2 が「実測値 (0--1023) と振幅 (V 単位) を同じプロッタに出していた」
-        ために波形がつぶれる問題を自分で理解し、振幅系の3トレースのみに絞って出力した
-  \item 固定値で DC を引いていたのを EWMA による動的追従に書き換え、
-        追従用 (\texttt{ALPHA\_DC}) とノイズ除去用 (\texttt{ALPHA\_LP}) の
-        係数を目的別に分けて命名した
-  \item \texttt{delayMicroseconds(500)} でサンプリング間隔を 2\,kHz に固定し、
-        送信タイミングを安定させた
-  \item 「最大振幅」「最小振幅」を定数として常に出力することで、
-        プロッタのY軸範囲が振幅レンジ（$\pm$1.65\,V）に張り付くようにした
+  \item 例題2 が「実測値 (0--1023) と振幅 (V 単位) を同じプロッタに出していた」ために波形がつぶれる問題を自分で理解し、振幅系の3トレースのみに絞って出力した
+  \item 固定値で DC を引いていたのを EWMA による動的追従に書き換え、追従用 (\texttt{ALPHA\_DC}) とノイズ除去用 (\texttt{ALPHA\_LP}) の係数を目的別に分けて命名した
+  \item \texttt{delayMicroseconds(500)} でサンプリング間隔を 2\,kHz に固定し、送信タイミングを安定させた
+  \item 「最大振幅」「最小振幅」を定数として常に出力することで、プロッタのY軸範囲が振幅レンジ ($\pm$1.65\,V) に張り付くようにした
 \end{itemize}
-\end{itembox}
 
-%% ============================================================
-%%  参考文献
-%% ============================================================
 \section*{参考文献}
 \begin{itemize}
-  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料, \texttt{references/lectures/})
-  \item Arduino Reference: \texttt{analogRead}, \texttt{analogReadResolution}, \texttt{Serial}
-        \url{https://docs.arduino.cc/language-reference/}
+  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料, \texttt{references/lectures/}）
+  \item Arduino Reference: \texttt{analogRead}, \texttt{analogReadResolution}, \texttt{Serial} \url{https://docs.arduino.cc/language-reference/}
   \item 例題2 オリジナルコード: \texttt{work/shiozawa/work-0422/work3/work3.ino}
 \end{itemize}
 
