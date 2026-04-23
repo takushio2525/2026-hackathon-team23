@@ -191,26 +191,29 @@
 
 \vspace{6pt}
 \textbf{選んだ理由：}
-AIが挙げた原因と修正方針のうち、以下は妥当と判断して採用した：
+AIが挙げた原因と修正方針のうち、以下は妥当と判断して \texttt{HCK02\_01.ino} に採用した：
 \begin{itemize}
   \item 実測値 (0--1023) と振幅 (V単位) を同時に出力しているため、
         プロッタのY軸が整数側に引っ張られて振幅波形がつぶれる問題
+        $\rightarrow$ 実測値の出力を撤去し、振幅系の3トレースだけ出す
   \item DCオフセットを固定値 (1.65V) で引いているため、
-        実際のバイアスが違うと中心が0にならない問題 $\rightarrow$ EWMAによる動的追従に変更
+        実際のバイアスが違うと中心が0にならない問題
+        $\rightarrow$ EWMA による動的追従 (\texttt{ALPHA\_DC}=0.001) に変更
   \item \texttt{delay} がないためシリアル送信バッファが溢れ、
-        波形がガタつく問題 $\rightarrow$ \texttt{delayMicroseconds(500)} で 2\,kHz サンプリングに固定
-  \item ボーレート 921600 は Arduino IDE のシリアルプロッタで
-        取りこぼしが起きやすいので 115200 に下げる
+        波形がガタつく問題
+        $\rightarrow$ \texttt{delayMicroseconds(500)} で 2\,kHz サンプリングに固定
 \end{itemize}
-一方で、以下は自分で調整・判断した：
+一方で、AIから以下の追加提案もあったが、\textbf{実機で動作確認していない現段階では採用を保留}している：
 \begin{itemize}
-  \item EWMA の時定数 (\texttt{ALPHA\_DC}=0.001 / \texttt{ALPHA\_LP}=0.2) は
-        AIの提案値をそのまま採用せず、マイク回路の特性を見ながら決める方針にした
-  \item 出力ラベルは日本語だと環境依存で文字化けするリスクがあるので
-        英字 (\texttt{signal}, \texttt{ref\_hi}, \texttt{ref\_lo}) に変更
-  \item 参照電圧は基板依存（UNO なら 5.0V、XIAO/ESP32 なら 3.3V）なので、
-        \texttt{\#define VREF} で切り替えやすくしコメントで明示
+  \item ボーレート 921600 $\rightarrow$ 115200 への変更
+        （実機で取りこぼしが確認できてから判断する）
+  \item 出力ラベルを日本語から英字 (\texttt{signal}/\texttt{ref\_hi}/\texttt{ref\_lo}) へ変更
+        （手元環境で文字化けが実際に起きてから判断する）
+  \item 参照電圧を \texttt{\#define VREF} で定数化
+        （基板を切り替える必要が出たら導入する）
 \end{itemize}
+EWMA の時定数 (\texttt{ALPHA\_DC}=0.001 / \texttt{ALPHA\_LP}=0.2) は
+AIの提案値をそのまま採用せず、実機でマイク回路の特性を見ながら調整する方針にしている。
 \end{itembox}
 
 %% ============================================================
@@ -222,10 +225,10 @@ AIが挙げた原因と修正方針のうち、以下は妥当と判断して採
 想定している確認手順（実機テストで実施する）：
 \begin{itemize}
   \item Arduino IDE でコンパイルが通ることを確認する
-  \item シリアルモニタを 115200\,bps で開き、数値が流れることを確認する
-  \item シリアルプロッタに切り替え、\texttt{signal} \texttt{ref\_hi} \texttt{ref\_lo} の3本が見えることを確認する
-  \item 無音時に \texttt{signal} が 0 付近に収束することを観察する（DC追従の確認）
-  \item マイクに声をかけると \texttt{signal} が上下に振動することを観察する
+  \item シリアルモニタを 921600\,bps で開き、数値が流れることを確認する
+  \item シリアルプロッタに切り替え、「振幅 / 最大振幅 / 最小振幅」の3本が見えることを確認する
+  \item 無音時に「振幅」が 0 付近に収束することを観察する（DC 追従の確認）
+  \item マイクに声をかけると「振幅」が上下に振動することを観察する
   \item コードを1行ずつ読み、EWMA 式 \(y_n = \alpha x + (1-\alpha) y_{n-1}\) の意味を説明できる状態にする
 \end{itemize}
 \end{itembox}
@@ -243,11 +246,11 @@ AIが挙げた原因と修正方針のうち、以下は妥当と判断して採
 \textbf{検証予定ポイント（実機で確認する）：}
 \begin{itemize}
   \item EWMA の初期値 \texttt{dc = 512.0f} が、
-        起動直後に実際のDCバイアスに収束するまで何秒かかるか
+        起動直後に実際の DC バイアスに収束するまで何秒かかるか
   \item \texttt{ALPHA\_DC=0.001} で DC 追従が遅すぎて、
         長めの声など低周波成分まで消してしまわないか
-  \item ボーレート 115200 + \texttt{delayMicroseconds(500)} + 3 トレース出力で
-        シリアル送信が間に合うか（取りこぼしが起きないか）
+  \item ボーレート 921600 + \texttt{delayMicroseconds(500)} + 3 トレース出力で
+        シリアル送信が間に合うか（取りこぼしが起きるようなら 115200 へ下げることを検討）
 \end{itemize}
 \end{itembox}
 
@@ -256,16 +259,15 @@ AIが挙げた原因と修正方針のうち、以下は妥当と判断して採
 %% ============================================================
 \begin{itembox}{6.\ 自分で工夫した点}
 \begin{itemize}
-  \item \texttt{HCK02\_01.ino} の冒頭に「例題2 (\texttt{work3.ino}) からの変更点」を
-        コメントでまとめ、後から自分や他のメンバーが変更理由を追えるようにした
-  \item シリアルプロッタ用ラベルを英字にし、Arduino IDE のバージョンや OS が
-        変わっても文字化けしないようにした
-  \item 参照電圧を \texttt{\#define VREF} で定数化し、UNO / XIAO 等 どの基板でも
-        1行書き換えるだけで対応できる形にした
-  \item EWMA の係数は定数名 (\texttt{ALPHA\_DC}, \texttt{ALPHA\_LP}) を
-        目的別に分けて命名し、何を制御しているかが読んで分かるようにした
-  \item \texttt{ref\_hi} / \texttt{ref\_lo} をあえて出力に混ぜることで、
-        プロッタのY軸範囲が振幅レンジ（$\pm$1.65V など）に固定されるようにした
+  \item 例題2 が「実測値 (0--1023) と振幅 (V 単位) を同じプロッタに出していた」
+        ために波形がつぶれる問題を自分で理解し、振幅系の3トレースのみに絞って出力した
+  \item 固定値で DC を引いていたのを EWMA による動的追従に書き換え、
+        追従用 (\texttt{ALPHA\_DC}) とノイズ除去用 (\texttt{ALPHA\_LP}) の
+        係数を目的別に分けて命名した
+  \item \texttt{delayMicroseconds(500)} でサンプリング間隔を 2\,kHz に固定し、
+        送信タイミングを安定させた
+  \item 「最大振幅」「最小振幅」を定数として常に出力することで、
+        プロッタのY軸範囲が振幅レンジ（$\pm$1.65\,V）に張り付くようにした
 \end{itemize}
 \end{itembox}
 
