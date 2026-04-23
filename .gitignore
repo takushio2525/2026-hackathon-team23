@@ -52,6 +52,7 @@ build/
 *.ist
 # 生成 PDF（手元で Docker コンパイルして確認する運用）
 report/main.pdf
+work/shiozawa/ai_declaration/**/main.pdf
 
 # ===== Processing =====
 *.pde.bak

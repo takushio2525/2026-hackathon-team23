@@ -1,0 +1,221 @@
+%% ============================================================
+%%  生成AI利用申告書 — テンプレート
+%%  ハッカソン1 提出課題用 (塩澤 / 2026)
+%%  コンパイル: docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%%              ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+%% ============================================================
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+%% ─── レイアウト ─────────────────────────────
+\usepackage[top=25mm,bottom=25mm,left=20mm,right=20mm]{geometry}
+
+%% ─── 色定義（プロジェクト共通パレット）──────
+\usepackage{xcolor}
+\definecolor{headerblue}{HTML}{1B3A5C}
+\definecolor{accentblue}{HTML}{2E86C1}
+\definecolor{lightgray}{HTML}{F2F3F4}
+\definecolor{codebg}{HTML}{F7F9FB}
+\definecolor{warnred}{HTML}{E74C3C}
+\definecolor{noteyellow}{HTML}{F39C12}
+\definecolor{okgreen}{HTML}{27AE60}
+
+%% ─── 見出し ─────────────────────────────────
+\usepackage{titlesec}
+\usepackage{needspace}
+\titleformat{\section}
+  {\needspace{5\baselineskip}\Large\bfseries\color{headerblue}}
+  {\thesection}{1em}{}
+  [\vspace{-0.5em}\textcolor{accentblue}{\rule{\textwidth}{1.2pt}}]
+\titleformat{\subsection}
+  {\needspace{4\baselineskip}\large\bfseries\color{headerblue}}
+  {\thesubsection}{1em}{}
+
+%% ─── 改ページ制御 ───────────────────────────
+\widowpenalty=10000
+\clubpenalty=10000
+\predisplaypenalty=10000
+\interfootnotelinepenalty=10000
+\brokenpenalty=5000
+
+%% ─── tcolorbox ─────────────────────────────
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\tcbset{before={\par\medskip\needspace{2\baselineskip}\noindent}}
+
+% 申告書の各項目を囲む共通ボックス
+\newtcolorbox{itembox}[1]{%
+  enhanced, breakable,
+  colback=codebg, colframe=accentblue,
+  boxrule=0.5pt, arc=2pt,
+  left=12pt, right=12pt, top=10pt, bottom=10pt,
+  fonttitle=\bfseries, coltitle=white, colbacktitle=accentblue,
+  attach boxed title to top left={xshift=10pt, yshift=-3mm},
+  boxed title style={sharp corners, boxrule=0pt, arc=2pt,
+                     left=6pt, right=6pt, top=2pt, bottom=2pt},
+  title={#1}
+}
+
+%% ─── ヘッダー／フッター ─────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{headerblue}生成AI利用申告書}
+\fancyhead[R]{\small\color{headerblue}\assignname}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+%% ─── リスト・表 ─────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{enumitem}
+\setlist{nosep, leftmargin=1.5em}
+
+%% ─── チェックボックス ───────────────────────
+\usepackage{amssymb}
+\newcommand{\cboxon}{$\boxtimes$\ }
+\newcommand{\cboxoff}{$\square$\ }
+
+%% ─── コードブロック（listings + plistings）──
+\usepackage{listings}
+\usepackage{plistings}  % 日本語コメント混在時の文字幅補正
+
+\lstdefinestyle{promptstyle}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single, framerule=0.4pt, rulecolor=\color{accentblue!60},
+  breaklines=true, breakatwhitespace=false,
+  xleftmargin=8pt, xrightmargin=8pt,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+\lstdefinestyle{cppstyle}{
+  language=C++,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{accentblue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{okgreen},
+  numberstyle=\tiny\color{gray},
+  numbers=left, numbersep=8pt,
+  frame=single, framerule=0.5pt, rulecolor=\color{accentblue},
+  backgroundcolor=\color{codebg},
+  breaklines=true, breakatwhitespace=false,
+  tabsize=2, showstringspaces=false,
+  xleftmargin=15pt, framexleftmargin=15pt,
+  morekeywords={uint8_t,uint16_t,uint32_t,int16_t,int32_t,setup,loop,analogRead,Serial},
+}
+
+%% ─── 課題メタ情報（サブ文書で \renewcommand して上書き）──
+\newcommand{\assignname}{提出課題 X}
+
+%% ─── hyperref（プリアンブル最後）────────────
+\usepackage[dvipdfmx]{hyperref}
+\usepackage{pxjahyper}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=accentblue,
+  urlcolor=accentblue,
+  citecolor=accentblue,
+  pdftitle={生成AI利用申告書},
+  pdfauthor={Shiozawa Takumi}
+}
+
+%% ============================================================
+\begin{document}
+
+%% ─── タイトル ───────────────────────────────
+\begin{center}
+  {\LARGE\bfseries\color{headerblue}生成AI利用申告書}\\[2pt]
+  {\small\color{accentblue}\assignname}
+\end{center}
+\vspace{2pt}
+\textcolor{accentblue}{\rule{\textwidth}{1.2pt}}
+\vspace{6pt}
+
+%% ─── 基本情報 ───────────────────────────────
+\noindent
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+  \textbf{氏\ 名}               & 塩澤 拓海 \\
+  \textbf{学籍番号}             & (学籍番号を記入) \\
+  \textbf{プログラムファイル名} & \texttt{HCK02\_0X.ino}（該当する課題に合わせて書く） \\
+  \textbf{使用したAIツール}     & Claude Code (Opus 4.7) \\
+\end{tabularx}
+
+\vspace{10pt}
+
+%% ============================================================
+%%  1. 何に使ったか
+%% ============================================================
+\begin{itembox}{1.\ 何に使ったか}
+% 今回の課題で、生成AIをどの部分に使ったかを書く。
+% 例：エラー修正／コード作成／アイデア出し／例題の問題点診断／コメント推敲
+（ここに記入）
+\end{itembox}
+
+%% ============================================================
+%%  2. AIへの指示（プロンプト）
+%% ============================================================
+\begin{itembox}{2.\ AIへの指示（プロンプト）}
+AIにどのような質問・指示を出したか、重要なものを1〜2個引用する。
+
+\begin{lstlisting}[style=promptstyle]
+（ここにプロンプトを貼り付ける）
+\end{lstlisting}
+\end{itembox}
+
+%% ============================================================
+%%  3. AIの出力の使い方
+%% ============================================================
+\begin{itembox}{3.\ AIの出力の使い方}
+\cboxoff そのまま使った\quad
+\cboxoff 一部修正して使った\quad
+\cboxoff 参考にしただけ
+
+\vspace{4pt}
+\textbf{選んだ理由：}
+（具体的に、どの出力をどう採用／修正／参考にしたかを書く）
+\end{itembox}
+
+%% ============================================================
+%%  4. 正しいと確認した方法
+%% ============================================================
+\begin{itembox}{4.\ 正しいと確認した方法}
+AIの出力が正しいと、どのように確認したか。具体的な手順を書く。
+
+\begin{itemize}
+  \item （例）Arduino IDE のシリアルプロッタでマイクに声をかけたときの波形を観測した
+  \item （例）無音時に信号値が0付近に収束することを確認した
+  \item （例）コードを1行ずつ読み、EWMAの係数が何を意味するか理解した
+\end{itemize}
+\end{itembox}
+
+%% ============================================================
+%%  5. 問題や間違い
+%% ============================================================
+\begin{itembox}{5.\ 問題や間違い}
+\cboxoff あった\quad
+\cboxoff なかった（※「本当に？」と思って確認した内容を書くこと）
+
+\vspace{4pt}
+\textbf{確認した内容や気づいたこと：}
+（ここに記入）
+\end{itembox}
+
+%% ============================================================
+%%  6. 自分で工夫した点
+%% ============================================================
+\begin{itembox}{6.\ 自分で工夫した点}
+最終的なプログラムの中で、自分で考えて工夫したところを書く。
+（ここに記入）
+\end{itembox}
+
+%% ============================================================
+%%  参考文献
+%% ============================================================
+\section*{参考文献}
+\begin{itemize}
+  \item 生成AI利用申告書テンプレート（ハッカソン1講義資料）
+  \item （その他参考にしたWebページ・書籍があれば記載）
+\end{itemize}
+
+\end{document}
