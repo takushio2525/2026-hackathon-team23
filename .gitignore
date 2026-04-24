@@ -54,7 +54,6 @@ build/
 report/main.pdf
 # 生成AI利用申告書のテンプレート/各回コピー先で生成される PDF
 work/shiozawa/ai_declaration_template/main.pdf
-work/shiozawa/**/ai_declation/**/main.pdf
 work/shiozawa/**/ai_declaration/**/main.pdf
 
 # ===== Processing =====

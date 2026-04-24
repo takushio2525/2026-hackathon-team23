@@ -21,7 +21,7 @@ work/shiozawa/
     ├── HCK02_01/              ← Arduino スケッチ（提出物）
     ├── HCK02_01.zip           ← 提出用ZIP
     ├── work1/, work2/, work3/, work2_processing/   ← 例題・試作
-    └── ai_declation/          ← その回の生成AI利用申告書（埋めた実体）
+    └── ai_declaration/          ← その回の生成AI利用申告書（埋めた実体）
         └── HCK02_01/
             ├── main.tex
             ├── .latexmkrc
@@ -31,29 +31,29 @@ work/shiozawa/
 
 ## 新しい課題の申告書を作る手順
 
-ここではテンプレートを `work-0422/ai_declation/HCK02_02/` に複製する例を示す。
+ここではテンプレートを `work-0422/ai_declaration/HCK02_02/` に複製する例を示す。
 日付やコース番号に合わせてパスを読み替える。
 
 1. テンプレートを複製
    ```bash
    # work/shiozawa/ をカレントとした場合
-   mkdir -p work-0422/ai_declation
-   cp -r ai_declaration_template work-0422/ai_declation/HCK02_02
+   mkdir -p work-0422/ai_declaration
+   cp -r ai_declaration_template work-0422/ai_declaration/HCK02_02
    ```
-2. `work-0422/ai_declation/HCK02_02/main.tex` を編集し、6項目と基本情報を埋める
+2. `work-0422/ai_declaration/HCK02_02/main.tex` を編集し、6項目と基本情報を埋める
 3. コンパイル
    ```bash
    # Docker Desktop が未起動なら起動してから
    docker info > /dev/null 2>&1 || (open -a Docker && until docker info > /dev/null 2>&1; do sleep 2; done)
 
    docker run --rm \
-     -v "$(pwd)/work-0422/ai_declation/HCK02_02:/workspace" \
+     -v "$(pwd)/work-0422/ai_declaration/HCK02_02:/workspace" \
      -w /workspace \
      ghcr.io/paperist/texlive-ja:debian latexmk main.tex
    ```
 4. 生成された `main.pdf` を提出用ファイル名にリネームして提出
    ```bash
-   cp work-0422/ai_declation/HCK02_02/main.pdf HCK02_02.pdf
+   cp work-0422/ai_declaration/HCK02_02/main.pdf HCK02_02.pdf
    ```
 
 ## 記入のポイント
