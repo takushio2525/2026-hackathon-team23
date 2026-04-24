@@ -9,6 +9,18 @@
 - 指揮者ノード（IMU ジェスチャ認識）と楽器ノード（パート演奏）の双方をカバーする
 - 設計書としての最終提出物は **PDF + TeX ソース** だが、内容合意までは Markdown で進める
 
+## 前提アーキテクチャ（重要）
+
+`firmware/` 配下は **Embedded-Module-Architecture（以下 EMA）** に全面準拠する
+（[ADR-0005](../../../../docs/decisions/0005-firmware-embedded-module-architecture.md)）。
+本設計書中の「3 フェーズループ」「`IModule`」「`SystemData`」「`ProjectConfig`」等の
+用語は、すべて EMA の定義に従う。
+
+EMA の参照資料は同階層の [`../architecture_reference/`](../architecture_reference/) に
+取り込んである（README、AI 用 Markdown、PDF 3 種）。レビュー時はそちらを正本として参照。
+
+- 採用元リポジトリ: <https://github.com/takushio2525/Embedded-Module-Architecture>
+
 ## ファイル
 
 | ファイル / ディレクトリ | 役割 |

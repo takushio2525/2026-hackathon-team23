@@ -9,6 +9,8 @@
   - 通信方針: [`docs/design/protocol.md`](../../../../docs/design/protocol.md)
   - 指揮ジェスチャ方針: [`docs/design/conductor_gesture.md`](../../../../docs/design/conductor_gesture.md)
   - 採用判断: [`docs/decisions/`](../../../../docs/decisions/)
+  - **採用アーキテクチャ参照資料（本書の前提）**: [`../architecture_reference/`](../architecture_reference/)
+    （Embedded-Module-Architecture 由来。<https://github.com/takushio2525/Embedded-Module-Architecture>）
 
 ## このファイルの役割
 
@@ -53,9 +55,10 @@ LaTeX 化時には `doc/sections/*.tex` に 1 対 1 で移植し、`\input{secti
 | 担当範囲・スコープ | [§1.2](sections/01_overview.md) |
 | 担当拡大の経緯 | [§2.3](sections/02_background.md) |
 | 全体ブロック図・データフロー | [§5](sections/05_architecture.md) |
-| Embedded-Module-Architecture の採用方針 | [§5.4](sections/05_architecture.md), [§6](sections/06_interface.md) |
+| Embedded-Module-Architecture（EMA）の採用方針 | [§5.4](sections/05_architecture.md), [§6](sections/06_interface.md) |
+| EMA の正本（PDF / AI 用 Markdown） | [`../architecture_reference/`](../architecture_reference/) |
 | UDP パケット形式（CTRL / BEAT / NOTE） | [§10.3](sections/10_common_api.md) |
-| 拍検出・テンポ推定アルゴリズム | [§11.5, §11.6](sections/11_node_conductor.md) |
+| 拍検出・テンポ推定アルゴリズム | [§11.5](sections/11_node_conductor.md) |
 | 楽譜データ形式 | [§12.3](sections/12_node_performer.md) |
 | 同期誤差などの目標値 | [§4.3 MOP](sections/04_requirements.md), [§13.4 TPM](sections/13_verification.md) |
 | 未確定項目・リスク | [§14](sections/14_limitations.md) |
