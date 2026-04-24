@@ -5,23 +5,30 @@
 
 ## 13.1 単体テスト方針
 
-PlatformIO の `test/` ディレクトリを使い、**共通層を中心に**ユニットテストを書く。
-各ノードの `lib/` 側は最低限（「ビルドが通る」「ヘッダの整合が取れている」程度）とする。
+PlatformIO の `test/` ディレクトリを使い、**共通層と `applyPattern()` を中心に**
+ユニットテストを書く。各ノードの `lib/` 側（H/W ドライバ）は最低限（「ビルドが通る」
+「ヘッダの整合が取れている」程度）とする。
+
+EMA に従い、判断ロジックは `IModule` 派生クラスではなく `applyPattern(SystemData&)`
+関数として実装するため、テストでは **`SystemData` をテスト側で組み立てて
+`applyPattern()` を呼ぶだけ**でロジック単体を検証できる。
 
 | 対象 | テスト内容 | 手段 |
 |---|---|---|
-| `ModuleTimer` | `begin(100)` 後、100 ms 経過で `ready()` が true、それ以前は false | `millis()` をモック差し替え |
-| `OrcProtocol` シリアライズ | CTRL / BEAT / NOTE を書き込み → バッファから読み直すと一致 | バイト列ラウンドトリップ |
-| `BeatDetector` | あらかじめ記録した `acc_norm` 時系列（CSV から読む）を流し、検出数と位置が期待通り | ゴールデンテスト |
-| `TempoEstimator` | `beat_event` を一定間隔で発火させると、BPM が期待値に収束 | 単調列テスト |
-| `ScorePlayer` | `last_beat_no` を増やすと発音フラグが期待順序で立つ | 状態機械テスト |
+| `ModuleTimer`（共通層） | `setTime()` 後、所定 ms 経過で `getNowTime()` が閾値を超える | `millis()` をモック差し替え |
+| `OrcProtocol` シリアライズ（共通層） | CTRL / BEAT / NOTE を書き込み → バッファから読み直すと一致 | バイト列ラウンドトリップ |
+| `applyPattern()` の拍検出（node_01） | あらかじめ記録した `data.imu.acc` 時系列（CSV から読む）を流し、`data.beat.event` の発火位置が期待通り | ゴールデンテスト |
+| `applyPattern()` のテンポ推定（node_01） | `data.beat.event` を一定間隔で発火させると、`data.tempo.bpm` が期待値に収束 | 単調列テスト |
+| `applyPattern()` の楽譜進行（node_02〜05） | `data.receiver.lastBeatNo` を増やすと `data.noteOut.pendingOn` が期待順序で立つ | 状態機械テスト |
+| `applyPattern()` の SelfRun 遷移（node_02〜05） | `data.receiver.lastBeatReceivedMs` を進めずに時間を経過させると `state == SelfRun` に遷移し、仮想 BEAT で進行する | 状態機械テスト |
 
 **モジュール設計上の工夫**:
 
-- `IModule` 実装は `SystemData&` と `ProjectConfig&` を参照で受ける構造なので、
-  テストからは **偽の SystemData / ProjectConfig を渡すだけ**でモジュール単体を呼べる
-- ハードウェア依存（I2C、UDP）は `ImuDriver` と `OrcNet` に局在化しているので、
-  それ以外のモジュールは **Arduino 依存なし**でホスト側テストが可能
+- EMA の `IModule` は `init()` / `updateInput(SystemData&)` / `updateOutput(SystemData&)`
+  という形でフェーズ毎に `SystemData&` を受けるので、テストからは **偽の `SystemData`
+  を渡すだけ**でモジュール単体を呼べる（Config はコンストラクタで注入済み）
+- ハードウェア依存（I2C、UDP）は `ImuModule` と `OrcNetModule` に局在化しているので、
+  それ以外のロジック（`applyPattern()`）は **Arduino 依存なし**でホスト側テストが可能
 
 ## 13.2 結合テスト方針
 
