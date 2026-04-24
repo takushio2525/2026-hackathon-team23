@@ -42,6 +42,41 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace \
   ghcr.io/paperist/texlive-ja:debian latexmk main.tex
 ```
 
+### LaTeX 編集時の運用ルール（重要）
+
+`.tex` ファイルを編集・新規作成した場合は、以下をワンセットで必ず行う。
+LaTeX 報告書だけでなく、`work/shiozawa/ai_declaration/` 配下の生成AI利用申告書など、
+このリポジトリ内の **すべての `.tex` プロジェクト** に適用する。
+
+1. **Docker で自動コンパイルしてエラーゼロを確認**
+
+   `.tex` が置かれているディレクトリ（`main.tex` と同階層）で:
+
+   ```bash
+   # Docker Desktop が未起動なら自動起動して待つ
+   docker info > /dev/null 2>&1 || (open -a Docker && until docker info > /dev/null 2>&1; do sleep 2; done)
+   # コンパイル実行
+   docker run --rm -v "$(pwd):/workspace" -w /workspace \
+     ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+   ```
+
+   コンパイルが通らないままコミットするのは禁止。
+
+2. **生成 PDF も `.tex` と同じコミットに含める**
+
+   - 生成された `main.pdf`（または提出用にリネームした PDF）を必ず `git add` する
+   - `.tex` の変更と PDF の更新は **同一コミット** にまとめる（分けない）
+   - プッシュまでを 1 セットとして完了させる
+
+   理由: 提出物 PDF やレビュー用 PDF がリポジトリに入っていないと、
+   Docker 環境を持たないメンバーが中身を確認できず、提出・レビューが止まる。
+
+3. **中間ファイルはコミットしない**
+
+   `.gitignore` で除外済み: `*.aux` / `*.log` / `*.fls` / `*.fdb_latexmk` /
+   `*.synctex.gz` / `*.dvi` / `*.out` / `*.toc` など。
+   コミット対象は **`.tex` 一式（`main.tex`, `sections/*.tex`, スタイルファイル等）と `*.pdf`** のみ。
+
 ## CI
 
 - `.github/workflows/pio-build.yml`: firmware/ 変更時に全ノードをビルド
