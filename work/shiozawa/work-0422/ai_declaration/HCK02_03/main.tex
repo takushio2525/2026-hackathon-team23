@@ -1,0 +1,190 @@
+%% ============================================================
+%%  生成AI利用申告書 — 発展課題 (HCK02_03.ino / HCK02_03.pde)
+%%  ハッカソン1 / 塩澤 拓海 / 2026
+%%  コンパイル: docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%%              ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+%% ============================================================
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{plistings}
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+\usepackage{pxjahyper}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  xleftmargin=1em,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+
+\newcommand{\cboxon}{$\boxtimes$}
+\newcommand{\cboxoff}{$\square$}
+\newcommand{\todo}[1]{\textbf{[TODO: #1]}}
+
+\begin{document}
+
+{\LARGE\bfseries 生成AI利用申告書}
+\vspace{1em}
+
+\begin{itemize}
+  \item 氏名：塩澤 拓海
+  \item 学籍番号：\todo{学籍番号を記入}
+  \item プログラムファイル名：\texttt{HCK02\_03.ino} / \texttt{HCK02\_03.pde}
+  \item 使用したAIツール：Claude Code (Opus 4.7)
+\end{itemize}
+
+\section*{1. 何に使ったか}
+発展課題（マイク入力音信号を Processing でスペクトル解析し、結果をウィンドウに描画する
+スペクトルアナライザを作る）の設計と実装で生成AIを利用した。提出課題2 (\texttt{HCK02\_02.ino}
+/ \texttt{HCK02\_02.pde}) の構成を土台に、Processing 側を時間領域表示から
+周波数領域 (FFT) 解析へ拡張する作業の補助として用いた。
+\begin{itemize}
+  \item Arduino 側 (\texttt{HCK02\_03.ino}) のサンプリング周期と Processing 側の
+        \texttt{SAMPLE\_RATE\_HZ} を一致させるための数値設計
+        （\texttt{SAMPLE\_US} = 150\,µs $\rightarrow$ 6666.67\,Hz、ナイキスト約 3333\,Hz）
+  \item Processing 側 (\texttt{HCK02\_03.pde}) で minim の \texttt{ddf.minim.analysis.FFT}
+        を使ってシリアル受信サンプルを FFT にかけ、ビン強度を dB 表示する設計の相談
+  \item 時間領域波形と周波数領域スペクトルを 1 ウィンドウに上下 2 段で並べる
+        レイアウトと、横軸 Hz 目盛り・縦軸 dB 目盛りの描画方法のレビュー
+\end{itemize}
+
+\section*{2. AIへの指示（プロンプト）}
+AIへ送った指示のうち、主要なものを以下に示す。
+
+\begin{lstlisting}
+発展課題は「Processing でスペクトルアナライザを作り、マイクから入力された音信号の波形を
+スペクトル解析した結果をウィンドウに描画する」プログラムを作りたい。
+ベースにしたいファイル:
+- Arduino:  work/shiozawa/work-0422/HCK02_02/HCK02_02.ino（動作確認済み、6.67 kHz サンプリング）
+- Processing: work/shiozawa/work-0422/HCK02_02_processing/HCK02_02.pde（楽曲再生＋時間波形描画）
+
+要件:
+- Arduino 側はそのまま流用してよい（1 行 1 サンプル送信、150 µs 周期）
+- Processing 側でシリアル受信したサンプルを蓄積し、minim の FFT クラスで解析する
+- スペクトルはバーグラフ表示。横軸は Hz、縦軸は dB
+- 楽曲再生のキーバインド（'p' / '1'-'6'）はそのまま残す
+\end{lstlisting}
+
+\begin{lstlisting}
+FFT のサイズと窓関数、表示する周波数範囲を決めたい。
+- サンプリングレート 6666.67 Hz、ナイキストは約 3333 Hz
+- 周波数分解能と応答速度のバランスを考えて FFT_SIZE を決めたい
+- 振幅の dB 変換時に log10(0) で発散しないようにしたい
+\end{lstlisting}
+
+\section*{3. AIの出力の使い方}
+\begin{itemize}
+  \item \cboxoff そのまま使った
+  \item \cboxon 一部修正して使った
+  \item \cboxoff 参考にしただけ
+\end{itemize}
+$\rightarrow$ 上で選んだ理由：
+
+AI が挙げた設計のうち、以下は妥当と判断して採用した：
+\begin{itemize}
+  \item Arduino 側は \texttt{HCK02\_02.ino} と同じく 1 行 1 サンプル送信を維持し、
+        Processing 側の FFT 用バッファに直接流し込む構成
+  \item \texttt{FFT\_SIZE} = 1024（2 のべき乗）。サンプリング 6666.67\,Hz では
+        1 回の FFT に必要な時間が約 154\,ms で、約 6.5\,Hz のビン幅となり、
+        スペアナの応答性と分解能のバランスがとれる
+  \item Hamming 窓を適用してスペクトル漏れを抑える
+        （\texttt{fft.window(FFT.HAMMING)}）
+  \item \texttt{20 * log10(max(magnitude, 1e-6))} の形で dB 変換し、
+        ゼロ入力時の $-\infty$ 発散を防ぐ
+  \item 上段 (時間領域) ／ 下段 (周波数領域) の 2 段レイアウト、
+        下段は横軸 Hz・縦軸 dB の目盛りを併記
+\end{itemize}
+一方で、AI から追加提案された「FFT 結果を対数周波数軸で表示する」案や
+「ピークホールドの減衰アニメーション」は、初版では機能を最小に絞りたかったため
+今回は採用を見送り、後から拡張する余地として残した。
+
+\section*{4. 正しいと確認した方法}
+\todo{実機テスト後に具体的な観測内容を記入する}
+
+想定している確認手順：
+\begin{itemize}
+  \item Arduino IDE で \texttt{HCK02\_03.ino} がコンパイルでき、
+        シリアルモニタ (921600\,bps) に数値が 1 行ずつ流れることを確認する
+  \item Processing IDE で \texttt{HCK02\_03.pde} を起動し、
+        上段に時間波形、下段にスペクトルバーグラフが描画されることを観察する
+  \item PC スピーカから \texttt{'p'} で楽曲を再生し、マイクへ入力したとき、
+        スペクトルが楽曲の音高 (C4 $\approx$ 262\,Hz, G4 $\approx$ 392\,Hz, A4 = 440\,Hz)
+        付近で立ち上がることを目視で確認する
+  \item \texttt{'1'} (正弦波) で再生したときに、基音 1 本が突出した綺麗な
+        スパイク状スペクトルになることを確認する
+        $\rightarrow$ 倍音の少ない音色と FFT 結果が直感的に一致するかを見る
+  \item \texttt{'3'} (のこぎり波) や \texttt{'4'} (矩形波) に切り替えると、
+        基音に加えて倍音が高い周波数まで段々と並ぶことを確認する
+        $\rightarrow$ 倍音構成の理論と実測の対応を確認する
+  \item 拍手や口笛を入力し、無音時とのスペクトル差が見えることを確認する
+  \item \texttt{SAMPLE\_RATE\_HZ}（Processing 側）と \texttt{SAMPLE\_US}（Arduino 側）の
+        対応が \texttt{1000000.0 / SAMPLE\_US} で正しく一致していることを
+        ソース上で計算しなおして確認する
+\end{itemize}
+
+\section*{5. 問題や間違い}
+\begin{itemize}
+  \item \cboxoff あった
+  \item \cboxoff なかった
+\end{itemize}
+\todo{実機テスト後に、実際に気づいた問題や AI の誤り・自分が気づいた点を記入する}
+
+検証予定ポイント：
+\begin{itemize}
+  \item シリアル受信が間に合わずに FFT バッファに穴が空くと、スペクトルが乱れる。
+        \texttt{frameRate} と \texttt{port.available()} を表示し、取りこぼしが
+        起きていないか確認する
+  \item Arduino のサンプリングジッタが大きいと FFT の周波数軸が歪む。
+        既知の音叉や PC で生成した既知周波数の正弦波（例: 440\,Hz）を入れ、
+        スペクトルのピーク位置が想定ビン (440 / 6.51 $\approx$ 67 番目) に来るか確認する
+  \item 起動直後に \texttt{fftInput} がゼロ初期化のまま FFT にかかるため、
+        最初の数フレームは底値スペクトルが見える。
+        想定どおり徐々にサンプルが埋まるかを観察する
+  \item Processing のシリアルポート名 (\texttt{/dev/cu.usbmodem...}) は PC ごとに違うため、
+        メンバ B の環境で書き換え忘れによる起動失敗が起きないか
+\end{itemize}
+
+\section*{6. 自分で工夫した点}
+\begin{itemize}
+  \item Arduino 側 (\texttt{HCK02\_03.ino}) は \texttt{HCK02\_02.ino} を継承して
+        サンプリング周期 150\,µs を維持し、Processing 側の \texttt{SAMPLE\_RATE\_HZ}
+        を \texttt{1000000.0 / SAMPLE\_US} で導出する形にして、両者の数値が
+        ずれない構造にした
+  \item Processing 側 (\texttt{HCK02\_03.pde}) では、ADC 値をシリアル受信した
+        その場で \texttt{[-1, +1]} に正規化して直流成分を抜き、
+        FFT 入力バッファ \texttt{fftInput} と時間波形バッファ \texttt{waveBuf} の
+        両方に書き込む構成にした $\rightarrow$ 1 サンプルで時間領域・周波数領域の
+        両方を更新できる
+  \item FFT の縦軸を \texttt{20 * log10(max(magnitude, 1e-6))} で dB 化し、
+        \texttt{SPECTRUM\_DB\_MIN} / \texttt{SPECTRUM\_DB\_MAX} の範囲外を
+        \texttt{constrain} でクランプすることで、ゼロ入力時にバーが
+        画面下に飛ぶ／対数の発散で描画が壊れる、といった事故を防いだ
+  \item 表示する最高周波数 \texttt{DISPLAY\_MAX\_HZ} を 3000\,Hz に絞り、
+        ナイキスト直近の使い物にならない領域を捨てて
+        可聴域（楽器音域）に画面を集中させた
+  \item バーの色を周波数比 \texttt{i / numBins} で連続的に変化させ、
+        どの帯域が立っているかを色でも認識しやすくした
+        （初期方針の「落ち着いた配色」の範囲内で、彩度を控えめに調整）
+  \item 楽曲再生のキーバインド (\texttt{'p'} / \texttt{'1'}--\texttt{'6'}) を
+        \texttt{HCK02\_02.pde} から維持し、波形 → 周波数の対応を
+        音色を切り替えながら直感的に検証できるようにした
+\end{itemize}
+
+\section*{参考文献}
+\begin{itemize}
+  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料, \texttt{references/lectures/}）
+  \item 提出課題2 のコード一式（本リポジトリ \texttt{work/shiozawa/work-0422/HCK02\_02/} 配下）
+  \item 動作確認済み Arduino: \texttt{work/shiozawa/work-0422/HCK02\_02/HCK02\_02.ino}
+  \item Processing Reference: \texttt{Serial}, \texttt{bufferUntil}, \texttt{serialEvent}
+        \url{https://processing.org/reference/libraries/serial/}
+  \item Minim Reference: \texttt{FFT}, \texttt{AudioOutput}, \texttt{Oscil}, \texttt{Line}
+        \url{https://code.compartmental.net/minim/}
+  \item Minim FFT Javadoc: \url{https://code.compartmental.net/minim/javadoc/ddf/minim/analysis/FFT.html}
+\end{itemize}
+
+\end{document}
