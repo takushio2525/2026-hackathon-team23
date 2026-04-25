@@ -9,6 +9,10 @@ final String PORT_NAME = "/dev/cu.usbmodem34B7DA642F642";
 final int    BAUD      = 921600;
 final int    ADC_MAX   = 1023;
 
+// 画面に表示する直近サンプル数（少ないほど波がゆったり見える。
+// 800 → 約30周期、160 → 約6周期）
+final int    DISPLAY_SAMPLES = 160;
+
 Serial port;
 int[]  samples;
 int    writeIdx = 0;
@@ -63,15 +67,18 @@ void setup() {
 void draw() {
   background(0);
 
-  // マイク波形を画面いっぱいに描画
+  // 直近 DISPLAY_SAMPLES 個のサンプルだけを画面幅いっぱいに引き伸ばして描画
   stroke(255);
   noFill();
-  for (int x = 0; x < width - 1; x++) {
-    int i1 = (writeIdx + x)     % samples.length;
-    int i2 = (writeIdx + x + 1) % samples.length;
+  int startIdx = (writeIdx - DISPLAY_SAMPLES + samples.length) % samples.length;
+  for (int i = 0; i < DISPLAY_SAMPLES - 1; i++) {
+    int i1 = (startIdx + i)     % samples.length;
+    int i2 = (startIdx + i + 1) % samples.length;
+    float x1 = map(i,     0, DISPLAY_SAMPLES - 1, 0, width);
+    float x2 = map(i + 1, 0, DISPLAY_SAMPLES - 1, 0, width);
     float y1 = map(samples[i1], 0, ADC_MAX, height, 0);
     float y2 = map(samples[i2], 0, ADC_MAX, height, 0);
-    line(x, y1, x + 1, y2);
+    line(x1, y1, x2, y2);
   }
 
   fill(200);
