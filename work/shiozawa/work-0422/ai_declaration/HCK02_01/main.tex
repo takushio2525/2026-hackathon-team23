@@ -1,10 +1,16 @@
 \documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
 
-\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage[top=18mm,bottom=18mm,left=22mm,right=22mm]{geometry}
 \usepackage{amssymb}
 \usepackage{listings}
 \usepackage{plistings}
+\usepackage{titlesec}
+\usepackage{enumitem}
 \usepackage[dvipdfmx,hidelinks]{hyperref}
+
+\titlespacing*{\section}{0pt}{0.5em}{0.1em}
+\setlength{\parskip}{0pt}
+\setlist[itemize]{itemsep=1pt,topsep=2pt,parsep=0pt,partopsep=0pt}
 
 \lstset{
   basicstyle=\ttfamily\small,
@@ -21,21 +27,17 @@
 \begin{document}
 
 {\LARGE\bfseries 生成AI利用申告書}
-\vspace{1em}
 
 \begin{itemize}
   \item 氏名：塩澤 拓海
   \item 学籍番号：25G1065
   \item プログラムファイル名：\texttt{HCK02\_01.ino}
-  \item 使用したAIツール：ChatGPT (GPT-5)、Claude Code (Opus 4.7)
+  \item 使用したAIツール：Claude Code (Opus 4.7)
 \end{itemize}
 
 \section*{1. 何に使ったか}
-例題2 のプログラムをそのまま動かすと、シリアルプロッタで波形が見にくかった。
-最大振幅・最小振幅といったラベル付きの値が一緒に出ていることや、表示の縦軸が
-自動で動いてしまうことが原因だと考え、出力フォーマットの直し方について
-生成AIに相談した。具体的には、シリアルプロッタで「波形が見やすい状態」に
-するには何を出力すればよいか、という方針出しに使った。
+例題2 のプログラムをそのまま動かすと、シリアルプロッタの縦軸が自動で動いて
+しまい、波形が見にくかった。出力のしかたをどう直せばよいか、生成AIに相談した。
 
 \section*{2. AIへの指示（プロンプト）}
 \begin{lstlisting}
@@ -52,24 +54,17 @@
 \end{itemize}
 $\rightarrow$ 上で選んだ理由：
 
-AIからは「ラベル付きの文字列を消して、数値だけをカンマ区切りで出す」
-「縦軸を固定するために、毎回 0 と 1023 のガイド線も一緒に出す」という
-2つのアイデアが出てきた。これは自分の困っていたことに合っていたので採用した。
-一方で、AI が出してきたサンプルコードには電圧変換やフィルタ処理など
-今回必要のない部分が含まれていたので、その部分は削って、自分のコードでは
-\texttt{analogRead} の生値・\texttt{0}・\texttt{1023} の3つだけを
-カンマ区切りで出力する形に書き直した。
+AIから出てきた「ラベル付きの文字列を消して数値だけをカンマ区切りで出す」
+「縦軸を固定するために毎回 0 と 1023 のガイド線も一緒に出す」という
+2点を採用した。AIのサンプルにあった電圧変換などの処理は今回不要だったので
+削った。
 
 \section*{4. 正しいと確認した方法}
 \begin{itemize}
-  \item Arduino IDE でコンパイルが通ることを確認した
   \item シリアルモニタを 921600\,bps で開き、
         \texttt{<生値>,0,1023} の形式で1行ずつ流れていることを確認した
-  \item シリアルプロッタに切り替え、上下に \texttt{0} と \texttt{1023} の
-        ガイド線が引かれた状態で、中央の線がマイクに入る音に応じて動くことを
-        観察した
-  \item 例題2 と並べて表示し、波形が安定して読めるようになっていることを
-        目で確認した
+  \item シリアルプロッタで上下に \texttt{0} と \texttt{1023} のガイド線が出て、
+        中央の線がマイクに入る音に応じて動くことを観察した
 \end{itemize}
 
 \section*{5. 問題や間違い}
@@ -79,27 +74,23 @@ AIからは「ラベル付きの文字列を消して、数値だけをカンマ
 \end{itemize}
 
 AI が最初に出してきたコードは、\texttt{Serial.print} で各値の前に
-\texttt{"value:"} のような文字列ラベルを付ける形だった。これをそのまま使うと
-1サンプルの送信バイト数が増えてしまい、結局シリアルプロッタの更新が
-追いつかないという問題がありそうだった。実際に試してみて文字列ラベルは
-要らないと判断し、整数だけをカンマで区切る形式に直した。
+\texttt{"value:"} のような文字列ラベルを付ける形だったが、送信バイト数が
+増えてプロッタの更新が重くなりそうだったので、整数だけをカンマで区切る
+形式に直した。
 
 \section*{6. 自分で工夫した点}
 \begin{itemize}
-  \item 例題2 にあった電圧への換算 (\texttt{(float)d / (pow(2, RESOLUTION)-1) * 5.0})
-        や中心化処理は今回の課題には不要だったので削除し、必要最小限の処理だけにした
-  \item シリアルプロッタの縦軸が動くと波形が読めないので、毎ループで
-        \texttt{0} と \texttt{1023} を一緒に送り、表示範囲が固定されるようにした
-  \item サンプリングは \texttt{delay(1)} で約 1\,ms 周期にし、コードが読みやすい
-        素直な書き方にした
+  \item 例題2 にあった電圧換算や中心化処理は今回不要だったので削除し、
+        必要最小限の処理だけにした
+  \item 毎ループで \texttt{0} と \texttt{1023} を一緒に送り、シリアルプロッタの
+        縦軸が動かないようにした
+  \item サンプリングは \texttt{delayMicroseconds(100)} で素直な書き方にした
 \end{itemize}
 
 \section*{参考文献}
 \begin{itemize}
-  \item 有本泰子, 佐波孝彦「ハッカソン1 第2回」講義資料 (\texttt{HCK1\_02.pdf}, \texttt{HCK1\_02\_ex.pdf})
-  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料）
-  \item Arduino Reference: \texttt{analogRead}, \texttt{analogReadResolution}, \texttt{Serial.print} \\
-        \url{https://docs.arduino.cc/language-reference/}
+  \item Arduino 日本語リファレンス（武蔵野電波） \\
+        \url{https://www.musashinodenpa.com/arduino/ref/}
 \end{itemize}
 
 \end{document}
