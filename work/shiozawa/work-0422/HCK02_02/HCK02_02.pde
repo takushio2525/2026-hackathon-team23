@@ -11,7 +11,7 @@ final int    ADC_MAX   = 1023;
 
 // 画面に表示する直近サンプル数（少ないほど波がゆったり見える。
 // 800 → 約30周期、160 → 約6周期）
-final int    DISPLAY_SAMPLES = 160;
+final int    DISPLAY_SAMPLES = 60;
 
 Serial port;
 int[]  samples;
