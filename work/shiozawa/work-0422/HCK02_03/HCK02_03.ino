@@ -12,5 +12,5 @@ void setup() {
 void loop() {
   int d = analogRead(PIN);
   Serial.println(d);
-  delay(1);
+  delayMicroseconds(100);
 }

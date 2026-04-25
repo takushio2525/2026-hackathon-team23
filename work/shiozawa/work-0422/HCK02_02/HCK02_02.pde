@@ -9,12 +9,6 @@ final String PORT_NAME = "/dev/cu.usbmodem34B7DA642F642";
 final int    BAUD      = 921600;
 final int    ADC_MAX   = 1023;
 
-// 受信バッファサイズ（取得データはこの長さのリングバッファに保持）
-final int    BUFFER_SIZE  = 4000;
-// 画面に映す最新サンプル数（小さくすると波形が横に広がる）。
-// .ino 側のサンプリング 6.6kHz と組み合わせて、200 で約 30ms 分が画面に映る。
-final int    VIEW_SAMPLES = 200;
-
 Serial port;
 int[]  samples;
 int    writeIdx = 0;
@@ -59,7 +53,7 @@ void setup() {
   out.setTempo(120);
   currentWaveform = Waves.SINE;
 
-  samples = new int[BUFFER_SIZE];
+  samples = new int[width];
   for (int i = 0; i < samples.length; i++) samples[i] = ADC_MAX / 2;
 
   port = new Serial(this, PORT_NAME, BAUD);
@@ -69,18 +63,15 @@ void setup() {
 void draw() {
   background(0);
 
-  // 受信バッファのうち、最新 VIEW_SAMPLES 個ぶんだけを画面幅に引き伸ばして描画
+  // マイク波形を画面いっぱいに描画
   stroke(255);
   noFill();
-  int start = (writeIdx - VIEW_SAMPLES + samples.length) % samples.length;
-  for (int i = 0; i < VIEW_SAMPLES - 1; i++) {
-    int i1 = (start + i)     % samples.length;
-    int i2 = (start + i + 1) % samples.length;
-    float x1 = map(i,     0, VIEW_SAMPLES - 1, 0, width);
-    float x2 = map(i + 1, 0, VIEW_SAMPLES - 1, 0, width);
+  for (int x = 0; x < width - 1; x++) {
+    int i1 = (writeIdx + x)     % samples.length;
+    int i2 = (writeIdx + x + 1) % samples.length;
     float y1 = map(samples[i1], 0, ADC_MAX, height, 0);
     float y2 = map(samples[i2], 0, ADC_MAX, height, 0);
-    line(x1, y1, x2, y2);
+    line(x, y1, x + 1, y2);
   }
 
   fill(200);
