@@ -29,7 +29,7 @@
 
     "latex-workshop.latex.tools": [
         {
-            "name": "latexmk",
+            "name": "latexmk-platex",
             "command": "latexmk",
             "args": [
                 "-synctex=1",
@@ -40,11 +40,31 @@
                 "%DOC%"
             ],
             "env": {}
+        },
+        {
+            "name": "latexmk-lualatex",
+            "command": "latexmk",
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-lualatex",
+                "-outdir=%OUTDIR%",
+                "%DOC%"
+            ],
+            "env": {}
         }
     ],
+    // レシピ名は magic comment「% !TEX program = ...」の値と揃える
+    // ファイル先頭に「% !TEX program = lualatex」と書けば自動で LuaLaTeX が走る
     "latex-workshop.latex.recipes": [
-        { "name": "latexmk (platex)", "tools": ["latexmk"] }
+        { "name": "platex",   "tools": ["latexmk-platex"] },
+        { "name": "lualatex", "tools": ["latexmk-lualatex"] }
     ],
+    // magic comment による自動切替を有効化（false にするとコメント優先）
+    "latex-workshop.latex.build.forceRecipeUsage": false,
+    // デフォルトは recipes の先頭（= platex）。magic comment があればそちら優先
+    "latex-workshop.latex.recipe.default": "first",
     "latex-workshop.latex.autoBuild.run": "onFileChange",
     "latex-workshop.view.pdf.viewer": "tab"
 }
