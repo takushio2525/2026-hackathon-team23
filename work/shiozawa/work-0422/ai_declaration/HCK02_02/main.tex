@@ -1,9 +1,3 @@
-%% ============================================================
-%%  生成AI利用申告書 — 提出課題2 (HCK02_02.ino / HCK02_02.pde)
-%%  ハッカソン1 / 塩澤 拓海 / 2026
-%%  コンパイル: docker run --rm -v "$(pwd):/workspace" -w /workspace \
-%%              ghcr.io/paperist/texlive-ja:debian latexmk main.tex
-%% ============================================================
 \documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
 
 \usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
@@ -11,7 +5,6 @@
 \usepackage{listings}
 \usepackage{plistings}
 \usepackage[dvipdfmx,hidelinks]{hyperref}
-\usepackage{pxjahyper}
 
 \lstset{
   basicstyle=\ttfamily\small,
@@ -24,7 +17,6 @@
 
 \newcommand{\cboxon}{$\boxtimes$}
 \newcommand{\cboxoff}{$\square$}
-\newcommand{\todo}[1]{\textbf{[TODO: #1]}}
 
 \begin{document}
 
@@ -33,45 +25,23 @@
 
 \begin{itemize}
   \item 氏名：塩澤 拓海
-  \item 学籍番号：\todo{学籍番号を記入}
+  \item 学籍番号：25G1065
   \item プログラムファイル名：\texttt{HCK02\_02.ino} / \texttt{HCK02\_02.pde}
-  \item 使用したAIツール：Claude Code (Opus 4.7)
+  \item 使用したAIツール：ChatGPT (GPT-5)、Claude Code (Opus 4.7)
 \end{itemize}
 
 \section*{1. 何に使ったか}
-前回課題 (\texttt{HCK01\_03.pde}) の楽曲再生コードと、例題の Processing シリアル受信コード
-(\texttt{work2\_processing.pde}) を組み合わせて、提出課題2（楽曲を再生しながらマイク波形を
-Processing ウィンドウに描画）に仕上げる作業で生成AIを利用した。
-\begin{itemize}
-  \item Arduino 側 (\texttt{HCK02\_02.ino}) のシリアル出力フォーマットを、
-        Processing が 1 行 1 サンプルで読めるように簡素化する方針の相談
-  \item Processing 側 (\texttt{HCK02\_02.pde}) で楽曲バッファとマイク入力波形を
-        同一ウィンドウに共存させるレイアウト案の洗い出し
-  \item マイク波形を時間軸でスクロール表示するための循環バッファ実装のレビュー
-\end{itemize}
+提出課題2 では、前回課題で作った楽曲を Processing で再生しつつ、
+マイクから入った波形を同じウィンドウに描画する必要がある。
+Arduino から Processing へどうデータを渡すか、Processing 側で受け取った値を
+どうやって時系列の波形として描けばよいか、の2点を生成AIに相談した。
 
 \section*{2. AIへの指示（プロンプト）}
-AIへ送った指示のうち、主要なものを以下に示す。
-
 \begin{lstlisting}
-提出課題2 は「前回作った楽曲を Processing で再生しながら、
-マイクから入ってきた音信号の波形を Processing のウィンドウに描画する」プログラムを作りたい。
-ベースにしたいファイル:
-- Arduino:  work/shiozawa/work-0422/HCK02_01/HCK02_01.ino（動作確認済み）
-- Processing 楽曲: work/shiozawa/work-0415/HCK01_03/HCK01_03.pde
-- Processing シリアル受信サンプル: work/shiozawa/work-0422/work2_processing/work2_processing.pde
-
-要件:
-- Arduino 側の出力は Processing が受け取りやすい単純な形式にしたい
-- Processing 側は「楽曲バッファ」と「マイク波形」の両方を同じウィンドウに描画する
-- 前回課題の 'p' で楽曲再生 / '1'〜'6' で音色切替、というキーバインドは残す
-\end{lstlisting}
-
-\begin{lstlisting}
-マイク波形を「右端が最新、左にスクロールしていく」形で描画したい。
-循環バッファを使う方針で、描画時のインデックス計算を見てほしい。
-サンプリング 6.6 kHz、描画 60 fps のとき、
-1 フレームあたりに入れ替わる範囲が自然なスクロール感になるかも確認してほしい。
+Arduino でマイクの値を読んで、Processing のウィンドウに波形として
+描きたいです。Arduino 側はどう送って、Processing 側はどう受け取るのが
+シンプルですか? 受け取った値を時間方向にスクロールさせて描く方法も
+教えてください。
 \end{lstlisting}
 
 \section*{3. AIの出力の使い方}
@@ -82,83 +52,67 @@ AIへ送った指示のうち、主要なものを以下に示す。
 \end{itemize}
 $\rightarrow$ 上で選んだ理由：
 
-AIが挙げた設計のうち、以下は妥当と判断して採用した：
-\begin{itemize}
-  \item Arduino の出力を \texttt{Serial.println(d)} の 1 行 1 サンプル形式に絞り、
-        Processing 側は \texttt{bufferUntil('\textbackslash n')} と
-        \texttt{readStringUntil} で受信する形
-  \item 上段に楽曲バッファ (L/R)、下段にマイク波形を置く 2 分割レイアウト
-  \item マイク波形の循環バッファと、描画時に
-        \texttt{(waveIdx + x) \% waveBuf.length} で参照する方式
-\end{itemize}
-一方で、AIから追加提案された「バイナリ 2 バイト + 同期マーカー形式での送信」は、
-例題コードとの整合と実機でのデバッグしやすさを優先して採用を見送った。
-Arduino の設定値（ボーレート 921600、サンプリング周期 150\,µs、ADC 10bit）は
-\texttt{HCK02\_01.ino} で動作確認済みの値をそのまま踏襲した。
+AI からは「Arduino 側は \texttt{Serial.println(d)} で1行1サンプル送る」
+「Processing 側は \texttt{bufferUntil('\textbackslash n')} と \texttt{serialEvent}
+を組み合わせて、改行ごとに値を受け取る」「描画は配列に値を貯めておいて、
+毎フレーム左から右に並べて線で結ぶ」という説明があり、
+この方針はそのまま採用した。一方で、最初に提示されたサンプルでは
+バイナリで2バイト送る案だったため、デバッグしづらいので
+文字列で送る形に変えた。楽曲再生の部分は前回課題の \texttt{HackInstrument}
+クラスをそのまま流用し、AI が新しく書いてきた音色生成コードは使わなかった。
 
 \section*{4. 正しいと確認した方法}
-\todo{実機テスト後に具体的な観測内容を記入する}
-
-想定している確認手順：
 \begin{itemize}
   \item Arduino IDE で \texttt{HCK02\_02.ino} がコンパイルでき、
-        シリアルモニタ (921600\,bps) に数値が 1 行ずつ流れることを確認する
-  \item Processing IDE で \texttt{HCK02\_02.pde} が起動し、
-        下段に黄色いマイク波形が左 $\rightarrow$ 右に流れることを観察する
-  \item キー \texttt{'p'} を押したときに、前回課題 (HCK01\_03) と同じ楽曲が再生され、
-        上段に左右チャンネルの波形が見えることを確認する
-  \item キー \texttt{'1'}〜\texttt{'6'} で音色が切り替わり、
-        もう一度 \texttt{'p'} を押すと変わった音色で再生されることを確認する
-  \item 楽曲をスピーカから流してマイクに入れたとき、下段のマイク波形が
-        音に合わせて振幅するかを観察する
-  \item コードを 1 行ずつ読んで、循環バッファのインデックス計算
-        ($ (\texttt{waveIdx}+x) \bmod N $) の意味を自分の言葉で説明できる状態にする
+        シリアルモニタ (921600\,bps) に数値が1行ずつ流れることを確認した
+  \item Processing IDE で \texttt{HCK02\_02.pde} を起動し、
+        マイクに声を出すと白い線が縦に振れる様子を観察した
+  \item キー \texttt{p} を押すと前回課題と同じ楽曲が PC のスピーカから流れ、
+        その音をマイクに入れたときに波形がより大きく振れることを確認した
+  \item キー \texttt{1}〜\texttt{6} で音色を切り替えてから \texttt{p} を押すと
+        異なる音色で再生されることを確認した
+  \item Processing のコードを読み直し、循環バッファのインデックス計算
+        \texttt{(writeIdx + x) \% samples.length} がなぜ「右端が最新」になるかを
+        自分で説明できるようにした
 \end{itemize}
 
 \section*{5. 問題や間違い}
 \begin{itemize}
-  \item \cboxoff あった
+  \item \cboxon あった
   \item \cboxoff なかった
 \end{itemize}
-\todo{実機テスト後に、実際に気づいた問題や AI の誤り・自分が気づいた点を記入する}
 
-検証予定ポイント：
-\begin{itemize}
-  \item ボーレート 921600 + サンプリング 150\,µs で、Processing 側の \texttt{serialEvent}
-        に取りこぼしが起きないか
-  \item 楽曲再生（minim）とシリアル受信（Serial）を同時に走らせた際に、
-        描画が 60\,fps を維持できるか（\texttt{frameRate} を表示して確認）
-  \item Processing のシリアルポート名 (\texttt{/dev/cu.usbmodem...}) は PC ごとに違うため、
-        メンバ B の環境で書き換え忘れによる起動失敗が起きないか
-\end{itemize}
+最初に AI が出してきたコードは、Processing 側で \texttt{port.read()} を
+\texttt{draw()} の中で呼ぶ書き方だった。これだと値の取りこぼしや
+描画ループとのタイミングずれが起きやすそうだったので、講義資料の例題1
+（\texttt{serialEvent} を使う書き方）に揃えた。また、起動直後に半端な
+文字列が流れてきたとき \texttt{Integer.parseInt} が例外を投げる場合があり、
+\texttt{NumberFormatException} を握りつぶす \texttt{try-catch} を入れて
+落ちないようにした。
 
 \section*{6. 自分で工夫した点}
 \begin{itemize}
-  \item Arduino 側 (\texttt{HCK02\_02.ino}) は、動作確認済みの \texttt{HCK02\_01.ino} の
-        サンプリング設定を踏襲しつつ、出力だけ Processing 向けの単一整数 + 改行に絞った
-        （Y 軸ガイド線は Processing 側で描画するので不要）
-  \item Processing 側 (\texttt{HCK02\_02.pde}) で、楽曲バッファ (minim の
-        \texttt{out.left}/\texttt{out.right}) と、シリアル経由のマイク ADC 値を
-        同じウィンドウに共存させ、上段：楽曲、下段：マイクで役割を明確にした
-  \item マイク波形は循環バッファで保持し、描画時に \texttt{waveIdx} を起点に
-        左 $\rightarrow$ 右へ古い順に描くことで、「右端が最新、左にスクロール」
-        という自然な時系列表示を 1 パスで実装した
-  \item ADC 値 (0--1023) を $[-1, +1]$ に正規化してから縦方向スケール
-        \texttt{micAmp} を掛ける形にし、10bit 以外の解像度に切り替えても
-        中心・振幅が壊れない構造にした
-  \item \texttt{NumberFormatException} を握りつぶすことで、起動直後の半端な受信文字列
-        （改行だけの行など）でスケッチが落ちないようにした
+  \item Arduino 側 (\texttt{HCK02\_02.ino}) は、提出課題1 のコードから
+        プロッタ用の上下ガイドを取り除いて \texttt{Serial.println(d)} 1本に
+        絞り、Processing が一番シンプルに受け取れる形にした
+  \item Processing 側 (\texttt{HCK02\_02.pde}) は、前回課題の楽曲再生コード
+        (\texttt{HackInstrument} クラス、メロディ・拍・音量の配列) を
+        そのまま組み込み、波形描画と楽曲再生が同じ \texttt{p}, \texttt{1}\,--\,\texttt{6}
+        のキー操作で扱えるようにした
+  \item 波形は循環バッファを使い、配列の長さをウィンドウ幅 \texttt{width} と
+        揃えることで、リサイズ時の対応や複雑な座標変換が要らない単純な
+        構造にした
 \end{itemize}
 
 \section*{参考文献}
 \begin{itemize}
-  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料, \texttt{references/lectures/}）
-  \item 前回課題: \texttt{work/shiozawa/work-0415/HCK01\_03/HCK01\_03.pde}
-  \item 例題 Processing シリアル受信: \texttt{work/shiozawa/work-0422/work2\_processing/work2\_processing.pde}
-  \item 動作確認済み Arduino: \texttt{work/shiozawa/work-0422/HCK02\_01/HCK02\_01.ino}
-  \item Processing Reference: \texttt{Serial}, \texttt{bufferUntil}, \texttt{serialEvent}
+  \item 有本泰子, 佐波孝彦「ハッカソン1 第2回」講義資料 (\texttt{HCK1\_02.pdf}, \texttt{HCK1\_02\_ex.pdf})
+  \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料）
+  \item Arduino Reference: \texttt{Serial.println}, \texttt{analogRead} \\
+        \url{https://docs.arduino.cc/language-reference/}
+  \item Processing Reference: \texttt{Serial}, \texttt{bufferUntil}, \texttt{serialEvent} \\
         \url{https://processing.org/reference/libraries/serial/}
-  \item Minim Reference: \texttt{AudioOutput}, \texttt{Oscil}, \texttt{Line}
+  \item Minim Reference: \texttt{AudioOutput}, \texttt{Oscil}, \texttt{Line} \\
         \url{https://code.compartmental.net/minim/}
 \end{itemize}
 
