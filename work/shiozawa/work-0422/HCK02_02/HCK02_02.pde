@@ -9,6 +9,9 @@ final String PORT_NAME = "/dev/cu.usbmodem34B7DA642F642";
 final int    BAUD      = 921600;
 final int    ADC_MAX   = 1023;
 
+// 画面に表示するサンプル数（小さくすると波形が横に広がる）
+final int    VISIBLE_SAMPLES = 80;
+
 Serial port;
 int[]  samples;
 int    writeIdx = 0;
@@ -53,7 +56,7 @@ void setup() {
   out.setTempo(120);
   currentWaveform = Waves.SINE;
 
-  samples = new int[width];
+  samples = new int[VISIBLE_SAMPLES];
   for (int i = 0; i < samples.length; i++) samples[i] = ADC_MAX / 2;
 
   port = new Serial(this, PORT_NAME, BAUD);
@@ -63,15 +66,17 @@ void setup() {
 void draw() {
   background(0);
 
-  // マイク波形を画面いっぱいに描画
+  // マイク波形を画面いっぱいに描画（サンプルを横方向に等間隔で引き伸ばす）
   stroke(255);
   noFill();
-  for (int x = 0; x < width - 1; x++) {
-    int i1 = (writeIdx + x)     % samples.length;
-    int i2 = (writeIdx + x + 1) % samples.length;
+  for (int i = 0; i < samples.length - 1; i++) {
+    int i1 = (writeIdx + i)     % samples.length;
+    int i2 = (writeIdx + i + 1) % samples.length;
+    float x1 = map(i,     0, samples.length - 1, 0, width);
+    float x2 = map(i + 1, 0, samples.length - 1, 0, width);
     float y1 = map(samples[i1], 0, ADC_MAX, height, 0);
     float y2 = map(samples[i2], 0, ADC_MAX, height, 0);
-    line(x, y1, x + 1, y2);
+    line(x1, y1, x2, y2);
   }
 
   fill(200);
