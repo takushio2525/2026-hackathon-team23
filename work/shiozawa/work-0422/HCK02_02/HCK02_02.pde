@@ -11,8 +11,9 @@ final int    ADC_MAX   = 1023;
 
 // 受信バッファサイズ（取得データはこの長さのリングバッファに保持）
 final int    BUFFER_SIZE  = 4000;
-// 画面に映す最新サンプル数（小さくすると波形が横に広がる）
-final int    VIEW_SAMPLES = 80;
+// 画面に映す最新サンプル数（小さくすると波形が横に広がる）。
+// .ino 側のサンプリング 6.6kHz と組み合わせて、200 で約 30ms 分が画面に映る。
+final int    VIEW_SAMPLES = 200;
 
 Serial port;
 int[]  samples;
