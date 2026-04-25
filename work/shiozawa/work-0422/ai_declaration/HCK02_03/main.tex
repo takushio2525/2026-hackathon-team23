@@ -24,26 +24,37 @@
 \vspace{1em}
 
 \begin{itemize}
-  \item 氏名：塩澤 拓海
+  \item 氏名：塩澤 匠生
   \item 学籍番号：25G1065
   \item プログラムファイル名：\texttt{HCK02\_03.ino} / \texttt{HCK02\_03.pde}
   \item 使用したAIツール：ChatGPT (GPT-5)、Claude Code (Opus 4.7)
 \end{itemize}
 
 \section*{1. 何に使ったか}
-発展課題はマイクから入った音を Processing でスペクトル解析して画面に
-表示するスペクトルアナライザを作る課題である。FFT を自分で書くのは
-難しいので、Processing で使える FFT ライブラリ（Minim の \texttt{FFT} クラス）の
-使い方と、Arduino のサンプリング周波数を Processing 側にどう渡すかについて
-生成AIに相談した。
+発展課題は、提出課題2 の波形描画にスペクトル解析を加え、Processing で
+スペクトルアナライザを作る課題である。授業（ハッカソン1 第2回）では
+マイク波形を Serial Plotter / Processing に表示するところまでで、
+FFT（高速フーリエ変換）の扱い方は出てこなかった。FFT を一から実装するのは
+難しいので、
+\begin{itemize}
+  \item Processing でそのまま使える FFT ライブラリ（Minim の \texttt{FFT} クラス）の
+        基本的な使い方
+  \item Arduino 側のサンプリング周期と FFT の周波数軸（ナイキスト周波数）の対応
+        の取り方
+\end{itemize}
+を生成AIに相談した。マイクからのサンプル受信・楽曲再生は提出課題2 の
+コードを流用しており、その部分は AI に相談していない。
 
 \section*{2. AIへの指示（プロンプト）}
 \begin{lstlisting}
-Processing でマイクから入ってきた音を FFT して、周波数ごとの強さを
+Processing で、マイクから入ってきた音を FFT して周波数ごとの強さを
 バーグラフで表示するプログラムを作りたいです。
 - 入力は Arduino から 1 行 1 サンプル送られてくる ADC 値 (0-1023)
-- Arduino 側のサンプリング周期は delay(1) なので約 1 kHz
+- Arduino 側のサンプリング周期は delayMicroseconds(100) で、analogRead 自体に
+  かかる時間も合わせて実測で約 5 kHz になる予定
 Minim の FFT クラスをどう使うのが一番シンプルですか?
+入力データの正規化と、表示する周波数軸（横軸）をサンプリング周波数に
+合わせる方法も教えてください。
 \end{lstlisting}
 
 \section*{3. AIの出力の使い方}
@@ -54,15 +65,22 @@ Minim の FFT クラスをどう使うのが一番シンプルですか?
 \end{itemize}
 $\rightarrow$ 上で選んだ理由：
 
-AI からは「\texttt{FFT} を \texttt{new FFT(FFT\_SIZE, SAMPLE\_RATE)} で作る」
-「入力は \texttt{[-1, +1]} に正規化した \texttt{float} 配列を用意する」
-「\texttt{fft.forward(input)} を呼んだ後 \texttt{fft.getBand(i)} で各ビンの
-強度を取れる」という基本の流れを教えてもらい、これは採用した。
+AI からは
+\begin{itemize}
+  \item \texttt{FFT} を \texttt{new FFT(FFT\_SIZE, SAMPLE\_RATE)} で作る
+  \item 入力は \texttt{[-1, +1]} に正規化した \texttt{float} 配列を用意する
+        （直流成分を除くために中心電圧を引く）
+  \item \texttt{fft.forward(input)} を呼んだ後、\texttt{fft.specSize()} 個の
+        ビンを \texttt{fft.getBand(i)} で順に取り出して棒の高さに使う
+  \item 横軸を Hz 表記したいときは \texttt{map(hz, 0, SAMPLE\_RATE/2, 0, width)} で
+        位置を計算する
+\end{itemize}
+という基本の流れを教えてもらい、これは採用した。
 ただし AI が最初に書いてきたサンプルは「Hamming 窓 + dB 変換 + 色相を
 周波数で連続変化させたカラフルなバー + 表示する周波数の上限制限」など、
-要件以上に盛り込まれていた。授業の課題は「FFT の結果をバーグラフで表示する」
+要件以上に盛り込まれていた。授業の発展課題は「FFT の結果をバーグラフで表示する」
 だけなので、いったんすべて外し、線形の振幅をそのままバーの高さにする
-シンプルな形に書き直した。色も単色 1 つに統一した。
+シンプルな形に書き直した。色も単色に統一した。
 
 \section*{4. 正しいと確認した方法}
 \begin{itemize}
@@ -70,15 +88,15 @@ AI からは「\texttt{FFT} を \texttt{new FFT(FFT\_SIZE, SAMPLE\_RATE)} で作
         1 行 1 サンプルで流れることを確認した
   \item Processing IDE で \texttt{HCK02\_03.pde} を起動し、上段に時間波形・
         下段にスペクトルバーが描画されることを確認した
-  \item キー \texttt{p} で楽曲を再生してマイクに入力したとき、楽曲の音 (C4 / G4 / A4)
-        付近のバーが立ち上がる様子を観察した
-  \item \texttt{1} (正弦波) で再生したときは基音のバー1本がはっきり立ち、
-        \texttt{3} (のこぎり波) や \texttt{4} (矩形波) では倍音にあたる位置にも
+  \item キー \texttt{p} で楽曲を再生してマイクに入力したとき、楽曲の音
+        (C4 / G4 / A4) 付近のバーが立ち上がる様子を観察した
+  \item \texttt{1}（正弦波）で再生したときは基音のバー 1 本がはっきり立ち、
+        \texttt{3}（のこぎり波）や \texttt{4}（矩形波）では倍音にあたる位置にも
         バーが並ぶことを確認した。これにより波形の違いと FFT 結果の対応が
         理解できているか確かめた
-  \item Arduino 側の \texttt{delay(1)} と Processing 側の \texttt{SAMPLE\_RATE = 1000.0}
-        が対応していること、ナイキスト周波数が 500\,Hz で目盛りの上限と
-        一致していることをコード上で確認した
+  \item Arduino 側 \texttt{delayMicroseconds(100)} と Processing 側
+        \texttt{SAMPLE\_RATE = 5000.0} が対応していること、
+        ナイキスト周波数が 2.5\,kHz になることをコード上で確認した
 \end{itemize}
 
 \section*{5. 問題や間違い}
@@ -101,13 +119,14 @@ AI からは「\texttt{FFT} を \texttt{new FFT(FFT\_SIZE, SAMPLE\_RATE)} で作
 
 \section*{6. 自分で工夫した点}
 \begin{itemize}
-  \item Arduino 側のサンプリング周期と Processing 側の \texttt{SAMPLE\_RATE} を
+  \item Arduino 側のループ周期と Processing 側の \texttt{SAMPLE\_RATE} を
         必ず一致させないと FFT の周波数軸がずれることに気づき、
-        どちらも 1\,kHz と分かる素直な数値で揃えた
+        \texttt{delayMicroseconds(100)} と \texttt{analogRead} の所要時間から
+        実機での周期を見積もり、\texttt{SAMPLE\_RATE = 5000.0} に揃えた
   \item シリアルから受け取った値を \texttt{[-1, +1]} に正規化してから FFT に
         渡すことで、直流成分（中心電圧）を抜いた状態でスペクトルを取った
   \item 1 つの \texttt{serialEvent} で時間波形バッファと FFT 入力バッファの
-        両方を同時に更新する形にし、上下 2 段の表示が同じサンプルから
+        両方を同時に更新する形にし、上下 2 段の表示が同じサンプル列から
         作られるようにした
   \item バーの高さの上限 (\texttt{maxMag}) は実測しながら見やすい値に
         手で調整して決めた
@@ -115,7 +134,8 @@ AI からは「\texttt{FFT} を \texttt{new FFT(FFT\_SIZE, SAMPLE\_RATE)} で作
 
 \section*{参考文献}
 \begin{itemize}
-  \item 有本泰子, 佐波孝彦「ハッカソン1 第2回」講義資料 (\texttt{HCK1\_02.pdf}, \texttt{HCK1\_02\_ex.pdf})
+  \item 有本泰子, 佐波孝彦「ハッカソン1 第2回」講義資料
+        (\texttt{HCK1\_02.pdf}, \texttt{HCK1\_02\_ex.pdf})
   \item 生成AI利用申告書テンプレート（ハッカソン1 講義資料）
   \item Processing Reference: \texttt{Serial}, \texttt{bufferUntil}, \texttt{serialEvent} \\
         \url{https://processing.org/reference/libraries/serial/}
