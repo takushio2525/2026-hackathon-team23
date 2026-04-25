@@ -19,5 +19,5 @@ void loop() {
   Serial.print(',');
   Serial.println(1023);
 
-  delay(1);
+  delayMicroseconds(100);
 }

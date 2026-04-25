@@ -10,8 +10,8 @@ import ddf.minim.analysis.FFT;
 final String PORT_NAME   = "/dev/cu.usbmodem34B7DA64482C2";
 final int    BAUD        = 921600;
 final int    ADC_MAX     = 1023;
-// Arduino は delay(1) なのでサンプリング周波数は約 1 kHz
-final float  SAMPLE_RATE = 1000.0;
+// Arduino は delayMicroseconds(100) なのでサンプリング周波数は約 5 kHz（実機に合わせて要調整）
+final float  SAMPLE_RATE = 5000.0;
 final int    FFT_SIZE    = 512;
 
 Serial  port;
