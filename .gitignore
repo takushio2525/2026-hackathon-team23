@@ -50,8 +50,8 @@ build/
 *.glo
 *.gls
 *.ist
-# 生成 PDF（手元で Docker コンパイルして確認する運用）
-report/main.pdf
+# 生成 PDF（手元で latexmk / Docker コンパイルして確認する運用）
+report/**/*.pdf
 
 # ===== Processing =====
 *.pde.bak
