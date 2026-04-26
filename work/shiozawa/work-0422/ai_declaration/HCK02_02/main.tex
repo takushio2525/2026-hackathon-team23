@@ -44,15 +44,15 @@ Serial Plotter に波形が正しく出るようにした．提出課題2 はそ
 
 \section*{2. AIへの指示（プロンプト）}
 \begin{lstlisting}
-Arduino でマイクの値を analogRead して、Processing のウィンドウに
-時系列の波形として描きたいです。
+課題1 で、Arduino 側は Serial.println(d) で 1 行 1 サンプルの整数を
+送るところまでできています。これを Processing のウィンドウに、
+左から右に流れる時系列の波形として描きたいです。
 - 授業の例題1 では Serial.write で 1 バイト送って、Processing 側で
   serialEvent から read() を呼ぶ書き方を習いました
-- 今回は値を連続で送り続け、ウィンドウの左から右に波形が並ぶように
-  描きたいです
-Arduino 側はどう送るのが扱いやすいですか? また Processing 側では
-受信したサンプルをどんなバッファに貯めて、どう毎フレーム描けば
-よいですか?
+- 今回は連続で送られてくる整数を受け取って、ウィンドウの左から右に
+  波形として並べて描きたいです
+Processing 側で、受信したサンプルをどんなバッファに貯めて、
+毎フレームどう描けばよいですか?
 \end{lstlisting}
 
 \section*{3. AIの出力の使い方}
