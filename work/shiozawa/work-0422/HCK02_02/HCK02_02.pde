@@ -5,7 +5,7 @@ import ddf.minim.*;
 import ddf.minim.ugens.*;
 
 // 自分の環境のポート名に書き換える
-final String PORT_NAME = "/dev/cu.usbmodem34B7DA642F642";
+final String PORT_NAME = "/dev/cu.usbmodem34B7DA64482C2";
 final int    BAUD      = 921600;
 final int    ADC_MAX   = 1023;
 
