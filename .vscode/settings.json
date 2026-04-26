@@ -36,6 +36,6 @@
     "latex-workshop.latex.recipes": [
         { "name": "latexmk (platex)", "tools": ["latexmk"] }
     ],
-    "latex-workshop.latex.autoBuild.run": "onFileChange",
+    "latex-workshop.latex.autoBuild.run": "never",
     "latex-workshop.view.pdf.viewer": "tab"
 }
