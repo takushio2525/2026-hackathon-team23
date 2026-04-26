@@ -52,12 +52,12 @@ void loop() {
   a = a - maxa;           // 中⼼を0にする
   float mina = -maxa;     // 振幅最⼩値
   // シリアルモニタに出⼒
-  Serial.print("実測値:");
-  Serial.print(d);
-  Serial.print(",振幅:");
-  Serial.print(a);
-  Serial.print(",最⼤振幅:");
-  Serial.print(maxa);
-  Serial.print(",最⼩振幅:");
-  Serial.println(mina);
+  //Serial.print("実測値:");
+  Serial.println(d);
+  // //Serial.print(",振幅:");
+  // Serial.print(a);
+  // //Serial.print(",最⼤振幅:");
+  // Serial.print(maxa);
+  // //Serial.print(",最⼩振幅:");
+  // Serial.println(mina);
 }
