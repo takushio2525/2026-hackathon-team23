@@ -76,10 +76,7 @@ void draw() {
 
   drawSpectrum();
 
-  fill(200);
-  noStroke();
-  textSize(12);
-  text("p: 再生 / 1-4: 音色切替", 10, height - 10);
+  
 }
 
 void drawSpectrum() {
