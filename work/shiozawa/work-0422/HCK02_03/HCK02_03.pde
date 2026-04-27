@@ -13,8 +13,6 @@ final int    ADC_MAX     = 1023;
 // Arduino は delayMicroseconds(100) なのでサンプリング周波数は約 5 kHz（実機に合わせて要調整）
 final float  SAMPLE_RATE = 5000.0;
 final int    FFT_SIZE    = 512;
-// 波形表示で使う直近サンプル数（少なくするほど拡大される）
-final int    WAVE_SHOW   = 100;
 
 Serial  port;
 int[]   samples;
@@ -97,24 +95,17 @@ void drawWave() {
 
   stroke(255);
   noFill();
-  // 直近 WAVE_SHOW 個をウィンドウ幅に引き伸ばして描画（サンプル間を線形補間）
+  // 1サンプル=1ピクセルで描画（バッファ全体 = width 個）
+  // → 1フレームあたりの更新が全体の ~9% で滑らかにスクロールする
   for (int x = 0; x < width - 1; x++) {
-    float y1 = lerpSample(x,     midY, amp);
-    float y2 = lerpSample(x + 1, midY, amp);
+    int i1 = (sampleIdx + x)     % samples.length;
+    int i2 = (sampleIdx + x + 1) % samples.length;
+    float y1 = midY - (samples[i1] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
+    float y2 = midY - (samples[i2] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
     line(x, y1, x + 1, y2);
   }
   stroke(80);
   line(0, height * 0.5, width, height * 0.5);
-}
-
-// ピクセル位置 x に対応するサンプル値を線形補間で返す
-float lerpSample(int x, float midY, float amp) {
-  float fi   = (float) x / width * WAVE_SHOW;
-  int   idxA = (sampleIdx - WAVE_SHOW + (int) fi + samples.length) % samples.length;
-  int   idxB = (idxA + 1) % samples.length;
-  float frac = fi - (int) fi;
-  float val  = samples[idxA] * (1 - frac) + samples[idxB] * frac;
-  return midY - (val - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
 }
 
 void drawSpectrum() {
