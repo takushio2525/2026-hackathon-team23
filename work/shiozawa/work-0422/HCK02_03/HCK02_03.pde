@@ -13,6 +13,8 @@ final int    ADC_MAX     = 1023;
 // Arduino は delayMicroseconds(100) なのでサンプリング周波数は約 5 kHz（実機に合わせて要調整）
 final float  SAMPLE_RATE = 5000.0;
 final int    FFT_SIZE    = 512;
+// 波形表示で使う直近サンプル数（少なくするほど拡大される）
+final int    WAVE_SHOW   = 256;
 
 Serial  port;
 int[]   samples;
@@ -89,23 +91,28 @@ void draw() {
 }
 
 void drawWave() {
-  final float midY = 100;
-  final float amp  = 70;
+  // 上半分をゆったり使う
+  final float midY = height * 0.25;
+  final float amp  = height * 0.20;
+
   stroke(255);
   noFill();
+  // 直近 WAVE_SHOW 個をウィンドウ幅に引き伸ばして描画
   for (int x = 0; x < width - 1; x++) {
-    int i1 = (sampleIdx + x)     % samples.length;
-    int i2 = (sampleIdx + x + 1) % samples.length;
-    float y1 = midY - (samples[i1] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
-    float y2 = midY - (samples[i2] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
+    float fi1 = (float) x       / width * WAVE_SHOW;
+    float fi2 = (float) (x + 1) / width * WAVE_SHOW;
+    int   si1 = (sampleIdx - WAVE_SHOW + (int) fi1 + samples.length) % samples.length;
+    int   si2 = (sampleIdx - WAVE_SHOW + (int) fi2 + samples.length) % samples.length;
+    float y1  = midY - (samples[si1] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
+    float y2  = midY - (samples[si2] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
     line(x, y1, x + 1, y2);
   }
   stroke(80);
-  line(0, 200, width, 200);
+  line(0, height * 0.5, width, height * 0.5);
 }
 
 void drawSpectrum() {
-  final float top    = 220;
+  final float top    = height * 0.55;
   final float bottom = height - 30;
   final float maxMag = 30;  // バーの表示上限の目安
 
