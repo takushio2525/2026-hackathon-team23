@@ -61,8 +61,8 @@
     <tr><td>113 MOE / MOP / TPM の最終化</td><td align="center">全員</td></tr>
     <tr><td>114 システムアーキテクチャ設計（EMA 準拠）</td><td align="center">塩澤</td></tr>
     <tr><td>115 通信プロトコル基本設計（CTRL/BEAT/NOTE）</td><td align="center">塩澤</td></tr>
-    <tr><td>116 楽譜データ形式 基本設計（4 パート/ROM 埋込）</td><td align="center">齋藤</td></tr>
-    <tr><td>117 音色合成 基本設計（金管倍音 + ADSR）</td><td align="center">梅澤</td></tr>
+    <tr><td>116 楽譜データ形式 基本設計（4 種類の楽器パートを Arduino のメモリに埋め込む方針）</td><td align="center">齋藤</td></tr>
+    <tr><td>117 音色合成 基本設計（金管楽器っぽい音色を作る方針：重ねる倍音と、音の立ち上がり・伸び・余韻のカーブ）</td><td align="center">梅澤</td></tr>
     <tr>
       <td rowspan="10" align="center">120</td>
       <td rowspan="10">詳細設計</td>
@@ -71,13 +71,13 @@
     </tr>
     <tr><td>122 <code>node_01</code> 詳細設計（IMU→拍検出→テンポ推定→送出）</td><td align="center">塩澤</td></tr>
     <tr><td>123 <code>node_02-05</code> 詳細設計（受信→楽譜進行→NOTE 送出）</td><td align="center">塩澤</td></tr>
-    <tr><td>124 Processing 詳細設計：NOTE 受信モジュール仕様（パース→キュー）</td><td align="center">梅澤</td></tr>
-    <tr><td>125 Processing 詳細設計：ボイス管理（4 パート同時発音／ボイス割り当て）</td><td align="center">梅澤</td></tr>
-    <tr><td>126 Processing 詳細設計：金管音色合成エンジン仕様（倍音構成 + ADSR 具体パラメータ）</td><td align="center">梅澤</td></tr>
-    <tr><td>127 <em>（余裕があれば）</em> Python で実音源を FFT→倍音・ADSR を抽出し 126 に反映</td><td align="center">梅澤</td></tr>
-    <tr><td>128 楽譜データ詳細設計：課題曲の 4 パートへの分配</td><td align="center">齋藤</td></tr>
-    <tr><td>129 楽譜データ詳細設計：テンポ・音程・拍の情報フォーマット</td><td align="center">齋藤</td></tr>
-    <tr><td>130 楽譜データ詳細設計：Arduino（<code>node_02-05</code>）→ Processing の音楽データ仕様</td><td align="center">齋藤</td></tr>
+    <tr><td>124 Processing 詳細設計：Arduino から届く音の指令（NOTE）を受け取って順番に並べる仕組み</td><td align="center">梅澤</td></tr>
+    <tr><td>125 Processing 詳細設計：4 種類の楽器パートを同時に鳴らす管理（どの音をどの発音枠で鳴らすか）</td><td align="center">梅澤</td></tr>
+    <tr><td>126 Processing 詳細設計：金管楽器っぽい音色を作る仕組み（重ねる倍音と、音の立ち上がり・伸び・余韻のカーブ）</td><td align="center">梅澤</td></tr>
+    <tr><td>127 <em>（余裕があれば）</em> Python で実際の金管楽器音を周波数分解（FFT）して、倍音と音量カーブの実データを取り出し 126 に反映</td><td align="center">梅澤</td></tr>
+    <tr><td>128 楽譜データ詳細設計：課題曲を 4 種類の楽器パートに振り分ける（誰がどのメロディを演奏するか）</td><td align="center">齋藤</td></tr>
+    <tr><td>129 楽譜データ詳細設計：テンポ・音の高さ・拍（リズム）をどんな形でデータに書くか決める</td><td align="center">齋藤</td></tr>
+    <tr><td>130 楽譜データ詳細設計：Arduino（<code>node_02-05</code>）から PC（Processing）へ送る音データの中身（何を、どのタイミングで送るか）</td><td align="center">齋藤</td></tr>
   </tbody>
 
   <tbody>
