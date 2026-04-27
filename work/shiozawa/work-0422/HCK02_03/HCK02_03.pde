@@ -18,7 +18,6 @@ Serial  port;
 int[]   samples;
 int     sampleIdx = 0;
 float[] fftInput;
-int     fftIdx = 0;
 FFT     fft;
 
 // --- 楽曲再生 ---
@@ -73,7 +72,14 @@ void setup() {
 
 void draw() {
   background(0);
+
+  // samples の最新 FFT_SIZE 個を時系列順に並べて [-1, +1] に正規化してから FFT
+  for (int i = 0; i < FFT_SIZE; i++) {
+    int idx = (sampleIdx - FFT_SIZE + i + samples.length) % samples.length;
+    fftInput[i] = (samples[idx] - ADC_MAX / 2.0) / (ADC_MAX / 2.0);
+  }
   fft.forward(fftInput);
+
   drawWave();
   drawSpectrum();
   fill(200);
@@ -128,15 +134,9 @@ void serialEvent(Serial p) {
   if (line == null) return;
   line = trim(line);
   try {
-    int v = Integer.parseInt(line);
-    v = constrain(v, 0, ADC_MAX);
-
+    int v = constrain(Integer.parseInt(line), 0, ADC_MAX);
     samples[sampleIdx] = v;
     sampleIdx = (sampleIdx + 1) % samples.length;
-
-    // FFT 入力は [-1, 1] に正規化
-    fftInput[fftIdx] = (v - ADC_MAX / 2.0) / (ADC_MAX / 2.0);
-    fftIdx = (fftIdx + 1) % FFT_SIZE;
   } catch (NumberFormatException e) {
     // 文字化けは無視
   }
