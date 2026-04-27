@@ -91,15 +91,7 @@ $\rightarrow$ 上で選んだ理由：
 \section*{6. 自分で工夫した点}
 AI が出したコードは上段に時間波形・下段にスペクトルという 2 段構成だったが，時間波形は
 提出課題2 と重複するため \texttt{drawWave()} を削除し，スペクトルバーだけを画面全体に
-大きく表示するレイアウトに変更した．また，採用にあたってコードを 1 行ずつ読み直し，
-\begin{itemize}
-  \item 入力を \texttt{[-1, +1]} に正規化しているのは中心電圧ぶんを引いて直流成分を抜くため
-  \item \texttt{SAMPLE\_RATE = 5000.0} を Arduino 側の \texttt{delayMicroseconds(100)} と
-        対応させているのは，FFT の周波数軸を実際の Hz に合わせるため
-  \item ナイキスト周波数（\texttt{SAMPLE\_RATE / 2 = 2.5\,kHz}）までしか意味のあるバーは
-        出ないこと
-\end{itemize}
-を自分の言葉で説明できるところまで確認したうえで提出した．
+大きく表示するレイアウトに変更した．
 
 \section*{参考文献}
 \begin{itemize}
