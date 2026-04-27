@@ -1,63 +1,50 @@
-// work3_sim - work3.ino の擬似シミュレーション版
+// work3_sim - スペクトラムアナライザ検証用シミュレータ
 //
-// 目的:
-//   work3.ino はマイク（A0）から analogRead した値を漢字ラベル付きで
-//   Serial.print する構成。このスケッチはマイクが壊れている状態でも
-//   同じフォーマットで「波形が崩れて見える」状況を再現できるよう、
-//   analogRead を内部タイマー基準の sin 波生成に置き換えたもの。
-//
-// 仕様:
-//   - analogRead(PIN) を呼び出す代わりに、micros() から時刻 t を取り、
-//     SIM_FREQ [Hz] の sin 波を 0〜1023 の整数値に量子化して d とする
-//   - 以降の処理（電圧換算・中心化・漢字ラベル付きシリアル出力）は
-//     work3.ino と完全同一
-//
-// ※ サンプリング時刻は「Serial 出力が呼ばれた瞬間の micros()」になる。
-//   漢字ラベル送信が支配的に時間を食うため、t がガタつく → 本来の
-//   サイン波が Serial Plotter 上で正しく見えない、という状況を再現する。
+// 2秒ごとにド→レ→ミ→ファ→ソ→ラ→シ→ド（C4〜C5）を
+// 順番に切り替えて sin 波を生成する。
+// スペクトラム表示側でピーク周波数が階段状に上がっていけば正常。
 
-#define BAUD 921600    // ボーレート（速め）
-#define PIN 0          // A0 アナログ⼊⼒（互換のため定義のみ・本スケッチでは未使用）
-#define RESOLUTION 10  // 量⼦化10bit
+#define BAUD 921600
+#define PIN 0
+#define RESOLUTION 10
 
-// シミュレーションする波形の周波数
-const float SIM_FREQ = 440.0;
+// ド レ ミ ファ ソ ラ シ ド（C4〜C5, 平均律）
+const float SCALE[] = {
+  261.63,  // C4  ド
+  293.66,  // D4  レ
+  329.63,  // E4  ミ
+  349.23,  // F4  ファ
+  392.00,  // G4  ソ
+  440.00,  // A4  ラ
+  493.88,  // B4  シ
+  523.25   // C5  ド
+};
+const int SCALE_LEN = sizeof(SCALE) / sizeof(SCALE[0]);
 
-// 10bit 量子化の最大値・中央値（事前計算）
+// 各音の持続時間 [ms]
+const unsigned long NOTE_DURATION_MS = 2000;
+
 const int SIM_ADC_MAX = 1023;
 const int SIM_ADC_MID = SIM_ADC_MAX / 2;
 
 void setup() {
-  // マイクのポートを指定（シミュレーションでは未使用だが互換のため残す）
   pinMode(PIN, INPUT);
-  // シリアル通信の速度を設定(bit per second)
   Serial.begin(BAUD);
-  // アナログ読み込みの量⼦化精度
   analogReadResolution(RESOLUTION);
 }
 
 void loop() {
-  // ------ analogRead(PIN) の代わりに内部タイマー基準で sin 波を生成 ------
-  // 「シリアル出力が行われる瞬間のマイコン起動時間」を t とする
+  // 現在の音階インデックスを経過時間から決定
+  unsigned long now = millis();
+  int noteIndex = (now / NOTE_DURATION_MS) % SCALE_LEN;
+  float freq = SCALE[noteIndex];
+
+  // sin 波生成
   float t = (float)micros() / 1000000.0;
-  float s = sin(2.0 * PI * SIM_FREQ * t);          // -1.0 〜 +1.0
-  int d = (int)(SIM_ADC_MID + s * SIM_ADC_MID);    // 0 〜 1023
+  float s = sin(2.0 * PI * freq * t);
+  int d = (int)(SIM_ADC_MID + s * SIM_ADC_MID);
   if (d < 0)            d = 0;
   if (d > SIM_ADC_MAX)  d = SIM_ADC_MAX;
-  // ----------------------------------------------------------------------
 
-  // 読み込んだ値を量⼦化精度で規格化し，電圧を取得
-  float a = (float)d / (pow(2, RESOLUTION) - 1) * 5.0;
-  float maxa = 3.3 / 2.0; // 振幅最⼤値
-  a = a - maxa;           // 中⼼を0にする
-  float mina = -maxa;     // 振幅最⼩値
-  // シリアルモニタに出⼒
-  //Serial.print("実測値:");
   Serial.println(d);
-  // //Serial.print(",振幅:");
-  // Serial.print(a);
-  // //Serial.print(",最⼤振幅:");
-  // Serial.print(maxa);
-  // //Serial.print(",最⼩振幅:");
-  // Serial.println(mina);
 }
