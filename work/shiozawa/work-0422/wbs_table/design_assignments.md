@@ -5,12 +5,6 @@
 第3回ミーティング前（今週）に、各自が **「基本設計」「詳細設計」として
 何を持ち寄るか**を担当者ごとに一目で確認できるよう抜粋したもの。
 
-- 元データは同フォルダの [`README.md`](README.md)（全 51 タスクの WBS 表）。
-- そのうち **110 基本設計** と **120 詳細設計** から、各自が個別に分担して
-  仕上げてくる対象だけを抜き出している。
-- **111 FBS / 112 PBS / 113 MOE・MOP・TPM の最終化** は、
-  チーム全員で合意形成するタスクなので個別分担対象から外している
-  （ミーティング中に詰める）。
 
 ## 担当者表記
 
@@ -28,26 +22,25 @@
 - **122** `node_01` 詳細設計（IMU→拍検出→テンポ推定→送出）
 - **123** `node_02-05` 詳細設計（受信→楽譜進行→NOTE 送出）
 
-### 齋藤（2 タスク）
+### 齋藤（4 タスク）
 
 - **116** 楽譜データ形式 基本設計（4 パート/ROM 埋込）
-- **125** 楽譜データ詳細設計
-  - 課題曲のパート割・データ表化
-  - **テンポ・音程・拍** の情報フォーマット
-  - **Arduino 側（`node_02-05`）から Processing へ送る音楽データ仕様**
-    （何を、どんな粒度で、どのタイミングで送るか）
+- **128** 楽譜データ詳細設計：**課題曲の 4 パートへの分配**
+- **129** 楽譜データ詳細設計：**テンポ・音程・拍** の情報フォーマット
+- **130** 楽譜データ詳細設計：**Arduino**（`node_02-05`）**→ Processing** の音楽データ仕様
+  （何を、どんな粒度で、どのタイミングで送るか）
 
-### 梅澤（2 タスク）
+### 梅澤（5 タスク／うち 127 は任意）
 
 - **117** 音色合成 基本設計（金管倍音 + ADSR）
-- **124** Processing 詳細設計
-  - NOTE 受信 → ボイス管理 → 出力
-  - **（余裕があれば）** Python で実音源を FFT し、
-    **倍音構成・ADSR パラメータ** を取得して 252 の合成エンジン設計に反映
+- **124** Processing 詳細設計：**NOTE 受信モジュール** 仕様（パース → キュー）
+- **125** Processing 詳細設計：**ボイス管理**（4 パート同時発音／ボイス割り当てロジック）
+- **126** Processing 詳細設計：**金管音色合成エンジン** 仕様
+  （倍音構成 + ADSR の具体パラメータ）
+- **127** *（余裕があれば）* **Python で実音源解析**：
+  FFT で倍音構成と ADSR を抽出 → 126 に反映
 
 ## フェーズ × 番号順の表
-
-> `README.md` と同じ HTML 縦結合（`rowspan`）形式で 110・120 のみ抜粋。
 
 <table border="1">
   <thead>
@@ -62,7 +55,7 @@
 
   <tbody>
     <tr>
-      <td rowspan="9" align="center"><strong>100<br>設計フェーズ</strong></td>
+      <td rowspan="14" align="center"><strong>100<br>設計フェーズ</strong></td>
       <td rowspan="4" align="center">110</td>
       <td rowspan="4">基本設計</td>
       <td>114 システムアーキテクチャ設計（EMA 準拠）</td>
@@ -72,28 +65,20 @@
     <tr><td>116 楽譜データ形式 基本設計（4 パート/ROM 埋込）</td><td align="center">齋藤</td></tr>
     <tr><td>117 音色合成 基本設計（金管倍音 + ADSR）</td><td align="center">梅澤</td></tr>
     <tr>
-      <td rowspan="5" align="center">120</td>
-      <td rowspan="5">詳細設計</td>
+      <td rowspan="10" align="center">120</td>
+      <td rowspan="10">詳細設計</td>
       <td>121 共通層 API 詳細（IModule / SystemData / ProjectConfig）</td>
       <td align="center">塩澤</td>
     </tr>
     <tr><td>122 <code>node_01</code> 詳細設計（IMU→拍検出→テンポ推定→送出）</td><td align="center">塩澤</td></tr>
     <tr><td>123 <code>node_02-05</code> 詳細設計（受信→楽譜進行→NOTE 送出）</td><td align="center">塩澤</td></tr>
-    <tr><td>124 Processing 詳細設計（NOTE 受信→ボイス管理→出力／<em>余裕があれば</em> Python で実音源を FFT→倍音・ADSR パラメータ取得）</td><td align="center">梅澤</td></tr>
-    <tr><td>125 楽譜データ詳細設計（課題曲のパート割・データ表化／テンポ・音程・拍のフォーマット／Arduino 側（<code>node_02-05</code>）から Processing へ送る音楽データ仕様）</td><td align="center">齋藤</td></tr>
+    <tr><td>124 Processing 詳細設計：NOTE 受信モジュール仕様（パース→キュー）</td><td align="center">梅澤</td></tr>
+    <tr><td>125 Processing 詳細設計：ボイス管理（4 パート同時発音／ボイス割り当て）</td><td align="center">梅澤</td></tr>
+    <tr><td>126 Processing 詳細設計：金管音色合成エンジン仕様（倍音構成 + ADSR 具体パラメータ）</td><td align="center">梅澤</td></tr>
+    <tr><td>127 <em>（余裕があれば）</em> Python で実音源を FFT→倍音・ADSR を抽出し 126 に反映</td><td align="center">梅澤</td></tr>
+    <tr><td>128 楽譜データ詳細設計：課題曲の 4 パートへの分配</td><td align="center">齋藤</td></tr>
+    <tr><td>129 楽譜データ詳細設計：テンポ・音程・拍の情報フォーマット</td><td align="center">齋藤</td></tr>
+    <tr><td>130 楽譜データ詳細設計：Arduino（<code>node_02-05</code>）→ Processing の音楽データ仕様</td><td align="center">齋藤</td></tr>
   </tbody>
 </table>
 
-## 補足
-
-- 「基本設計」と「詳細設計」の中身（成果物の形式・粒度）は、
-  ミーティングで合意したフォーマット（Markdown / 図 / 表 など）で各自まとめる。
-- 同じ番号の基本設計と詳細設計は紐付いている
-  （例：115 通信プロトコル基本設計 → 121 共通層 API 詳細 → 122/123 ノード詳細）。
-- 完成したら `work/<各自のフォルダ>/` 配下に成果物を置き、第3回ミーティングで
-  共有する想定。
-
-## 不要になったら
-
-第3回ミーティングで全員の設計が共有され、計画書本体や設計成果物リポジトリに
-取り込まれたら役割を終えるので削除して構わない。

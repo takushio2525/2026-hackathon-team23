@@ -51,7 +51,7 @@
 
   <tbody>
     <tr>
-      <td rowspan="12" align="center"><strong>100<br>設計フェーズ</strong></td>
+      <td rowspan="17" align="center"><strong>100<br>設計フェーズ</strong></td>
       <td rowspan="7" align="center">110</td>
       <td rowspan="7">基本設計</td>
       <td>111 FBS（機能分解構造）の最終化</td>
@@ -64,15 +64,20 @@
     <tr><td>116 楽譜データ形式 基本設計（4 パート/ROM 埋込）</td><td align="center">齋藤</td></tr>
     <tr><td>117 音色合成 基本設計（金管倍音 + ADSR）</td><td align="center">梅澤</td></tr>
     <tr>
-      <td rowspan="5" align="center">120</td>
-      <td rowspan="5">詳細設計</td>
+      <td rowspan="10" align="center">120</td>
+      <td rowspan="10">詳細設計</td>
       <td>121 共通層 API 詳細（IModule / SystemData / ProjectConfig）</td>
       <td align="center">塩澤</td>
     </tr>
     <tr><td>122 <code>node_01</code> 詳細設計（IMU→拍検出→テンポ推定→送出）</td><td align="center">塩澤</td></tr>
     <tr><td>123 <code>node_02-05</code> 詳細設計（受信→楽譜進行→NOTE 送出）</td><td align="center">塩澤</td></tr>
-    <tr><td>124 Processing 詳細設計（NOTE 受信→ボイス管理→出力／<em>余裕があれば</em> Python で実音源を FFT→倍音・ADSR パラメータ取得）</td><td align="center">梅澤</td></tr>
-    <tr><td>125 楽譜データ詳細設計（課題曲のパート割・データ表化／テンポ・音程・拍のフォーマット／Arduino 側（<code>node_02-05</code>）から Processing へ送る音楽データ仕様）</td><td align="center">齋藤</td></tr>
+    <tr><td>124 Processing 詳細設計：NOTE 受信モジュール仕様（パース→キュー）</td><td align="center">梅澤</td></tr>
+    <tr><td>125 Processing 詳細設計：ボイス管理（4 パート同時発音／ボイス割り当て）</td><td align="center">梅澤</td></tr>
+    <tr><td>126 Processing 詳細設計：金管音色合成エンジン仕様（倍音構成 + ADSR 具体パラメータ）</td><td align="center">梅澤</td></tr>
+    <tr><td>127 <em>（余裕があれば）</em> Python で実音源を FFT→倍音・ADSR を抽出し 126 に反映</td><td align="center">梅澤</td></tr>
+    <tr><td>128 楽譜データ詳細設計：課題曲の 4 パートへの分配</td><td align="center">齋藤</td></tr>
+    <tr><td>129 楽譜データ詳細設計：テンポ・音程・拍の情報フォーマット</td><td align="center">齋藤</td></tr>
+    <tr><td>130 楽譜データ詳細設計：Arduino（<code>node_02-05</code>）→ Processing の音楽データ仕様</td><td align="center">齋藤</td></tr>
   </tbody>
 
   <tbody>
