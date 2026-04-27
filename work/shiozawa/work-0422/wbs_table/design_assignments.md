@@ -16,7 +16,7 @@
 
 ### 塩澤（5 タスク）
 
-- **114** システムアーキテクチャ設計（EMA 準拠）
+- **114** システムアーキテクチャ設計
 - **115** 通信プロトコル基本設計（CTRL/BEAT/NOTE）
 - **121** 共通層 API 詳細（IModule / SystemData / ProjectConfig）
 - **122** `node_01` 詳細設計（IMU→拍検出→テンポ推定→送出）
@@ -68,7 +68,7 @@
       <td rowspan="14" align="center"><strong>100<br>設計フェーズ</strong></td>
       <td rowspan="4" align="center">110</td>
       <td rowspan="4">基本設計</td>
-      <td>114 システムアーキテクチャ設計（EMA 準拠）</td>
+      <td>114 システムアーキテクチャ設計</td>
       <td align="center">塩澤</td>
     </tr>
     <tr><td>115 通信プロトコル基本設計（CTRL/BEAT/NOTE）</td><td align="center">塩澤</td></tr>
