@@ -248,7 +248,8 @@
     F3.3 BEAT 同期での音符進行，F3.4 NOTE イベント生成，
     F3.5 パート固有ロジック（\texttt{partId}・\texttt{startBeatNo}）．
   \item[F4. 発音情報配信（node\_02〜05 → PC）]
-    F4.1 NOTE パケット生成，F4.2 Processing への UDP ユニキャスト送信．
+    F4.1 NOTE パケット生成，F4.2 Processing への USB Serial 送信
+    （\texttt{Serial.write()}，CDC 1:1 接続）．
   \item[F5. 共通基盤（全ノード）]
     F5.1 \texttt{IModule} 登録・3 フェーズループ，
     F5.2 \texttt{ModuleTimer} による周期実行，
