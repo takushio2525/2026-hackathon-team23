@@ -40,7 +40,7 @@
   **金管楽器っぽい音色を作る方針**（重ねる倍音と、
   音の立ち上がり・伸び・余韻のカーブ）を決める
 - **124** Processing 詳細設計：
-  **Arduino から届く「音の指令（NOTE）」を受け取って順番に並べる仕組み**
+  **Arduino から届く「音の指令（NOTE）」を受け取って鳴らす仕組み**
 - **125** Processing 詳細設計：
   **4 種類の楽器パートを鳴らす管理**
   （どの音をどの発音枠で鳴らすかを決めるロジック）
@@ -82,7 +82,7 @@
     </tr>
     <tr><td>122 <code>node_01</code> 詳細設計（IMU→拍検出→テンポ推定→送出）</td><td align="center">塩澤</td></tr>
     <tr><td>123 <code>node_02-05</code> 詳細設計（受信→楽譜進行→NOTE 送出）</td><td align="center">塩澤</td></tr>
-    <tr><td>124 Processing 詳細設計：Arduino から届く音の指令（NOTE）を受け取って順番に並べる仕組み</td><td align="center">梅澤</td></tr>
+    <tr><td>124 Processing 詳細設計：Arduino から届く音の指令（NOTE）を受け取って鳴らす仕組み</td><td align="center">梅澤</td></tr>
     <tr><td>125 Processing 詳細設計：4 種類の楽器パートを鳴らす管理（どの音をどの発音枠で鳴らすか）</td><td align="center">梅澤</td></tr>
     <tr><td>126 Processing 詳細設計：金管楽器っぽい音色を作る仕組み（重ねる倍音と、音の立ち上がり・伸び・余韻のカーブ）</td><td align="center">梅澤</td></tr>
     <tr><td>127 <em>（余裕があれば）</em> Python で実際の金管楽器音を周波数分解（FFT）して、倍音と音量カーブの実データを取り出し 126 に反映</td><td align="center">梅澤</td></tr>
