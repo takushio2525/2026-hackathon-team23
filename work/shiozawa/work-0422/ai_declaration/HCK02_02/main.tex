@@ -57,29 +57,27 @@ Processing 側で、受信したサンプルをどんなバッファに貯めて
 
 \section*{3. AIの出力の使い方}
 \begin{itemize}
-  \item \cboxon そのまま使った
-  \item \cboxoff 一部修正して使った
+  \item \cboxoff そのまま使った
+  \item \cboxon 一部修正して使った
   \item \cboxoff 参考にしただけ
 \end{itemize}
 $\rightarrow$ 上で選んだ理由：
 
-受け取る側 (\texttt{HCK02\_02.pde}) のコードは，AI が出してくれたものを
-ほぼそのまま組み込んだ．動かしてみて，Arduino IDE の Serial Plotter で
-見える波形と同じような波形が Processing のウィンドウにも出ていることを
-確認した．また，コードを 1 行ずつ読み直し，\texttt{serialEvent} の動き方や
-循環バッファのインデックス計算がなぜ正しく動くのかを，自分の言葉で説明
-できるところまで理解してから提出した．
+Processing 側で波形を描く部分（\texttt{serialEvent} と \texttt{draw}）は，AI が出して
+くれたものをほぼそのまま使った．一方で，Arduino 側 (\texttt{HCK02\_02.ino}) は提出課題1
+のコードからガイド線出力を消しただけで AI には相談しておらず，Processing 側の楽曲再生
+(Minim) 部分も前回課題で書いたコードを統合して載せている．これらをまとめて 1 つの
+提出物にしているので「一部修正して使った」を選んだ．
 
 \section*{4. 正しいと確認した方法}
 \begin{itemize}
   \item Arduino IDE で \texttt{HCK02\_02.ino} がコンパイルでき，シリアルモニタ
-        に整数が 1 行ずつ流れることを確認した
+        に整数が 1 行ずつ流れることを確認した．
   \item Arduino IDE の Serial Plotter で見える波形と，Processing のウィンドウに
-        描かれる波形が，同じように見えていることを確認した
+        描かれる波形が，同じように見えていることを確認した．
   \item キー \texttt{p} を押すと前回課題と同じ楽曲が PC のスピーカから流れ，
-        その音をマイクが拾って波形がより大きく振れることを確認した
-  \item Processing のコードを読み直し，循環バッファのインデックス計算が
-        なぜ「右端が最新サンプル」になるかを自分で説明できるようにした
+        その音をマイクが拾って波形がより大きく振れることを確認した．
+  \item Processing のコードを読み直し，おかしなことしてないか確認した．
 \end{itemize}
 
 \section*{5. 問題や間違い}
@@ -91,13 +89,14 @@ $\rightarrow$ 上で選んだ理由：
 特になかった．
 
 \section*{6. 自分で工夫した点}
-特になし．AI が示した方針をそのまま採用した．
+直近 \texttt{DISPLAY\_SAMPLES} = 60 サンプルだけを画面幅に引き伸ばして描画するようにし，
+波形が流れる速さと見やすさのバランスを調整した．
 
 \section*{参考文献}
 \begin{itemize}
-  \item Arduino Reference: \texttt{Serial.println}, \texttt{analogRead} \\
+  \item Arduino Reference: \\
         \url{https://docs.arduino.cc/language-reference/}
-  \item Minim Reference: \texttt{AudioOutput}, \texttt{Oscil}, \texttt{Line} \\
+  \item Minim Reference:\\
         \url{https://code.compartmental.net/minim/}
 \end{itemize}
 
