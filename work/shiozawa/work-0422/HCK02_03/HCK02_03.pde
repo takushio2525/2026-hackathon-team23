@@ -1,5 +1,4 @@
-// 発展課題: マイク波形を FFT してスペクトルアナライザとして表示する。
-// 上段: 生波形 / 下段: 周波数スペクトル
+// 発展課題: マイク入力を FFT して周波数スペクトルを表示する。
 
 import processing.serial.*;
 import ddf.minim.*;
@@ -75,7 +74,6 @@ void draw() {
   }
   fft.forward(fftInput);
 
-  drawWave();
   drawSpectrum();
 
   fill(200);
@@ -84,28 +82,9 @@ void draw() {
   text("p: 再生 / 1-4: 音色切替", 10, height - 10);
 }
 
-// 上半分: 生波形
-void drawWave() {
-  float midY = height * 0.25;
-  float amp  = height * 0.20;
-
-  stroke(255);
-  noFill();
-  for (int x = 0; x < width - 1; x++) {
-    int i1 = (sampleIdx + x)     % samples.length;
-    int i2 = (sampleIdx + x + 1) % samples.length;
-    float y1 = midY - (samples[i1] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
-    float y2 = midY - (samples[i2] - ADC_MAX / 2.0) / (ADC_MAX / 2.0) * amp;
-    line(x, y1, x + 1, y2);
-  }
-  stroke(80);
-  line(0, height * 0.5, width, height * 0.5);
-}
-
-// 下半分: 周波数スペクトル
 void drawSpectrum() {
-  float top    = height * 0.55;
-  float bottom = height - 20;
+  float top    = 20;
+  float bottom = height - 30;
   int   bins   = fft.specSize();
   float barW   = (float) width / bins;
 
