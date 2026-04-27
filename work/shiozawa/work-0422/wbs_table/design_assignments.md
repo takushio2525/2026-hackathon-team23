@@ -31,12 +31,19 @@
 ### 齋藤（2 タスク）
 
 - **116** 楽譜データ形式 基本設計（4 パート/ROM 埋込）
-- **125** 楽譜データ詳細設計（課題曲のパート割・データ表化）
+- **125** 楽譜データ詳細設計
+  - 課題曲のパート割・データ表化
+  - **テンポ・音程・拍** の情報フォーマット
+  - **Arduino 側（`node_02-05`）から Processing へ送る音楽データ仕様**
+    （何を、どんな粒度で、どのタイミングで送るか）
 
 ### 梅澤（2 タスク）
 
 - **117** 音色合成 基本設計（金管倍音 + ADSR）
-- **124** Processing 詳細設計（NOTE 受信→ボイス管理→出力）
+- **124** Processing 詳細設計
+  - NOTE 受信 → ボイス管理 → 出力
+  - **（余裕があれば）** Python で実音源を FFT し、
+    **倍音構成・ADSR パラメータ** を取得して 252 の合成エンジン設計に反映
 
 ## フェーズ × 番号順の表
 
@@ -72,8 +79,8 @@
     </tr>
     <tr><td>122 <code>node_01</code> 詳細設計（IMU→拍検出→テンポ推定→送出）</td><td align="center">塩澤</td></tr>
     <tr><td>123 <code>node_02-05</code> 詳細設計（受信→楽譜進行→NOTE 送出）</td><td align="center">塩澤</td></tr>
-    <tr><td>124 Processing 詳細設計（NOTE 受信→ボイス管理→出力）</td><td align="center">梅澤</td></tr>
-    <tr><td>125 楽譜データ詳細設計（課題曲のパート割・データ表化）</td><td align="center">齋藤</td></tr>
+    <tr><td>124 Processing 詳細設計（NOTE 受信→ボイス管理→出力／<em>余裕があれば</em> Python で実音源を FFT→倍音・ADSR パラメータ取得）</td><td align="center">梅澤</td></tr>
+    <tr><td>125 楽譜データ詳細設計（課題曲のパート割・データ表化／テンポ・音程・拍のフォーマット／Arduino 側（<code>node_02-05</code>）から Processing へ送る音楽データ仕様）</td><td align="center">齋藤</td></tr>
   </tbody>
 </table>
 
