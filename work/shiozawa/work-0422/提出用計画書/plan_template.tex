@@ -14,6 +14,86 @@
 % 画像
 \usepackage{graphicx}
 
+% --- ここから第2・3章の執筆用に追加（hack-cover/hack-fonts は変更しない） ---
+% 色・テーブル・ボックス・コード・図
+\usepackage{xcolor}
+\usepackage[most,breakable]{tcolorbox}
+\usepackage{listings}
+% NOTE: plistings は lualatex + 日本語コメントの組合わせで衝突するためここでは外す
+% \usepackage{plistings}
+\usepackage{fancyvrb}         % Verbatim 系（listings が苦手な平文コードブロック用）
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{needspace}
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,fit,calc}
+
+% 色定義（プロジェクト標準色）
+\definecolor{headerblue}{HTML}{1B3A5C}
+\definecolor{accentblue}{HTML}{2E86C1}
+\definecolor{lightgray}{HTML}{F2F3F4}
+\definecolor{codebg}{HTML}{F7F9FB}
+\definecolor{warnred}{HTML}{E74C3C}
+\definecolor{noteyellow}{HTML}{F39C12}
+\definecolor{okgreen}{HTML}{27AE60}
+
+% 改ページ制御（孤立行・見出し直後の改ページ抑制）
+\widowpenalty=10000
+\clubpenalty=10000
+\predisplaypenalty=10000
+\interfootnotelinepenalty=10000
+\brokenpenalty=5000
+
+% C++ コードスタイル
+\lstdefinestyle{cppstyle}{
+  language=C++,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{accentblue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{okgreen},
+  numberstyle=\tiny\color{gray},
+  numbers=left,
+  numbersep=8pt,
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{accentblue},
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  breakatwhitespace=false,
+  tabsize=2,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=15pt,
+  framexleftmargin=15pt,
+  morekeywords={override,nullptr,constexpr,uint8_t,uint16_t,uint32_t,int8_t,int16_t,int32_t,bool,IPAddress,String},
+}
+\lstset{style=cppstyle}
+
+% tcolorbox の標準ふるまい（タイトル直後に改ページが入らないようにする）
+\tcbset{before={\par\medskip\needspace{2\baselineskip}\noindent}}
+
+\newtcolorbox{apibox}[1]{
+  enhanced, breakable,
+  colback=codebg, colframe=accentblue,
+  title=#1, fonttitle=\bfseries\small, coltitle=white,
+  attach boxed title to top left={xshift=4mm,yshift*=-2mm},
+  boxed title style={colback=accentblue,colframe=accentblue,sharp corners=northwest},
+  boxrule=0.6pt, arc=2pt,
+  left=4pt,right=4pt,top=6pt,bottom=4pt,
+}
+
+\newtcolorbox{notebox}{
+  enhanced, breakable,
+  colback=lightgray, colframe=noteyellow,
+  boxrule=0.5pt, arc=2pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,
+}
+% --- ここまで追加 ---
+
 
 \title{ハッカソン}
 \subtitle{～計画書と設計書～}
@@ -127,68 +207,1135 @@
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{システムの基本設計}
+\chapter{システムの基本設計}\label{chap:basic}
 
-設計書は作成する成果物によって変化します．
-適宜修正して利用してください．
+本章では，5 台の Arduino UNO R4 WiFi で構成する「Arduino オーケストラ」のうち
+塩澤担当範囲（指揮者ノード node\_01 と楽器ノード node\_02〜node\_05 のファームウェア）を
+対象に，システム全体の機能・構成・操作インターフェース・状態遷移を基本設計レベルでまとめる．
+PC 側 Processing による音色合成・スピーカ出力（梅澤担当）は本章のスコープ外とし，
+データ受け渡し境界（NOTE パケット）のみを定義する．
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\section{機能一覧}
-機能分解構造FBSの要素の説明
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\section{システム構成図}
-ハードウェア，ソフトウェアなどの構成図を記載する．
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\section{操作インターフェース設計}
-画面やスイッチなどのインターフェースの設計図を記載する
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\section{状態遷移図}
+ファームウェアの設計原則は，外部 OSS であり著者本人が公開している
+\textbf{Embedded-Module-Architecture（以下 EMA）}\footnote{\url{https://github.com/takushio2525/Embedded-Module-Architecture}}
+に全面準拠する．EMA の中核ルール（\texttt{IModule} インターフェース，3 フェーズループ，
+\texttt{SystemData} と \texttt{ProjectConfig} の集約）は \S\ref{sec:basic-architecture}
+で位置づけを示し，第 \ref{chap:detail} 章で具体化する．
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%
+\section{機能一覧}\label{sec:basic-functions}
 %%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{システムの詳細設計}
 
-設計書は作成する成果物によって変化します．
-適宜修正して利用してください．
+ファームウェア全体を機能分解構造（FBS）で整理する．本書スコープは Arduino 系のみであり，
+楽器音色や発表準備などチーム全体側の要素は含めない．
+
+\subsection{機能分解（FBS）}
+
+\begin{description}
+  \item[F1. 指揮情報抽出（node\_01）]
+    F1.1 IMU 6 軸の取得，F1.2 信号前処理（IIR LPF + ノルム），
+    F1.3 拍検出（振り下ろしピーク），F1.4 テンポ推定（拍間隔→BPM），
+    F1.5 強弱推定（振幅→velocity，ストレッチ），F1.6 演奏状態管理．
+  \item[F2. 指揮情報配信（node\_01）]
+    F2.1 CTRL 送出（BPM・velocity・state），F2.2 BEAT 送出（拍トリガ），
+    F2.3 WiFi STA 接続維持・再接続．
+  \item[F3. 楽譜進行（node\_02〜05）]
+    F3.1 CTRL/BEAT 受信，F3.2 楽譜データ保持（C 配列・パート別），
+    F3.3 BEAT 同期での音符進行，F3.4 NOTE イベント生成，
+    F3.5 パート固有ロジック（\texttt{partId}・\texttt{startBeatNo}）．
+  \item[F4. 発音情報配信（node\_02〜05 → PC）]
+    F4.1 NOTE パケット生成，F4.2 Processing への UDP ユニキャスト送信．
+  \item[F5. 共通基盤（全ノード）]
+    F5.1 \texttt{IModule} 登録・3 フェーズループ，
+    F5.2 \texttt{ModuleTimer} による周期実行，
+    F5.3 \texttt{SystemData}/\texttt{ProjectConfig} 集約，
+    F5.4 起動シーケンス・診断 LED，
+    F5.5 init 失敗リトライ・パケロス時のフォールバック．
+\end{description}
+
+ストレッチ機能（F1.5 強弱推定）は必達機能の実装完了後に着手する．
+詳細設計ではインターフェースだけ用意し，初期実装ではスタブで通す構成にする．
+
+\subsection{機能と性能指標（MOP）の対応}
+
+各機能に対する性能指標を表 \ref{tab:fbs-mop} に示す．目標値は原案段階のたたき台であり，
+実機計測後に第 \ref{sec:test-design} 節で再調整する．
+
+\begin{longtable}{p{0.10\textwidth} p{0.46\textwidth} p{0.34\textwidth}}
+\caption{機能と性能指標の対応}\label{tab:fbs-mop}\\
+\toprule
+\textbf{ID} & \textbf{指標} & \textbf{目標値} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{指標} & \textbf{目標値} \\
+\midrule
+\endhead
+MOP-1 & 楽器間 同期誤差（4 ノードの BEAT 受信時刻差）          & $\leq$ 30 ms \\
+MOP-2 & 指揮 → 楽器 通信遅延（送信〜受信）                     & $\leq$ 10 ms \\
+MOP-3 & 拍検出 正解率（定速指揮時）                            & $\geq$ 90 \% \\
+MOP-4 & テンポ追従 遅延（BPM 階段変化への追従）                & $\leq$ 2 拍 \\
+MOP-5 & パケロス耐性（聴感破綻なし）                           & 5 \% パケロス \\
+MOP-6 & 入力フェーズ CPU 時間（1 周期）                        & $\leq$ 2 ms \\
+MOP-7 & 起動時間（電源投入 → 演奏可能）                        & $\leq$ 5 s \\
+MOP-8 & 強弱制御 分解能（ストレッチ）                          & 3 段階以上（p/mf/f） \\
+\bottomrule
+\end{longtable}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%
-\section{部品一覧}
-製品分解構造PBSの要素の説明
+\section{システム構成図}\label{sec:basic-architecture}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{全体ブロック図}
+
+5 ノードと WiFi AP・PC の関係を図 \ref{fig:overview} に示す．指揮者 node\_01 は
+ローカル WiFi AP に対して CTRL/BEAT をブロードキャストし，楽器 node\_02〜05 は
+これを受信して楽譜を進行させながら NOTE を PC へユニキャストで送信する．
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=10mm and 14mm,
+  node_box/.style={draw=accentblue, fill=codebg, rounded corners=2pt, minimum width=26mm, minimum height=11mm, align=center, font=\small},
+  ap_box/.style  ={draw=noteyellow, fill=lightgray, rounded corners=2pt, minimum width=22mm, minimum height=10mm, align=center, font=\small},
+  pc_box/.style  ={draw=okgreen, fill=lightgray, rounded corners=2pt, minimum width=30mm, minimum height=11mm, align=center, font=\small},
+  arr/.style     ={-{Stealth[length=2.5mm]}, thick, accentblue},
+  arr2/.style    ={-{Stealth[length=2.5mm]}, thick, okgreen},
+]
+  \node[node_box] (n1)                            {node\_01\\指揮者 + IMU};
+  \node[ap_box,   right=of n1] (ap)               {WiFi AP};
+  \node[node_box, right=22mm of ap, yshift= 18mm] (n2)  {node\_02\\楽器 A};
+  \node[node_box, right=22mm of ap, yshift=  6mm] (n3)  {node\_03\\楽器 B};
+  \node[node_box, right=22mm of ap, yshift= -6mm] (n4)  {node\_04\\楽器 C};
+  \node[node_box, right=22mm of ap, yshift=-18mm] (n5)  {node\_05\\楽器 D};
+  \node[pc_box, right=42mm of n3, yshift=-6mm] (pc)     {PC（Processing）\\音色合成・出力};
+
+  \draw[arr] (n1) -- node[above, font=\scriptsize] {CTRL/BEAT (UDP/5001 Bcast)} (ap);
+  \draw[arr] (ap) -- (n2);
+  \draw[arr] (ap) -- (n3);
+  \draw[arr] (ap) -- (n4);
+  \draw[arr] (ap) -- (n5);
+  \draw[arr2] (n2) to[bend left=10] node[above, font=\scriptsize, sloped] {NOTE (UDP/5002 Unicast)} (pc);
+  \draw[arr2] (n3) -- (pc);
+  \draw[arr2] (n4) -- (pc);
+  \draw[arr2] (n5) to[bend right=10] (pc);
+\end{tikzpicture}
+\caption{全体ブロック図（指揮者 1 + 楽器 4 + PC）}\label{fig:overview}
+\end{figure}
+
+\subsection{ノード役割分担}
+
+各ノードの責務とコード担当者を表 \ref{tab:node-roles} に示す．node\_02〜05 の Arduino
+コードは \textbf{共通ソース + パート設定差し替え}（\texttt{ProjectConfig} と楽譜データのみ差分）
+で構成し，4 台分の別コードは書き分けない（\S\ref{sec:proc-flow-performer}）．
+
+\begin{longtable}{l p{0.20\textwidth} p{0.42\textwidth} l}
+\caption{ノード役割分担}\label{tab:node-roles}\\
+\toprule
+\textbf{ノード} & \textbf{物理配置} & \textbf{主な責務} & \textbf{コード担当} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ノード} & \textbf{物理配置} & \textbf{主な責務} & \textbf{コード担当} \\
+\midrule
+\endhead
+node\_01 & 指揮者の手・指揮棒 & IMU 読み取り → 拍・テンポ・強弱推定 → CTRL/BEAT 送出 & 塩澤 \\
+node\_02 & 楽器 A             & BEAT 同期で楽譜進行 → NOTE 送出（第 1 声） & 塩澤 \\
+node\_03 & 楽器 B             & 同上（第 2 声） & 塩澤 \\
+node\_04 & 楽器 C             & 同上（第 3 声） & 塩澤 \\
+node\_05 & 楽器 D             & 同上（第 4 声 or リズム） & 塩澤 \\
+PC      & 据え置き           & NOTE 受信 → 音色合成 → スピーカ出力 & 梅澤（参考） \\
+\bottomrule
+\end{longtable}
+
+\subsection{データフロー}
+
+演奏中の 1 拍ぶんの情報の流れを擬似シーケンスで示す．
+
+\begin{notebox}
+\textbf{1 拍ぶんのデータフロー（演奏中）}\\[2pt]
+(1) 内蔵 IMU $\to$ node\_01: 加速度・角速度サンプル（200 Hz）．\\
+(2) node\_01 内: \texttt{applyPattern()} がフィルタ・拍検出・テンポ推定を実行．\\
+(3) 振り下ろしを検出: node\_01 $\to$ AP $\to$ node\_02〜05 に \textbf{BEAT}
+   （\texttt{beat\_no}, \texttt{timestamp\_ms}）をブロードキャスト．\\
+(4) node\_02〜05 内: 楽譜ポインタ前進 $\to$ NoteOn フラグ設定．\\
+(5) node\_02〜05 $\to$ PC: \textbf{NOTE}
+   （\texttt{note\_number}, \texttt{velocity}, \texttt{duration\_ms}）をユニキャスト．\\
+(6) 並行して node\_01 は 20 Hz で \textbf{CTRL}（BPM・velocity・state）を
+   ブロードキャストし続ける．
+\end{notebox}
+
+\subsection{採用アーキテクチャ（EMA）の方針}
+
+全 5 ノードのファームウェアは EMA に準拠する．EMA の中核ルールを本ハッカソンに
+当てはめた要旨を以下に示す．バイト単位のパケット定義や具体コードは
+第 \ref{chap:detail} 章で示す．
+
+\begin{itemize}
+  \item \textbf{\texttt{IModule} インターフェース}: 全ハードウェアモジュールが
+        \texttt{init()} / \texttt{updateInput()} / \texttt{updateOutput()} / \texttt{deinit()}
+        の 4 メソッドを実装する．
+  \item \textbf{3 フェーズ実行モデル}: \texttt{loop()} は
+        「入力 $\to$ ロジック \texttt{applyPattern()} $\to$ 出力」の順で必ず実行する．
+  \item \textbf{\texttt{SystemData} 集約}: モジュール間共有状態を一元化する構造体．
+        モジュール同士の直接呼び出しは禁止．
+  \item \textbf{\texttt{ProjectConfig} 集約}: 各モジュールの設定を
+        \texttt{\{MODULE\}\_CONFIG} インスタンスとして 1 ヘッダに集約．
+  \item \textbf{判断ロジックの位置づけ}: 拍検出・テンポ推定・楽譜進行のような
+        「ハードウェアに触れない判断ロジック」は \texttt{IModule} の派生にせず，
+        \texttt{applyPattern()} 関数内に書く．
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{操作インターフェース設計}\label{sec:basic-ui}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+本節では「操作インターフェース」を，\textbf{ユーザーが触れる物理 IF}（指揮棒・LED）と
+\textbf{ノード間の通信プロトコル IF}（CTRL/BEAT/NOTE）の二層に分けて定義する．
+通信プロトコルの基本方針はここで述べ，バイト単位のパケットレイアウトは
+\S\ref{sec:func-design} で具体化する．
+
+\subsection{ユーザー操作}
+
+\begin{itemize}
+  \item \textbf{指揮棒（指揮者）}: 内蔵 IMU を持つ node\_01 を指揮棒として手に持ち，
+        通常の指揮動作（4 拍子・3 拍子の振り下ろし）で操作する．特別なボタン等は持たない．
+  \item \textbf{起動順}: 楽器ノード（node\_02〜05）を先に起動して \texttt{WaitStart} 状態にし，
+        その後に指揮者ノード（node\_01）を起動する．指揮者の \texttt{Conducting} 入りで
+        BEAT が流れ始め，楽器が \texttt{Playing} に遷移する．
+  \item \textbf{Calibrating}: 指揮者ノードは起動後，最初の 2 秒間に静止姿勢を学習して
+        重力オフセットを記録する．使用者は単に「起動後 2 秒間，腕を自然に下ろした状態で
+        待つ」だけでよい．
+\end{itemize}
+
+\subsection{LED 表示仕様}
+
+各ノードは内蔵 LED（\texttt{LED\_BUILTIN}）の点滅パターンで状態を提示する
+（表 \ref{tab:led-spec}）．点滅周期は \texttt{StatusLedConfig.blinkIntervalMs} で調整可能．
+
+\begin{longtable}{p{0.15\textwidth} p{0.18\textwidth} p{0.20\textwidth} p{0.36\textwidth}}
+\caption{LED 表示パターン}\label{tab:led-spec}\\
+\toprule
+\textbf{ノード} & \textbf{状態} & \textbf{LED パターン} & \textbf{意味} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ノード} & \textbf{状態} & \textbf{LED パターン} & \textbf{意味} \\
+\midrule
+\endhead
+node\_01     & Idle        & 低速点滅（1 Hz）   & 起動直後・WiFi 未接続 \\
+node\_01     & Calibrating & 中速点滅（2 Hz）   & 重力オフセット学習中（2 秒） \\
+node\_01     & Conducting  & 点灯               & 通常演奏中 \\
+node\_01     & Fallback    & 高速点滅（5 Hz）   & IMU エラー or WiFi 切断 \\
+node\_02--05 & Idle        & 低速点滅（1 Hz）   & 起動直後・WiFi 未接続 \\
+node\_02--05 & WaitStart   & 中速点滅（2 Hz）   & WiFi 接続済，曲開始 BEAT 待ち \\
+node\_02--05 & Playing     & 点灯               & 通常演奏中 \\
+node\_02--05 & SelfRun     & 高速点滅（5 Hz）   & BEAT 取りこぼし検出，自走中 \\
+\bottomrule
+\end{longtable}
+
+\subsection{通信プロトコル方針（CTRL / BEAT / NOTE）}\label{subsec:protocol-policy}
+
+3 種類のメッセージを使い分ける（表 \ref{tab:msg-policy}）．
+
+\begin{longtable}{l p{0.27\textwidth} p{0.16\textwidth} p{0.13\textwidth} p{0.22\textwidth}}
+\caption{3 種類のメッセージの設計方針}\label{tab:msg-policy}\\
+\toprule
+\textbf{種別} & \textbf{送信元 → 宛先} & \textbf{送信契機} & \textbf{性質} & \textbf{役割} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{種別} & \textbf{送信元 → 宛先} & \textbf{送信契機} & \textbf{性質} & \textbf{役割} \\
+\midrule
+\endhead
+CTRL & node\_01 → node\_02--05 (Bcast) & 定期（20 Hz）       & 冪等         & BPM・velocity・state を継続同期 \\
+BEAT & node\_01 → node\_02--05 (Bcast) & 拍検出時（不定期） & 即時性重視   & 楽譜ポインタ前進トリガ \\
+NOTE & node\_02--05 → PC (Unicast)     & 楽譜イベント発火時 & 順序保証     & PC への発音依頼 \\
+\bottomrule
+\end{longtable}
+
+\textbf{設計原則}:
+\begin{itemize}
+  \item \textbf{CTRL は冪等}: 取りこぼしてもすぐ次が来るため，パケロス耐性は通信方針側で確保される．
+  \item \textbf{BEAT は即時}: 1 拍 1 発が原則．確実性を上げる場合は同一 \texttt{beat\_no} を
+        2〜3 連送し，受信側で \texttt{beat\_no} 重複排除する（冪等処理）．
+  \item \textbf{楽譜側内挿}: BEAT が一定時間（既定 1500\,ms）来なければ楽器が自走（SelfRun）して
+        直前 BPM から拍を内挿する．
+  \item \textbf{NOTE は単一経路}: 楽器 → PC で 1 系統．楽譜に従って必ず送出する．
+\end{itemize}
+
+\subsection{通信方式（WiFi STA + UDP）}
+
+ネットワーク仕様を表 \ref{tab:net-spec} に示す．運用時に変わる値（SSID / パス・PC IP）は
+\texttt{OrcNetConfig} および \texttt{NoteSenderConfig} のリテラルで一元管理する．
+
+\begin{longtable}{p{0.26\textwidth} p{0.66\textwidth}}
+\caption{ネットワーク仕様}\label{tab:net-spec}\\
+\toprule
+\textbf{項目} & \textbf{設計} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{項目} & \textbf{設計} \\
+\midrule
+\endhead
+WiFi モード   & 全ノード STA。外部 AP（スマホテザリング or 専用ルータ）へ接続 \\
+SSID / パス  & 仮 \texttt{OrchestraAP} / \texttt{orchestra2026}．本番運用で差替え \\
+IP 割り当て   & DHCP（初期段階）．固定 IP が必要になれば \texttt{OrcNetConfig} で切替可能 \\
+ポート       & node\_01 → node\_02--05: \textbf{UDP/5001}（ブロードキャスト 255.255.255.255）／node\_02--05 → PC: \textbf{UDP/5002}（PC IP へユニキャスト） \\
+PC IP        & 仮 \texttt{192.168.4.2} を \texttt{NoteSenderConfig} に直書き．本番で差替え \\
+エンディアン & リトルエンディアン（UNO R4 ARM Cortex-M4 ネイティブ） \\
+\bottomrule
+\end{longtable}
+
+\subsection{パケロス・ジッタ対策}
+
+\begin{itemize}
+  \item \textbf{CTRL 取りこぼし}: 冪等かつ 20 Hz 定期送信なので設計上問題にならない．
+  \item \textbf{BEAT 取りこぼし}: 同一 BEAT を 2〜3 連発 + 楽器側で \texttt{beat\_no} 重複排除．
+        さらに直前 BPM から予測時刻を内挿し，一定時間 BEAT が来なかったら自走（SelfRun）．
+  \item \textbf{ジッタ}: BEAT 受信時刻で楽譜ポインタを前進させ，内挿は最後の手段にとどめる．
+  \item \textbf{プロトコル不整合}: \texttt{magic} / \texttt{version} 不一致のパケットは破棄し，
+        \texttt{StatusLedModule} が \texttt{data.orcNet} を読んで点滅パターンに反映する．
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{状態遷移図}\label{sec:basic-state}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+各ノード種ごとの演奏状態を 4 状態の有限状態機械として定義する．状態は
+\texttt{ConductorState}（指揮者）と \texttt{PerformerState}（楽器）の
+\texttt{enum class} として \texttt{SystemData} の中に保持し，
+\texttt{applyPattern()} が遷移を判定する．
+
+\subsection{指揮者ノード（node\_01）}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=10mm and 18mm,
+  state/.style={draw=accentblue, fill=codebg, rounded corners=2pt, minimum width=24mm, minimum height=10mm, align=center, font=\small},
+  arr/.style ={-{Stealth[length=2.5mm]}, thick, accentblue, font=\scriptsize},
+]
+  \node[state] (idle)                       {Idle};
+  \node[state, right=of idle] (cal)         {Calibrating};
+  \node[state, right=of cal]  (cond)        {Conducting};
+  \node[state, below=of cond] (fb)          {Fallback};
+
+  \draw[arr] (idle)  --                node[above]      {WiFi 接続完了}      (cal);
+  \draw[arr] (cal)   --                node[above]      {2 秒経過}           (cond);
+  \draw[arr] (cond)  --                node[right]      {IMU/WiFi エラー}    (fb);
+  \draw[arr] (fb)    to[bend left=18]  node[left]       {復旧}                (cond);
+\end{tikzpicture}
+\caption{指揮者ノードの状態遷移}\label{fig:state-conductor}
+\end{figure}
+
+\begin{longtable}{l p{0.35\textwidth} p{0.45\textwidth}}
+\caption{指揮者ノードの状態定義}\label{tab:state-conductor}\\
+\toprule
+\textbf{状態} & \textbf{意味} & \textbf{動作} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{状態} & \textbf{意味} & \textbf{動作} \\
+\midrule
+\endhead
+Idle        & 起動直後．WiFi 未接続       & ImuModule.updateInput は動くが拍検出は無効．OrcSenderModule は何も送らない \\
+Calibrating & 初期静止姿勢の学習中（2 秒） & applyPattern() が IMU 平均で重力オフセットを記録 \\
+Conducting  & 通常演奏中                 & 全モジュール稼働。BEAT を拍検出時に送出，CTRL を 20 Hz 周期で送出 \\
+Fallback    & エラー発生                 & CTRL は state=Fallback で送り続ける．BEAT は停止．LED 高速点滅 \\
+\bottomrule
+\end{longtable}
+
+\subsection{楽器ノード（node\_02〜05）}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=10mm and 18mm,
+  state/.style={draw=accentblue, fill=codebg, rounded corners=2pt, minimum width=24mm, minimum height=10mm, align=center, font=\small},
+  arr/.style ={-{Stealth[length=2.5mm]}, thick, accentblue, font=\scriptsize},
+]
+  \node[state] (idle)                       {Idle};
+  \node[state, right=of idle] (wait)        {WaitStart};
+  \node[state, right=of wait] (play)        {Playing};
+  \node[state, below=of play] (self)        {SelfRun};
+
+  \draw[arr] (idle)  --                node[above]      {WiFi 接続完了}                       (wait);
+  \draw[arr] (wait)  --                node[above]      {beat\_no $\geq$ startBeatNo}         (play);
+  \draw[arr] (play)  --                node[right]      {BEAT 1500\,ms 未受信}                (self);
+  \draw[arr] (self)  to[bend left=18]  node[left]       {実 BEAT 復帰（200\,ms 以内）}        (play);
+\end{tikzpicture}
+\caption{楽器ノードの状態遷移}\label{fig:state-performer}
+\end{figure}
+
+\begin{longtable}{l p{0.35\textwidth} p{0.45\textwidth}}
+\caption{楽器ノードの状態定義}\label{tab:state-performer}\\
+\toprule
+\textbf{状態} & \textbf{意味} & \textbf{動作} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{状態} & \textbf{意味} & \textbf{動作} \\
+\midrule
+\endhead
+Idle      & 起動直後．WiFi 未接続       & 受信モジュールは動くが楽譜進行ロジックは無効 \\
+WaitStart & WiFi 接続済，曲頭 BEAT 待ち & beat\_no が startBeatNo に到達するまで待機 \\
+Playing   & 通常演奏中                 & BEAT 受信 → 楽譜進行 → NOTE 送出 \\
+SelfRun   & BEAT 取りこぼし検出，自走中 & 直前 BPM から仮想 BEAT を内挿し，楽譜進行を継続．LED 高速点滅 \\
+\bottomrule
+\end{longtable}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%
-\section{ハードウェア設計}
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{システムの詳細設計}\label{chap:detail}
 
-%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%
-\section{ソフトウェア設計}
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{ファイル構成}
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{オブジェクト設計(クラス図)}
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{関数設計}
+本章では，第 \ref{chap:basic} 章で示した基本設計を実装可能な水準まで具体化する．
+塩澤担当範囲（WBS タスク 121「共通層 API 詳細」，122「指揮者ノード詳細」，
+123「楽器ノード詳細」）の 3 領域を中心に，部品・ハードウェア配線・ソフトウェア構造・
+処理フロー・テストを順に記す．コード例は要点抽出にとどめ，フル実装は本書スコープ外
+とする．
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%
+\section{部品一覧}\label{sec:parts-list}
 %%%%%%%%%%%%%%%%%%%%%%%%
-\section{処理フローの設計}
+
+製品分解構造（PBS）として，本ファームウェアが直接関わるハードウェア・ソフトウェア
+構成要素を表 \ref{tab:hw-pbs}・表 \ref{tab:sw-stack} に列挙する．PC 側 Processing 環境
+やスピーカは本書スコープ外であるが，NOTE パケットの受信境界として記述する．
+
+\begin{longtable}{l l l p{0.40\textwidth}}
+\caption{ハードウェア部品一覧（PBS）}\label{tab:hw-pbs}\\
+\toprule
+\textbf{区分} & \textbf{要素} & \textbf{数量} & \textbf{備考} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{区分} & \textbf{要素} & \textbf{数量} & \textbf{備考} \\
+\midrule
+\endhead
+P1.1 指揮者     & Arduino UNO R4 WiFi      & 1 & Renesas RA4M1 + ESP32-S3 \\
+P1.1            & 内蔵 IMU（LSM6DSOX 相当）& 1 & 加速度 $\pm$4g / 角速度 $\pm$2000 dps \\
+P1.1            & 内蔵 WiFi                 & 1 & \texttt{WiFiS3} で制御 \\
+P1.1            & 状態 LED                  & 1 & \texttt{LED\_BUILTIN} 流用 \\
+P1.2 楽器       & Arduino UNO R4 WiFi      & 4 & node\_02--05 同一 H/W \\
+P1.2            & 内蔵 WiFi                 & 4 & 受信（指揮者）+ 送信（PC） \\
+P1.2            & 状態 LED                  & 4 & \texttt{LED\_BUILTIN} 流用 \\
+P2 ネットワーク & ローカル WiFi AP          & 1 & スマホテザリング or 専用ルータ \\
+P3 給電         & USB Type-C ケーブル       & 5 & PC または USB ハブから給電 \\
+P4 境界（参考） & PC（Processing）          & 1 & 本書スコープ外．NOTE 受信 \\
+P4 境界（参考） & スピーカ                  & 1 & 本書スコープ外 \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{l l p{0.50\textwidth}}
+\caption{ソフトウェア技術スタック}\label{tab:sw-stack}\\
+\toprule
+\textbf{レイヤ} & \textbf{採用技術} & \textbf{バージョン / 備考} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{レイヤ} & \textbf{採用技術} & \textbf{バージョン / 備考} \\
+\midrule
+\endhead
+MCU                  & UNO R4 WiFi                 & Renesas RA4M1 + ESP32-S3 \\
+フレームワーク       & Arduino Framework            & PlatformIO 経由 \\
+言語                 & C++（C++11）                 & arduino-core 範囲 \\
+ビルド               & PlatformIO                   & \texttt{platform=renesas-ra}, \texttt{board=uno\_r4\_wifi} \\
+外部ライブラリ       & \texttt{Arduino\_LSM6DSOX}    & IMU 読み取り \\
+外部ライブラリ       & \texttt{WiFiS3}              & 標準同梱の WiFi/UDP \\
+設計パターン         & EMA                          & 全章前提（ADR-0005） \\
+共通層（流用）       & \texttt{ModuleCore}（IModule + ModuleTimer） & EMA からそのまま流用 \\
+自作層（新規）       & \texttt{OrcProtocol} / \texttt{OrcNetModule} & \S\ref{sec:func-design} で定義 \\
+ネットワーク         & UDP over WiFi                & ブロードキャスト + ユニキャスト \\
+\bottomrule
+\end{longtable}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%
+\section{ハードウェア設計}\label{sec:hw-design}
 %%%%%%%%%%%%%%%%%%%%%%%%
-\section{テストの設計}
-どのようにテストを行うのか，例えば，テストデータの設計などを記述．
+
+\subsection{配線・ピン}
+
+指揮者ノード（node\_01）は内蔵 IMU を使うため I2C を経由する．楽器ノードは内蔵 LED
+以外に外部配線を要しない（表 \ref{tab:pin-assign}）．
+
+\begin{longtable}{l l l}
+\caption{配線・ピンアサイン}\label{tab:pin-assign}\\
+\toprule
+\textbf{ノード} & \textbf{用途} & \textbf{ピン} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ノード} & \textbf{用途} & \textbf{ピン} \\
+\midrule
+\endhead
+node\_01     & I2C SDA（内蔵 IMU） & D18（\texttt{I2C\_SDA\_PIN = 18}） \\
+node\_01     & I2C SCL（内蔵 IMU） & D19（\texttt{I2C\_SCL\_PIN = 19}） \\
+node\_01     & 状態 LED            & \texttt{LED\_BUILTIN} \\
+node\_02--05 & 状態 LED            & \texttt{LED\_BUILTIN} \\
+全ノード     & 給電                & USB Type-C \\
+\bottomrule
+\end{longtable}
+
+\subsection{ネットワーク構成}
+
+5 ノードと PC は同一 LAN（WiFi AP 配下）に接続する．node\_01 は CTRL/BEAT を
+ブロードキャスト，node\_02--05 は NOTE を PC へユニキャストで送る．本番運用時の
+SSID／パス／PC IP は \texttt{ProjectConfig} のリテラルで切替可能とする．
+
+\subsection{物理配置}
+
+演奏時は指揮者を中心に楽器 4 台を扇形に配置し，PC とスピーカは観客側からは見えない
+位置に置く．給電は USB ハブで集約する．配置に関する具体寸法・治具設計はチーム全体側
+（梅澤担当）に委ねる．
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ソフトウェア設計}\label{sec:sw-design}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{ファイル構成}\label{subsec:file-tree}
+
+\texttt{firmware/} 配下は \textbf{共通層}と\textbf{ノード別プロジェクト}の 2 段構造
+にする．EMA に準拠し，PlatformIO の \texttt{lib\_extra\_dirs} で共通層を全ノードから
+参照する．
+
+\begin{tcolorbox}[colback=codebg,colframe=accentblue,boxrule=0.5pt,arc=2pt,breakable,
+  left=4pt,right=4pt,top=8pt,bottom=4pt,
+  title={firmware/ ディレクトリ構成（抜粋）},
+  fonttitle=\bfseries\small,coltitle=white,
+  attach boxed title to top left={xshift=4mm,yshift*=-2mm},
+  boxed title style={colback=accentblue,colframe=accentblue,sharp corners=northwest}]
+\begin{Verbatim}[fontsize=\footnotesize,xleftmargin=2pt]
+firmware/
+|-- common/
+|   `-- lib/
+|       |-- ModuleCore/                # コア層（プロジェクト非依存）
+|       |   |-- IModule.h
+|       |   `-- ModuleTimer.h
+|       |-- OrcProtocol/               # CTRL/BEAT/NOTE のパケット定義
+|       |   |-- OrcProtocol.h
+|       |   `-- OrcProtocol.cpp
+|       `-- OrcNetModule/              # WiFi 接続維持 + UDP 送受信
+|           |-- OrcNetModule.h
+|           `-- OrcNetModule.cpp
+|-- node_01/                           # 指揮者ノード
+|   |-- platformio.ini
+|   |-- include/
+|   |   |-- SystemData.h               # {Module}Data を集約
+|   |   `-- ProjectConfig.h            # {MODULE}_CONFIG + 共有バスピン
+|   |-- src/
+|   |   |-- main.cpp                   # 入出力配列・3 フェーズループ
+|   |   `-- applyPattern.cpp           # フィルタ/拍検出/テンポ推定/状態遷移
+|   `-- lib/
+|       |-- ImuModule/                 # 入力: IMU
+|       |-- OrcSenderModule/           # 出力: CTRL/BEAT 送信
+|       `-- StatusLedModule/           # 出力: 状態 LED
+|-- node_02/                           # 楽器ノード A
+|   |-- platformio.ini
+|   |-- include/
+|   |   |-- SystemData.h
+|   |   |-- ProjectConfig.h            # partId=0x02, PC IP, startBeatNo 等
+|   |   `-- score_data.h               # パート A の楽譜（C 配列）
+|   |-- src/
+|   |   |-- main.cpp
+|   |   `-- applyPattern.cpp           # 楽譜進行 + SelfRun 判定
+|   `-- lib/
+|       |-- OrcReceiverModule/         # 入力: CTRL/BEAT 受信
+|       |-- NoteSenderModule/          # 出力: NOTE 送信
+|       `-- StatusLedModule/
+|-- node_03/  (構造同じ。ProjectConfig と score_data.h が差分)
+|-- node_04/
+`-- node_05/
+\end{Verbatim}
+\end{tcolorbox}
+
+各ノードの \texttt{platformio.ini} には次の 2 行を必ず含める（EMA 必須要件）．
+
+\begin{tcolorbox}[colback=codebg,colframe=accentblue,boxrule=0.5pt,arc=2pt,breakable,
+  left=4pt,right=4pt,top=8pt,bottom=4pt,
+  title={platformio.ini 共通部の必須設定},
+  fonttitle=\bfseries\small,coltitle=white,
+  attach boxed title to top left={xshift=4mm,yshift*=-2mm},
+  boxed title style={colback=accentblue,colframe=accentblue,sharp corners=northwest}]
+\begin{Verbatim}[fontsize=\footnotesize,xleftmargin=2pt]
+build_flags    = -I include          ; lib/ から include/SystemData.h を参照するために必須
+lib_extra_dirs = ../common/lib       ; ModuleCore / OrcProtocol / OrcNetModule を共有
+\end{Verbatim}
+\end{tcolorbox}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{オブジェクト設計（クラス図）}\label{subsec:class-design}
+
+EMA の \texttt{IModule} 抽象基底をすべてのハードウェアモジュールが継承する．
+\texttt{OrcNetModule} は共通層に置き両ノード種で共有する（図 \ref{fig:class-diagram}）．
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=8mm and 12mm,
+  abstract/.style={draw=accentblue, thick, fill=lightgray, rounded corners=2pt, minimum width=46mm, minimum height=10mm, align=center, font=\small\bfseries},
+  conc/.style    ={draw=accentblue, fill=codebg, rounded corners=2pt, minimum width=42mm, minimum height=8mm, align=center, font=\scriptsize},
+  inh/.style     ={-{Triangle[length=3mm,open]}, thick, accentblue},
+]
+  \node[abstract] (im)                                    {IModule (abstract)};
+
+  \node[conc, below left=14mm and 38mm of im]   (imu)     {ImuModule\\(node\_01・入力)};
+  \node[conc, below=of imu]                     (sender)  {OrcSenderModule\\(node\_01・出力)};
+  \node[conc, below=of sender]                  (led1)    {StatusLedModule\\(両ノード種・出力)};
+
+  \node[conc, below=14mm of im]                 (orcnet)  {OrcNetModule\\(共通・入出力両方)};
+
+  \node[conc, below right=14mm and 38mm of im]  (recv)    {OrcReceiverModule\\(node\_02--05・入力)};
+  \node[conc, below=of recv]                    (note)    {NoteSenderModule\\(node\_02--05・出力)};
+
+  \draw[inh] (imu)    -- (im);
+  \draw[inh] (sender) -- (im);
+  \draw[inh] (led1)   -- (im);
+  \draw[inh] (orcnet) -- (im);
+  \draw[inh] (recv)   -- (im);
+  \draw[inh] (note)   -- (im);
+\end{tikzpicture}
+\caption{モジュールのクラス継承関係}\label{fig:class-diagram}
+\end{figure}
+
+\begin{longtable}{l l l p{0.36\textwidth}}
+\caption{モジュール一覧（入出力分類別）}\label{tab:module-list}\\
+\toprule
+\textbf{モジュール} & \textbf{ノード} & \textbf{分類} & \textbf{責務} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{モジュール} & \textbf{ノード} & \textbf{分類} & \textbf{責務} \\
+\midrule
+\endhead
+\texttt{ImuModule}        & node\_01     & 入力       & 内蔵 IMU 6 軸を読み \texttt{data.imu} に書く \\
+\texttt{OrcSenderModule}  & node\_01     & 出力       & \texttt{data.beat}/\texttt{data.tempo} を読み CTRL/BEAT 送信キューに投入 \\
+\texttt{OrcReceiverModule}& node\_02--05 & 入力       & \texttt{data.orcNet.lastCtrl/Beat} を読み \texttt{data.receiver} に整形 \\
+\texttt{NoteSenderModule} & node\_02--05 & 出力       & \texttt{data.noteOut.pendingOn/Off} を見て NOTE 送信キューに投入 \\
+\texttt{OrcNetModule}     & 全ノード     & 入出力     & WiFi 接続維持，UDP 受信ポーリング（入力）と送信キューフラッシュ（出力） \\
+\texttt{StatusLedModule}  & 全ノード     & 出力       & 状態に応じた LED 点滅パターン表示 \\
+\bottomrule
+\end{longtable}
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{関数設計}\label{sec:func-design}
+
+\subsubsection{\texttt{IModule} インターフェース（流用）}
+
+\begin{apibox}{IModule.h}
+\begin{lstlisting}
+struct SystemData;  // 前方宣言（プロジェクト依存を避ける）
+
+class IModule {
+public:
+    bool enabled = true;
+    virtual bool init() = 0;                        // 純粋仮想
+    virtual void updateInput(SystemData& data) {}   // デフォルト空
+    virtual void updateOutput(SystemData& data) {}  // デフォルト空
+    virtual void deinit() {}                        // デフォルト空
+    virtual ~IModule() {}
+};
+\end{lstlisting}
+\end{apibox}
+
+\texttt{init()} の失敗時は \texttt{setup()} 側で MAX\_RETRY 回リトライし，それでも失敗
+した場合は \texttt{enabled = false} とする．ロジックフェーズで定期的に再 \texttt{init()}
+を試みて \texttt{enabled = true} に復帰させる（\S\ref{subsec:proc-flow-conductor} 参照）．
+
+\subsubsection{\texttt{ModuleTimer}（流用）}
+
+\begin{apibox}{ModuleTimer.h}
+\begin{lstlisting}
+class ModuleTimer {
+public:
+    void     setTime();                  // 現在時刻を起点としてセット
+    uint32_t getNowTime() const;         // setTime() からの経過時間 (ms)
+private:
+    uint32_t _startMs = 0;
+};
+\end{lstlisting}
+\end{apibox}
+
+サンプリング周期（IMU 200 Hz $\to$ \texttt{intervalMs=5}），CTRL 送信周期（20 Hz
+$\to$ 50 ms），LED 点滅，BEAT 不応期，SelfRun タイムアウト判定などに使用する．
+
+\subsubsection{通信パケット定義（\texttt{OrcProtocol}）}
+
+3 種のパケットすべてに 12 バイトの共通ヘッダを付与する．データはリトルエンディアンで
+シリアライズする．
+
+\begin{apibox}{共通ヘッダ（12 バイト）}
+\begin{tabular}{l l l p{0.42\textwidth}}
+\textbf{オフセット} & \textbf{フィールド} & \textbf{型} & \textbf{説明} \\
+\midrule
+0 & \texttt{magic}         & \texttt{uint16\_t} & 固定値 \texttt{0x4F52}（ASCII "OR"） \\
+2 & \texttt{version}       & \texttt{uint8\_t}  & 初期値 \texttt{0x01} \\
+3 & \texttt{type}          & \texttt{uint8\_t}  & \texttt{1=CTRL}, \texttt{2=BEAT}, \texttt{3=NOTE} \\
+4 & \texttt{seq}           & \texttt{uint32\_t} & 単調増加（パケロス検出用） \\
+8 & \texttt{timestamp\_ms} & \texttt{uint32\_t} & 送信側 \texttt{millis()} \\
+\end{tabular}
+\end{apibox}
+
+\begin{apibox}{CTRL ペイロード（type = 1，定期 20 Hz 送信，全 16 バイト）}
+\begin{tabular}{l l l p{0.42\textwidth}}
+\textbf{オフセット} & \textbf{フィールド} & \textbf{型} & \textbf{説明} \\
+\midrule
+12 & \texttt{bpm\_q8}  & \texttt{uint16\_t}   & BPM $\times 8$（例: 120.5 $\to$ 964） \\
+14 & \texttt{velocity} & \texttt{uint8\_t}    & 0--127．ストレッチ未実装時は固定 64 \\
+15 & \texttt{state}    & \texttt{uint8\_t}    & \texttt{0=Idle}, \texttt{1=Calibrating}, \texttt{2=Conducting}, \texttt{3=Fallback} \\
+16 & 予約              & \texttt{uint8\_t[4]} & ゼロ埋め \\
+\end{tabular}
+\end{apibox}
+
+\begin{apibox}{BEAT ペイロード（type = 2，拍検出時イベント送信，全 16 バイト）}
+\begin{tabular}{l l l p{0.42\textwidth}}
+\textbf{オフセット} & \textbf{フィールド} & \textbf{型} & \textbf{説明} \\
+\midrule
+12 & \texttt{beat\_no}  & \texttt{uint16\_t}   & 曲頭からの拍番号（曲開始時に 0 リセット） \\
+14 & \texttt{phase\_q8} & \texttt{uint16\_t}   & 拍内位相（0--255 で 1 拍）．通常 0 \\
+16 & 予約              & \texttt{uint8\_t[4]} & ゼロ埋め \\
+\end{tabular}
+\end{apibox}
+
+\begin{apibox}{NOTE ペイロード（type = 3，楽譜イベント発火時送信，全 20 バイト）}
+\begin{tabular}{l l l p{0.42\textwidth}}
+\textbf{オフセット} & \textbf{フィールド} & \textbf{型} & \textbf{説明} \\
+\midrule
+12 & \texttt{part\_id}     & \texttt{uint8\_t}    & \texttt{0x02}--\texttt{0x05}（= node\_02--05） \\
+13 & \texttt{note\_number} & \texttt{uint8\_t}    & MIDI ノート番号（0--127, \texttt{60}=C4） \\
+14 & \texttt{velocity}     & \texttt{uint8\_t}    & 0--127 \\
+15 & \texttt{gate}         & \texttt{uint8\_t}    & \texttt{1=NoteOn}, \texttt{0=NoteOff} \\
+16 & \texttt{duration\_ms} & \texttt{uint16\_t}   & 発音予定長さ（参考値） \\
+18 & 予約                  & \texttt{uint8\_t[2]} & ゼロ埋め \\
+\end{tabular}
+\end{apibox}
+
+\subsubsection{\texttt{OrcNetModule} API}
+
+WiFi 接続維持と UDP 送受信ポーリングを集約する \texttt{IModule} 実装．入出力両方の責務を
+持つため，\texttt{inputModules[]} と \texttt{outputModules[]} の両方に登録する．
+
+\begin{apibox}{OrcNetModule.h（抜粋）}
+\begin{lstlisting}
+struct OrcNetConfig {
+    const char* ssid;
+    const char* pass;
+    uint16_t    listenPort;            // 受信用 UDP ポート（5001 等）
+    uint32_t    reconnectIntervalMs = 2000;
+};
+
+struct OrcNetData {
+    bool       wifiConnected  = false;
+    uint8_t    sendQueueDepth = 0;
+    bool       hasNewCtrl     = false;
+    bool       hasNewBeat     = false;
+    CtrlPacket lastCtrl       = {};
+    BeatPacket lastBeat       = {};
+};
+
+class OrcNetModule : public IModule {
+public:
+    explicit OrcNetModule(const OrcNetConfig& config);
+    bool init() override;
+    void updateInput(SystemData& data) override;   // WiFi 状態 + 受信ポーリング
+    void updateOutput(SystemData& data) override;  // 送信キューフラッシュ
+    void deinit() override;
+
+    // applyPattern() / 他モジュールから呼ぶ送信 API
+    bool enqueueCtrl(const CtrlPacket& p);                   // ブロードキャスト:5001
+    bool enqueueBeat(const BeatPacket& p);                   // ブロードキャスト:5001
+    bool enqueueNote(IPAddress pcIp, const NotePacket& p);   // PC:5002
+};
+\end{lstlisting}
+\end{apibox}
+
+\textbf{ルール}: \texttt{enqueueXxx()} はロジックフェーズで呼び，実際の \texttt{Udp.send()}
+は \texttt{updateOutput()} で一括処理する．\texttt{tryRecvXxx()} のような外向き受信 API は
+持たず，受信結果は \texttt{OrcNetData} 内のフラグ + 直近パケットバッファとして
+\texttt{SystemData} 経由で渡す（モジュール間直接呼び禁止のため）．
+
+\subsubsection{命名規則・ログ書式（EMA 準拠）}
+
+\begin{itemize}
+  \item Config 型: \texttt{\{Module\}Config}（例: \texttt{ImuConfig}）
+  \item Config インスタンス: \texttt{\{MODULE\}\_CONFIG}（例: \texttt{IMU\_CONFIG}）
+  \item Data 型: \texttt{\{Module\}Data}（例: \texttt{ImuData}）
+  \item ログ: \texttt{[ModuleName] msg} 形式（例: \texttt{[OrcNet] reconnecting (attempt 3)}）
+  \item デバッグログは \texttt{\#ifdef DEBUG} で切替え可能
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{処理フローの設計}\label{sec:proc-flow}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{共通: 3 フェーズ実行モデル}
+
+全ノード共通で，\texttt{loop()} は「入力 $\to$ ロジック \texttt{applyPattern()} $\to$ 出力」
+の 3 フェーズで実行する．
+
+\begin{lstlisting}[caption={全ノード共通の loop()}]
+void loop() {
+    // 1. 入力フェーズ: センサー / UDP 受信 -> SystemData
+    for (int i = 0; i < INPUT_COUNT; i++) {
+        if (inputModules[i]->enabled)
+            inputModules[i]->updateInput(systemData);
+    }
+    // 2. ロジックフェーズ: SystemData を読み書き
+    applyPattern(systemData);
+    // 3. 出力フェーズ: SystemData -> ハードウェア / UDP 送信
+    for (int i = 0; i < OUTPUT_COUNT; i++) {
+        if (outputModules[i]->enabled)
+            outputModules[i]->updateOutput(systemData);
+    }
+}
+\end{lstlisting}
+
+入力モジュールは \texttt{SystemData} を書き込み，出力モジュールは読み込む．
+クロス参照は禁止．\texttt{OrcNetModule} は両配列に登録し，「入力フェーズで先に受信，
+出力フェーズの最後で送信」を配列順で制御する．
+
+
+\subsection{指揮者ノード（node\_01）}\label{subsec:proc-flow-conductor}
+
+\subsubsection{モジュール構成}
+
+\begin{itemize}
+  \item 入力配列: \texttt{OrcNetModule}, \texttt{ImuModule}
+  \item 出力配列: \texttt{OrcSenderModule}, \texttt{StatusLedModule}, \texttt{OrcNetModule}
+  \item ロジック: \texttt{applyPattern()}（フィルタ・拍検出・テンポ推定・状態遷移）
+\end{itemize}
+
+\subsubsection{\texttt{ProjectConfig}（抜粋）}
+
+\begin{lstlisting}[caption={node\_01/include/ProjectConfig.h（抜粋）}]
+// 共有バスピン
+constexpr int I2C_SDA_PIN = 18;
+constexpr int I2C_SCL_PIN = 19;
+
+const ImuConfig IMU_CONFIG = {
+    .address          = 0x6A,    // LSM6DSOX
+    .sampleIntervalMs = 5,       // 200 Hz
+    .accelRangeG      = 4,
+    .gyroRangeDps     = 2000,
+};
+const OrcNetConfig ORC_NET_CONFIG = {
+    .ssid       = "OrchestraAP",
+    .pass       = "orchestra2026",
+    .listenPort = 5001,
+};
+const OrcSenderConfig ORC_SENDER_CONFIG = {
+    .ctrlIntervalMs = 50,        // 20 Hz
+    .beatRedundancy = 1,         // 同一 BEAT を何発連送するか
+};
+const StatusLedConfig STATUS_LED_CONFIG = {
+    .pin             = LED_BUILTIN,
+    .blinkIntervalMs = 500,
+};
+
+struct LogicParams {
+    float    lpfAlpha            = 0.10f;
+    float    beatAccelThresholdG = 1.80f;
+    uint32_t beatRefractoryMs    = 250;
+    float    bpmEmaAlpha         = 0.30f;
+    float    bpmMin              = 40.0f;
+    float    bpmMax              = 240.0f;
+    uint32_t calibrationMs       = 2000;
+    uint32_t reinitRetryMs       = 5000;
+};
+constexpr LogicParams LOGIC_PARAMS = {};
+\end{lstlisting}
+
+\subsubsection{\texttt{SystemData}（抜粋）}
+
+\texttt{ImuData}・\texttt{OrcNetData}・\texttt{OrcSenderData}・\texttt{StatusLedData} に加え，
+\texttt{applyPattern()} の中間状態として \texttt{BeatLogicData}・\texttt{TempoLogicData}・
+\texttt{CalibrationData}・\texttt{ConductorStateData} を集約する．
+
+\begin{lstlisting}[caption={node\_01/include/SystemData.h（抜粋）}]
+enum class ConductorState : uint8_t {
+    Idle = 0, Calibrating = 1, Conducting = 2, Fallback = 3,
+};
+struct BeatLogicData      { bool event=false; uint16_t beatNo=0; uint32_t lastBeatMs=0; };
+struct TempoLogicData     { float bpm=0.0f; uint32_t nextBeatPredictedMs=0; uint8_t velocity=64; };
+struct CalibrationData    { bool done=false; uint32_t startMs=0; float gravityOffset[3]={0,0,0}; };
+struct ConductorStateData { ConductorState state = ConductorState::Idle; };
+
+struct SystemData {
+    ImuData            imu;
+    OrcNetData         orcNet;
+    OrcSenderData      sender;
+    StatusLedData      led;
+    BeatLogicData      beat;
+    TempoLogicData     tempo;
+    CalibrationData    calibration;
+    ConductorStateData conductor;
+};
+\end{lstlisting}
+
+\subsubsection{\texttt{applyPattern()} の処理フロー}
+
+毎周期，以下の順で処理する．
+
+\begin{enumerate}
+  \item \textbf{IIR LPF + ノルム計算}: \texttt{data.imu.acc} を一次ローパス
+        （$\alpha = 0.10$）で平滑化し，\texttt{data.imu.accNorm} を計算．
+  \item \textbf{拍検出}: \texttt{state == Conducting} のときのみ実行．ノルムが閾値
+        $1.80\,g$ を超え，前回検出から不応期 250 ms 以上経過していれば
+        \texttt{data.beat.event = true} とし \texttt{beatNo} を加算．
+  \item \textbf{テンポ推定（EMA）}: 拍間隔 $\to$ 瞬時 BPM $\to$ $\alpha = 0.30$ の指数移動
+        平均で \texttt{data.tempo.bpm} を更新．\texttt{[bpmMin, bpmMax]} にクランプし
+        \texttt{nextBeatPredictedMs} を計算．
+  \item \textbf{状態遷移}: \texttt{Idle} $\to$ \texttt{Calibrating}（WiFi 接続完了）$\to$
+        \texttt{Conducting}（2 秒経過）$\to$ \texttt{Fallback}（IMU/WiFi エラー）$\to$
+        \texttt{Conducting}（復旧）の判定．
+  \item \textbf{init 失敗モジュールの再試行}: \texttt{enabled == false} かつ 5 秒経過で
+        \texttt{init()} を再呼び出し．
+\end{enumerate}
+
+\textbf{拍検出アルゴリズム}: 候補（ノルムピーク閾値／鉛直成分ゼロクロス／角速度ピーク）の
+うち，装着方向に依存せず実装が容易な \textbf{ノルムピーク閾値}を初期採用する．強い振り
+でないと検出しないという欠点があるため，\S\ref{sec:test-design} で精度（MOP-3）を検証し，
+必要なら鉛直成分ゼロクロス方式に拡張する．
+
+\subsubsection{\texttt{OrcSenderModule} の出力フェーズ}
+
+\begin{lstlisting}[caption={OrcSenderModule.cpp の updateOutput()（要点）}]
+void OrcSenderModule::updateOutput(SystemData& data) {
+    // BEAT: イベント駆動
+    if (data.beat.event) {
+        BeatPacket p;
+        p.header.type = TYPE_BEAT;
+        p.header.seq  = ++data.sender.beatSeq;
+        p.beatNo      = data.beat.beatNo;
+        for (int i = 0; i < _config.beatRedundancy; i++) {
+            _net->enqueueBeat(p);
+        }
+    }
+    // CTRL: 周期駆動（20 Hz）
+    if (_ctrlTimer.getNowTime() >= _config.ctrlIntervalMs) {
+        _ctrlTimer.setTime();
+        CtrlPacket p;
+        p.header.type = TYPE_CTRL;
+        p.header.seq  = ++data.sender.ctrlSeq;
+        p.bpmQ8       = static_cast<uint16_t>(data.tempo.bpm * 8);
+        p.velocity    = data.tempo.velocity;
+        p.state       = static_cast<uint8_t>(data.conductor.state);
+        _net->enqueueCtrl(p);
+    }
+}
+\end{lstlisting}
+
+
+\subsection{楽器ノード（node\_02--05）}\label{sec:proc-flow-performer}
+
+4 台は \textbf{同一コード}で動かし，差分は \texttt{ProjectConfig.h} と
+\texttt{score\_data.h}（および \texttt{score\_data.cpp}）にのみ閉じ込める．
+
+\subsubsection{モジュール構成}
+
+\begin{itemize}
+  \item 入力配列: \texttt{OrcNetModule}, \texttt{OrcReceiverModule}
+  \item 出力配列: \texttt{NoteSenderModule}, \texttt{StatusLedModule}, \texttt{OrcNetModule}
+  \item ロジック: \texttt{applyPattern()}（楽譜進行・SelfRun 判定・発音フラグ）
+\end{itemize}
+
+\subsubsection{\texttt{ProjectConfig}（抜粋）}
+
+\begin{lstlisting}[caption={node\_02/include/ProjectConfig.h（抜粋）}]
+const OrcNetConfig ORC_NET_CONFIG = {
+    .ssid       = "OrchestraAP",
+    .pass       = "orchestra2026",
+    .listenPort = 5001,
+};
+const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
+    .partId        = 0x02,        // node_02 = パート A
+    .startBeatNo   = 0,           // 輪唱の入り（パート毎に差分）
+    .beatTimeoutMs = 1500,        // SelfRun 発動閾値
+};
+const NoteSenderConfig NOTE_SENDER_CONFIG = {
+    .pcIp   = IPAddress(192, 168, 4, 2),  // 運用時差替え
+    .pcPort = 5002,
+};
+const StatusLedConfig STATUS_LED_CONFIG = {
+    .pin             = LED_BUILTIN,
+    .blinkIntervalMs = 500,
+};
+\end{lstlisting}
+
+\subsubsection{楽譜データ形式}
+
+楽譜は C 配列としてヘッダに埋め込み，SD カード等を使わない．イベント単位の構造体を
+時系列順に並べる．
+
+\begin{lstlisting}[caption={node\_02/include/score\_data.h}]
+struct ScoreEvent {
+    uint16_t beatAt;           // この拍（startBeatNo 相対）で発動
+    uint8_t  noteNumber;       // MIDI ノート番号．0 なら休符
+    uint8_t  velocity;         // 個別 velocity（CTRL と乗算合成）
+    uint16_t durationQ8;       // 拍の 1/256 単位（256 = 1 拍）
+    uint8_t  flags;            // bit0=NoteOn, bit1=NoteOff, bit2=Rest
+};
+extern const ScoreEvent kScore[];
+extern const uint16_t   kScoreLength;
+\end{lstlisting}
+
+NoteOff の管理は \texttt{durationQ8} ぶん経過時点で \texttt{applyPattern()} が
+\texttt{pendingOff} を立てる．NoteOff を個別イベントとして並べる必要は原則ない
+（\texttt{flags} bit1 は拡張用）．
+
+\subsubsection{\texttt{applyPattern()} の処理フロー}
+
+\begin{enumerate}
+  \item \textbf{演奏状態遷移}: \texttt{Idle} $\to$ \texttt{WaitStart}（WiFi 接続完了）$\to$
+        \texttt{Playing}（\texttt{lastBeatNo} $\geq$ \texttt{startBeatNo}）$\to$
+        \texttt{SelfRun}（\texttt{beatTimeoutMs} 超過）$\to$ \texttt{Playing}（実 BEAT 復帰）．
+  \item \textbf{仮想 BEAT 内挿}: \texttt{SelfRun} 中は最後の \texttt{currentBpm} から
+        \texttt{virtualBeatNo} を進める．
+  \item \textbf{楽譜進行}: \texttt{effectiveBeatNo - startBeatNo} を相対拍として，
+        \texttt{kScore[currentEventIndex].beatAt} 以下のすべてのイベントを順次発火．
+        NoteOn なら \texttt{pendingOn = true} と \texttt{noteOffAtMs} を計算．
+  \item \textbf{velocity 合成}: 楽譜の \texttt{velocity} と CTRL の \texttt{currentVelocity}
+        を $\dfrac{\text{score} \times \text{ctrl}}{127}$ で乗算合成．ストレッチ未実装時は
+        CTRL velocity が固定 64．
+  \item \textbf{NoteOff 判定}: \texttt{noteIsSounding \&\& now $\geq$ noteOffAtMs} で
+        \texttt{pendingOff = true}．
+\end{enumerate}
+
+\subsubsection{ノード間差分}
+
+4 台の楽器は \texttt{ProjectConfig.h} と \texttt{score\_data.h} 以外は同一コード
+（表 \ref{tab:performer-diff}）．
+
+\begin{longtable}{l l l p{0.34\textwidth}}
+\caption{楽器ノード間差分}\label{tab:performer-diff}\\
+\toprule
+\textbf{ノード} & \textbf{partId} & \textbf{startBeatNo} & \textbf{score\_data.h} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ノード} & \textbf{partId} & \textbf{startBeatNo} & \textbf{score\_data.h} \\
+\midrule
+\endhead
+node\_02 & \texttt{0x02} (パート A) & 0          & パート A の楽譜 \\
+node\_03 & \texttt{0x03} (パート B) & 4          & パート B（輪唱では A と同旋律も多い） \\
+node\_04 & \texttt{0x04} (パート C) & 8          & パート C \\
+node\_05 & \texttt{0x05} (パート D) & 12 or 0    & パート D（リズムなら 0） \\
+\bottomrule
+\end{longtable}
+
+楽譜の \texttt{beatAt} は \textbf{開始ビート相対}（各パート楽譜は 0 始まり）で
+記述し，楽譜データの使い回しを効かせる．
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\section{テストの設計}\label{sec:test-design}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+\S\ref{sec:basic-functions} で定義した MOP を実機で測るための試験計画と，
+要求 $\to$ 検証の対応関係を示す．
+
+\subsection{試験戦略（単体 $\to$ 結合 $\to$ システム）}
+
+PlatformIO の \texttt{test/} を使い，共通層と \texttt{applyPattern()} を中心に単体テスト
+を整備する．EMA に従い判断ロジックは \texttt{IModule} 派生でなく \texttt{applyPattern()}
+関数として書くため，テストでは \texttt{SystemData} をテスト側で組み立てて
+\texttt{applyPattern()} を呼ぶだけでロジック単体を検証できる．
+
+\begin{longtable}{p{0.30\textwidth} p{0.34\textwidth} p{0.28\textwidth}}
+\caption{単体テスト対象}\label{tab:unit-tests}\\
+\toprule
+\textbf{対象} & \textbf{確認内容} & \textbf{手段} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{対象} & \textbf{確認内容} & \textbf{手段} \\
+\midrule
+\endhead
+\texttt{ModuleTimer}              & \texttt{setTime()} 後の経過時間判定 & \texttt{millis()} モック差替え \\
+\texttt{OrcProtocol} シリアライズ & CTRL/BEAT/NOTE のラウンドトリップ   & バイト列比較 \\
+\texttt{applyPattern()} 拍検出    & 記録 IMU 時系列で拍位置一致         & ゴールデンテスト \\
+\texttt{applyPattern()} テンポ推定 & 一定間隔の拍で BPM 収束           & 単調列テスト \\
+\texttt{applyPattern()} 楽譜進行  & \texttt{lastBeatNo} 増加で正しい順序で \texttt{pendingOn} & 状態機械テスト \\
+\texttt{applyPattern()} SelfRun   & 時間経過で \texttt{state==SelfRun}，仮想 BEAT 進行 & 状態機械テスト \\
+\bottomrule
+\end{longtable}
+
+結合テストは Tier 単位で段階的に積み上げる．
+
+\begin{longtable}{l p{0.22\textwidth} p{0.42\textwidth} p{0.18\textwidth}}
+\caption{結合テスト Tier}\label{tab:integration-tier}\\
+\toprule
+\textbf{Tier} & \textbf{構成} & \textbf{確認事項} & \textbf{機材} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tier} & \textbf{構成} & \textbf{確認事項} & \textbf{機材} \\
+\midrule
+\endhead
+T1 & node\_01 単体           & シリアルに \texttt{beat\_no}/\texttt{bpm} が出る．手で振って拍が出る   & PC + USB \\
+T2 & node\_01 + node\_02     & node\_02 が BEAT 受信 → NOTE 出力                                       & 受信スクリプト \\
+T3 & node\_01 + node\_02--05 & 4 台がほぼ同時に NOTE．同期誤差 $\leq$ 30 ms (MOP-1)                   & USB ハブ + ログ集約 \\
+T4 & 全ノード + PC Processing & 実音再生．指揮速度を変えると BPM が追従                                & PC + スピーカ + Processing \\
+\bottomrule
+\end{longtable}
+
+\subsection{試験項目（TPM）}
+
+各 MOP に対する試験項目を表 \ref{tab:tpm-list} に示す．
+
+\begin{longtable}{l p{0.13\textwidth} p{0.13\textwidth} p{0.30\textwidth} p{0.13\textwidth} l}
+\caption{試験項目（TPM）}\label{tab:tpm-list}\\
+\toprule
+\textbf{ID} & \textbf{項目} & \textbf{目標} & \textbf{手順} & \textbf{合否基準} & \textbf{時期} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{項目} & \textbf{目標} & \textbf{手順} & \textbf{合否基準} & \textbf{時期} \\
+\midrule
+\endhead
+TP-1 & 拍検出精度  & MOP-3: $\geq$ 90\% & 80/120/160 BPM のメトロノームに合わせて指揮し，30 秒の検出 vs 実拍数 & $\geq$ 90\% & W6 (M3) \\
+TP-2 & 通信遅延    & MOP-2: $\leq$ 10 ms & node\_01 の \texttt{timestamp\_ms} と node\_02 受信時刻の差を 100 サンプル平均 & 平均 $\leq$ 10 ms & W7 (M4) \\
+TP-3 & 同期誤差    & MOP-1: $\leq$ 30 ms & 4 ノードのシリアルログを PC で時刻同期して BEAT 受信時刻を比較 & 最大差 $\leq$ 30 ms & W9 (M5) \\
+TP-4 & テンポ追従  & MOP-4: $\leq$ 2 拍 & 80 → 120 BPM 切替時に楽器側 BPM が 120 に入るまでの拍数 & $\leq$ 2 拍 & W9 (M5) \\
+TP-5 & パケロス耐性 & MOP-5            & ルータで擬似 5\% パケロスを設定，演奏破綻なきこと & 聴感破綻なし & W11 (M7) \\
+TP-6 & CPU 負荷    & MOP-6: $\leq$ 2 ms & \texttt{micros()} で入力フェーズ所要時間を 10 分ログ取得 & 最大 $\leq$ 2 ms & W11 (M7) \\
+TP-7 & 起動時間    & MOP-7: $\leq$ 5 s  & 電源投入 → 最初の CTRL 送出までを 5 回平均 & $\leq$ 5 s & W11 (M7) \\
+TP-8 & 強弱制御（ストレッチ）& MOP-8 & 小・中・大の振り幅で velocity 出力値を記録 & 3 段階分離 & W10 (M6) \\
+\bottomrule
+\end{longtable}
+
+\subsection{要求 $\to$ 検証の対応}
+
+\begin{longtable}{l p{0.30\textwidth} p{0.36\textwidth} l}
+\caption{要求と検証の対応表}\label{tab:req-verify}\\
+\toprule
+\textbf{要求 ID} & \textbf{要求内容} & \textbf{検証方法} & \textbf{関連 MOP} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{要求 ID} & \textbf{要求内容} & \textbf{検証方法} & \textbf{関連 MOP} \\
+\midrule
+\endhead
+R-1 & 5 台同期演奏           & T4 で聴感確認 + MOP-1/2 実測   & MOP-1, MOP-2 \\
+R-2 & 輪唱曲（主旋律 3 + リズム 1 以上） & 4 パート楽譜を用意し T4 で演奏 & — \\
+R-3 & 可変テンポ追従          & 指揮 BPM 階段変化で MOP-4 実測 & MOP-4 \\
+R-4 (S) & 強弱制御            & 指揮振幅変化で MOP-8           & MOP-8 \\
+R-Internal-1 & 通信の信頼性    & MOP-5（5\% パケロスで継続）    & MOP-5 \\
+R-Internal-2 & CPU リソース    & MOP-6（入力 $\leq$ 2 ms）      & MOP-6 \\
+R-Internal-3 & 起動時間        & MOP-7（5 s 以内）              & MOP-7 \\
+\bottomrule
+\end{longtable}
 
 
 \end{document}
