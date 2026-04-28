@@ -196,7 +196,7 @@
 \textbf{ID} & \textbf{指標} & \textbf{目標値} \\
 \midrule
 \endhead
-MOP-1 & 楽器間 同期誤差（4 ノードの BEAT 受信時刻差）          & $\leq$ 30 ms \\
+MOP-1 & 楽器間 同期誤差（4 ノードの発音タイミング差）          & $\leq$ 30 ms \\
 MOP-2 & 指揮 → 楽器 通信遅延（送信〜受信）                     & $\leq$ 10 ms \\
 MOP-3 & 拍検出 正解率（定速指揮時）                            & $\geq$ 90 \% \\
 MOP-4 & テンポ追従 遅延（BPM 階段変化への追従）                & $\leq$ 2 拍 \\
@@ -335,9 +335,10 @@ Mac $\times$ 4 & 楽器ごとに 1 台 & UART で NOTE を受信 → 倍音・AD
 \begin{itemize}
   \item \textbf{指揮棒（指揮者）}: MPU6050 を搭載した node\_01（XIAO ESP32-S3 Sense）を指揮棒として手に持ち，
         通常の指揮動作（4 拍子・3 拍子の振り下ろし）で操作する．特別なボタン等は持たない．
-  \item \textbf{起動順}: 楽器ノード（node\_02〜05）を先に起動して \texttt{WaitStart} 状態にし，
-        その後に指揮者ノード（node\_01）を起動する．指揮者の \texttt{Conducting} 入りで
-        BEAT が流れ始め，楽器が \texttt{Playing} に遷移する．
+  \item \textbf{起動順}: 楽器ノード（node\_02〜05）を先に起動し（\texttt{Idle} 状態で
+        SoftAP を待機），その後に指揮者ノード（node\_01）を起動する．指揮者の SoftAP
+        起動で楽器が \texttt{WaitStart} に遷移し，指揮者の \texttt{Conducting} 入りで
+        BEAT が流れ始めて楽器が \texttt{Playing} に遷移する．
   \item \textbf{Calibrating}: 指揮者ノードは起動後，最初の 2 秒間に静止姿勢を学習して
         重力オフセットを記録する．使用者は単に「起動後 2 秒間，腕を自然に下ろした状態で
         待つ」だけでよい．
@@ -486,7 +487,7 @@ Arduino--Mac 間（NOTE）  & \textbf{USB Serial（CDC, \texttt{Serial.write}）
 \endhead
 Idle        & 起動直後．SoftAP 起動前     & ImuModule.updateInput は動くが拍検出は無効．OrcSenderModule は何も送らない \\
 Calibrating & 初期静止姿勢の学習中（2 秒） & applyPattern() が IMU 平均で重力オフセットを記録 \\
-Conducting  & 通常演奏中                 & 全モジュール稼働。BEAT を拍検出時に送出，CTRL を 20 Hz 周期で送出 \\
+Conducting  & 通常演奏中                 & 全モジュール稼働．BEAT を拍検出時に送出，CTRL を 20 Hz 周期で送出 \\
 Fallback    & エラー発生                 & CTRL は state=Fallback で送り続ける．BEAT は停止．LED 高速点滅 \\
 \bottomrule
 \end{longtable}
