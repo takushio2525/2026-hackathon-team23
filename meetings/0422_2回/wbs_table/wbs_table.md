@@ -76,7 +76,7 @@
     <tr><td>124 Processing 詳細設計：Arduino から届く音の指令（NOTE）を受け取って順番に並べる仕組み</td><td align="center">梅澤</td></tr>
     <tr><td>125 Processing 詳細設計：4 種類の楽器パートを同時に鳴らす管理（どの音をどの発音枠で鳴らすか）</td><td align="center">梅澤</td></tr>
     <tr><td>126 Processing 詳細設計：金管楽器っぽい音色を作る仕組み（重ねる倍音と、音の立ち上がり・伸び・余韻のカーブ）</td><td align="center">梅澤</td></tr>
-    <tr><td>127 <em>（余裕があれば）</em> Python で実際の金管楽器音を周波数分解（FFT）して、倍音と音量カーブの実データを取り出し 126 に反映</td><td align="center">梅澤</td></tr>
+    <tr><td>127 <em>（余裕があれば）</em> Python で実際の金管楽器音を周波数分解（FFT）して、倍音と音量カーブの実データを取り出し 126 に反映</td><td align="center">斎藤</td></tr>
     <tr><td>128 楽譜データ詳細設計：課題曲を 4 種類の楽器パートに振り分ける（誰がどのメロディを演奏するか）</td><td align="center">齋藤</td></tr>
     <tr><td>129 楽譜データ詳細設計：テンポ・音の高さ・拍（リズム）をどんな形でデータに書くか決める</td><td align="center">齋藤</td></tr>
     <tr><td>130 楽譜データ詳細設計：Arduino（<code>node_02-05</code>）から PC（Processing）へ送る音データの中身（何を、どのタイミングで送るか）</td><td align="center">齋藤</td></tr>
