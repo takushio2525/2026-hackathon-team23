@@ -1,0 +1,52 @@
+\documentclass[uplatex,dvipdfmx]{jlreq}
+\usepackage[fleqn,tbtags]{mathtools}
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet]{pxchfon} % must be after otf package
+\usepackage{stix2} %欧文＆数式フォント
+\usepackage[fleqn,tbtags]{mathtools} % 数式関連 (w/ amsmath)
+\usepackage{hira-stix} % ヒラギノフォント＆STIX2 フォント代替定義（Warning回避）
+\usepackage{url}
+
+\begin{document}
+
+\title{生成AI利用申告書}
+\author{25G1053 齋藤翔太}
+\maketitle
+\noindent
+\textbf{プログラムファイル名：} HCK02\_01.ino \\
+\textbf{使用した AI ツール：} Gemini
+\section{何に使ったか}
+例題2のプログラムにおいて，シリアルプロッタに正確な正弦波を描画するためのプログラム最適化，および波形が歪む原因の特定と解決策の検討に使用した．
+
+\section{AIへの指示（プロンプト）}
+\begin{itemize}
+    \item 「（既存のプログラムのコピー）このプログラムを変更して音声入力の精度を上げたいのでヒントをください．」
+    \item 「シリアルプロッタに実数値（AD変換値）しか表示されず，振幅の波形が確認できません．どうすればいいですか．」
+\end{itemize}
+
+\section{AI の出力の使い方}
+AIから提示された「不要な文字列送信の削除」「重い関数の置き換え（\texttt{pow()}の排除）」「定数のループ外への移動」などの処理負荷を軽減するヒントを参考に，自身のプログラムを書き換えた．また，プロッタの表示を分かりやすくするため，AIの提案を踏まえつつ，上限・下限の基準線（\texttt{maxa}，\texttt{mina}）を独自に残すなど調整を加えた．
+
+\section{正しいと確認した方法}
+\begin{itemize}
+    \item 修正したプログラムを実際にArduino Unoに書き込み，マイクから音声を読み取ってシリアルプロッタに出力し，動作を確認した．
+    \item AD変換値から電圧の振幅への計算式（規格化処理）を読み解き，中心が0になることが数式的に正しいことを確認した．
+    \item processingで作成した音声を入力し，目視で滑らかな正弦波が描画されることを確認した．
+\end{itemize}
+
+\section{問題や間違い}
+processingを用いて純音を入力したが，Arduinoのデータ取得間隔に対して入力周波数が高すぎたため，点数が足りず三角波のようにエイリアシングが発生してしまう問題に直面した．
+また，初期段階では値の大きな実測値も同時に出力していたため，プロッタの自動スケール機能によって振幅の小さな波形がゼロ付近に潰れてしまう問題もあった．
+
+\section{自分で工夫した点}
+\begin{itemize}
+    \item マイコンの計算リソースを有効活用するため，\texttt{loop()}内で毎回計算されていた \texttt{pow(2, 10)} を直接 \texttt{1023.0} と記述し直し，不変な定数（\texttt{maxa}，\texttt{mina}）はループ外で定義することで実行速度を極限まで高めた．
+    \item 波形の推移を視覚的に分かりやすくするため，上限・下限の基準線（\texttt{maxa}，\texttt{mina}）は残しつつ，通信負荷を減らすために送信データをカンマ区切りの数値のみにするフォーマットを採用した．
+    \item プログラムの高速化に加えて，ハードウェアの制約を考慮し，あえて低い周波数の音源を入力することで綺麗な正弦波を抽出することに成功した．
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{ref:lecture} 有本泰子, \& 佐波孝彦. (2026). ハッカソン1 第2回 講義資料.
+\end{thebibliography}
+
+\end{document}
