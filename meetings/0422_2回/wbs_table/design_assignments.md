@@ -60,7 +60,6 @@
       <th align="center">要素成果物</th>
       <th align="center">活動タスク</th>
       <th align="center">担当者</th>
-      <th align="center">期限</th>
     </tr>
   </thead>
 
