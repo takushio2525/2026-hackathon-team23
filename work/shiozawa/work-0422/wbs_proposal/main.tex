@@ -1,0 +1,543 @@
+% !TEX program = lualatex
+\documentclass[lualatex,book,paper=a4paper,jafontsize=11pt,jafontscale=1.05]{jlreq}
+
+% 日本語フォント・表紙スタイル（提出用計画書から流用）
+\usepackage{luatexja-fontspec}
+\usepackage{hack-fonts}
+\usepackage{hack-cover}
+
+% リンク
+\usepackage[hidelinks]{hyperref}
+
+% 表組み
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+% 色とボックス
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+%% ─── 改ページ制御 ─────────────────────────────
+\widowpenalty=10000
+\clubpenalty=10000
+\predisplaypenalty=10000
+\interfootnotelinepenalty=10000
+\brokenpenalty=5000
+
+% 色定義
+\definecolor{headerblue}{HTML}{1B3A5C}
+\definecolor{accentblue}{HTML}{2E86C1}
+\definecolor{lightgray}{HTML}{F2F3F4}
+\definecolor{warnred}{HTML}{E74C3C}
+\definecolor{noteyellow}{HTML}{F39C12}
+\definecolor{okgreen}{HTML}{27AE60}
+
+% tcolorbox 共通設定（ネスト時にコードブロックが押し出されないよう控えめ）
+\tcbset{before={\par\medskip\noindent}}
+
+% タイトル設定
+\title{ハッカソン1 WBS 再設計提案}
+\subtitle{～議事録 表1 を授業資料形式に再構成する～}
+\team{チーム23}
+\author{25G1065 塩澤 匠生}
+\date{\today}
+\version{0.1}
+
+\begin{document}
+\maketitle
+
+\setcounter{tocdepth}{2}
+\tableofcontents \thispagestyle{empty}
+
+%==================================================
+\chapter{はじめに}\setcounter{page}{1}
+
+\section{背景}
+
+本書は、2026年度ハッカソン1 チーム23（Arduino オーケストラ）における
+作業分解構造（WBS）の再設計提案書である。
+
+第2回ミーティング（2026-04-22）の議事録に掲載された
+\textbf{表1 WBS（作業分担表）} は、授業資料が示す WBS 形式と根本的に
+異なる構造で書かれている。具体的には：
+
+\begin{itemize}
+  \item 「時間的フェーズ」の中身が成果物（PBS）と完全に重複している
+  \item 第2回議事録冒頭で合意された機能要件の一部が WBS から抜け落ちている
+  \item 第1回議事録および ADR-0002〜0005 で確定した技術選定が反映されていない
+\end{itemize}
+
+このまま提出計画書 §3.1 に転記すると、評価軸（授業資料「役割分担」）
+に対して説明不能な構造になるため、本書ではボトムアップで
+WBS を再構成し、チーム内合意を経たうえで計画書本体に反映することを目指す。
+
+\section{本書の対象読者}
+
+チーム23 のメンバー全員（先輩 24G 勢 3 名・後輩 25G 勢 3 名）。
+特に、議事録 表1 を作成した実装3人（塩澤・齋藤・梅澤）と、
+それをレビューする先輩3人（片岡・地曵・御代川）を主読者とする。
+
+\section{本書の位置づけ}
+
+本書は \textbf{議論材料}であり、確定文書ではない。
+チームレビューを経たあとに、本書の WBS を提出計画書
+（\texttt{work/shiozawa/work-0422/提出用計画書/plan\_template.tex}）の
+§3.1「作業分解構造WBSと管理番号」に転記する。
+
+本書自体は計画書とは独立に保管する。提案が承認されて計画書本体への
+反映が完了したら、本フォルダは削除して構わない（経緯を残したい場合は
+\texttt{docs/decisions/} に ADR として要点を抜粋）。
+
+%==================================================
+\chapter{議事録 表1 WBS の問題分析}
+
+\section{授業資料が示す WBS 形式}
+
+授業資料（HCK1 役割分担スライド）では、WBS の構造を下記のように規定している：
+
+\begin{tcolorbox}[colback=lightgray, colframe=accentblue, title={\bfseries 授業資料「7. 役割分担」要約}, breakable]
+\begin{itemize}
+  \item WBS の第3層：活動タスクに対して担当者を割り当てる
+  \item アローダイアグラムで見つけたボトルネックを役割分担や割当人数で解消する
+  \item WBS を表として表し、各活動タスクに担当者を割り当てる
+  \item \textbf{時間的フェーズは「設計フェーズ → 製造フェーズ → テストフェーズ」}という工程軸
+\end{itemize}
+\end{tcolorbox}
+
+つまり「時間的フェーズ」は \textbf{開発工程の時間軸}（設計→製造→テスト）であり、
+「成果物の種類」ではない。授業資料の例では：
+
+\begin{itemize}
+  \item 100 設計フェーズ：基本設計、詳細設計
+  \item 200 製造フェーズ：機械実装、API実装
+  \item 300 テストフェーズ：データ作成、単体テスト、機能テスト、システムテスト
+\end{itemize}
+
+という構造で、各フェーズの第3層に活動タスクが並び、担当者が割り当てられている。
+
+\section{議事録 表1 の構造}
+
+第2回議事録の表1は、時間的フェーズ列に下記が並んでいる：
+
+\begin{itemize}
+  \item 100 入力装置（回路、指揮棒）
+  \item 200 出力装置（スピーカー、指揮棒の先端LED）
+  \item 300 通信システム（UDPの実装）
+\end{itemize}
+
+これらは時間軸ではなく \textbf{成果物の種類（PBS）}であり、
+授業資料が想定する形式と乖離している。
+PBS と完全に重複した分類が「時間的フェーズ」列に入ってしまっている。
+
+\section{構造的問題の整理}
+
+\begin{tcolorbox}[colback=lightgray, colframe=warnred, title={\bfseries 議事録 表1 の構造的問題}, breakable]
+\begin{enumerate}
+  \item \textbf{時間的フェーズが PBS と重複している}\\
+        「100 入力装置 / 200 出力装置 / 300 通信システム」は物（成果物）の
+        分類であって、時間軸ではない。授業資料形式では工程軸
+        （設計→製造→テスト）が来るべき位置。
+  \item \textbf{タスクの依存・粒度が崩れている}\\
+        「111 回路図作成」と「112 機材購入」が同列に並ぶが、回路図が
+        なければ機材は決まらない。「113 指揮↔楽器Arduino通信」と
+        「311 UDPコード作成」は実質同じ作業の重複。
+  \item \textbf{合意機能の欠落}\\
+        第2回議事録「成果物の範囲の明確化」で合意された強弱推定
+        （ストレッチ）、楽譜進行ロジック、Processing 側の音色合成エンジン、
+        状態管理、フォールバック動作などが WBS に出てこない。
+  \item \textbf{担当列が3人のみで配分も偏っている}\\
+        第1回議事録で「実装担当は塩澤・齋藤・梅澤の25G勢3名」と決定
+        されているが、表1では齋藤・梅澤・塩澤の配分も均等でなく、
+        Processing 担当（梅澤）の主タスクである音色合成や4パート同時発音
+        管理が掲載されていない。
+  \item \textbf{第1回議事録・ADR の不反映}\\
+        ADR-0002（UDP独自プロトコル）、ADR-0003（内蔵IMU）、
+        ADR-0004（5台金管四重奏）、ADR-0005（Embedded-Module-Architecture）
+        などの技術選定確定事項に紐づいた作業項目（共通層実装、IModule 設計、
+        SystemData 集約、4パート楽譜のヘッダ配列化など）が出てこない。
+\end{enumerate}
+\end{tcolorbox}
+
+%==================================================
+\chapter{再設計の方針}
+
+\section{基本方針}
+
+\begin{enumerate}
+  \item \textbf{授業資料の正解形式に厳密に従う}：時間的フェーズ＝開発工程軸
+        （100 設計 / 200 製造 / 300 テスト / 400 ストレッチ / 500 運用）。
+  \item \textbf{タスク分割は実装3人のみ}：塩澤匠生（25G1065）・
+        齋藤翔太（25G1053）・梅澤颯太（25G1021）の3名。
+        24G勢（片岡・地曵・御代川）は議事録持ち回りと実機検証・発表準備に
+        合流するため、本WBSには活動タスクとして含めず、
+        §\ref{sec:roles}「補助メンバー」として別建てで言及する。
+  \item \textbf{第1回・第2回議事録 + ADR-0002〜0005 + プロジェクト概要を全反映}：
+        WBSの各活動タスクに、根拠となる ADR や FBS の参照を付ける。
+  \item \textbf{ストレッチ機能は独立フェーズ}：強弱推定（FBS の F1.5）は
+        \texttt{400 ストレッチフェーズ}として独立させ、必達フェーズ完了後に
+        着手する。LED マトリクス・ゲームモードなどは第2回議事録
+        「成果物の範囲の明確化」に含まれていないため、WBSには入れず
+        スコープ外として記載する。
+  \item \textbf{議事録表1からの移行表を明示}：議事録の各タスクが新WBSの
+        どこへ移動したか・なぜ削除されたかを第\ref{chap:mapping}章に
+        対応表として示す。「先輩のWBSを否定」ではなく「ボトムアップで
+        再構成して各タスクを救い上げた」形にする。
+\end{enumerate}
+
+\section{担当略号}
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+\textbf{略号} & \textbf{メンバー} \\
+\midrule
+S   & 塩澤 匠生（25G1065、Arduino全般） \\
+Sa  & 齋藤 翔太（25G1053、楽譜データ・音階生成） \\
+U   & 梅澤 颯太（25G1021、Processing 音色合成） \\
+ALL & 実装3人全員（S + Sa + U） \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{役割分担の補足}\label{sec:roles}
+
+\textbf{24G勢（先輩3名）の役割}：議事録持ち回り（御代川→地曵→片岡）、
+および実機検証・発表準備への合流。本WBSの活動タスク列には載せないが、
+300 テストフェーズの結合・システムテスト（測定立ち会い、ログ集約など）
+では人手として自然に合流する想定。
+
+\section{スコープ外として明示する項目}
+
+第2回議事録で議論されたが「成果物の範囲の明確化」に含まれなかった項目は、
+本WBSには入れない。提出計画書 §1.2「対象範囲と非対象範囲」に明記する：
+
+\begin{itemize}
+  \item 指揮棒の先端 LED 発光（加速度連動の強弱表現）
+  \item LED マトリクスでの音階表示
+  \item 演奏モードとゲームモードの切り替え
+  \item テンポキープでスコア獲得などのゲーム性
+\end{itemize}
+
+これらは「やりたいリスト」として残し、必達 + ストレッチが完了して
+時間に余裕があれば追加実装の議題に挙げる。
+
+%==================================================
+\chapter{新 WBS（提案版）}
+
+\section{全体構造}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{番号} & \textbf{時間的フェーズ} & \textbf{対応週} \\
+\midrule
+100 & 設計フェーズ & W3〜W4（2026-04-22〜05-06） \\
+200 & 製造フェーズ & W6〜W9（2026-05-20〜06-17） \\
+300 & テストフェーズ & W6〜W11（2026-05-20〜06-24） \\
+400 & ストレッチフェーズ（必達後） & W10（2026-06-17） \\
+500 & 運用・発表 & W12〜W13（2026-07-01〜07-08） \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+3層構成は次のとおり：第1層が時間的フェーズ（100/200/...）、
+第2層が要素成果物（110/120/...）、第3層が活動タスク（111/112/...）。
+
+\section{100 設計フェーズ}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.9cm} >{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{6.5cm} >{\centering\arraybackslash}p{1.0cm} >{\centering\arraybackslash}p{0.9cm} >{\raggedright\arraybackslash}p{1.7cm}}
+\toprule
+\textbf{番号} & \textbf{要素成果物} & \textbf{活動タスク} & \textbf{担当} & \textbf{工数h} & \textbf{関連} \\
+\midrule
+\endhead
+110 & 基本設計 & & & & \\
+111 & & FBS（機能分解構造）の最終化 & ALL & 3 & FBS §4.1 \\
+112 & & PBS（製品分解構造）の最終化 & ALL & 2 & PBS §4.2 \\
+113 & & MOE / MOP / TPM の最終化 & ALL & 3 & §4.3 \\
+114 & & システムアーキテクチャ設計（EMA準拠方針） & S & 4 & ADR-0005 \\
+115 & & 通信プロトコル基本設計（CTRL/BEAT/NOTE） & S & 4 & ADR-0002 \\
+116 & & 楽譜データ形式 基本設計（4パート/ROM埋込） & Sa & 3 & — \\
+117 & & 音色合成 基本設計（金管倍音 + ADSR） & U & 3 & ADR-0004 \\
+\midrule
+120 & 詳細設計 & & & & \\
+121 & & 共通層API詳細（IModule / SystemData / ProjectConfig） & S & 4 & §10 \\
+122 & & node\_01 詳細設計（IMU→拍検出→テンポ推定→送出） & S & 6 & ADR-0003 \\
+123 & & node\_02-05 詳細設計（受信→楽譜進行→NOTE送出） & S & 4 & §12 \\
+124 & & Processing 詳細設計（NOTE受信→ボイス管理→出力） & U & 4 & — \\
+125 & & 楽譜データ詳細設計（課題曲のパート割・データ表化） & Sa & 4 & — \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{マイルストーン}：
+M1（W3 4/29 設計書原案）、M2（W4 5/6 計画書確定）
+
+\section{200 製造フェーズ}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.9cm} >{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{8.0cm} >{\centering\arraybackslash}p{1.0cm} >{\centering\arraybackslash}p{0.9cm}}
+\toprule
+\textbf{番号} & \textbf{要素成果物} & \textbf{活動タスク} & \textbf{担当} & \textbf{工数h} \\
+\midrule
+\endhead
+210 & 共通層実装 & & & \\
+211 & & IModule / ModuleTimer 実装 & S & 6 \\
+212 & & SystemData / ProjectConfig テンプレ整備 & S & 3 \\
+213 & & OrcNetModule（UDP送受信ラッパ：CTRL/BEAT/NOTE 共通） & S & 8 \\
+\midrule
+220 & 指揮者ノード(node\_01) & & & \\
+221 & & IMUドライバモジュール & S & 6 \\
+222 & & 信号前処理（重力分離・LPF）モジュール & S & 6 \\
+223 & & 拍検出モジュール（候補方式比較含む） & S & 10 \\
+224 & & テンポ推定モジュール & S & 6 \\
+225 & & コマンド送出モジュール（CTRL/BEAT） & S & 4 \\
+\midrule
+230 & 楽器ノード(node\_02-05) & & & \\
+231 & & CTRL/BEAT 受信モジュール & S & 4 \\
+232 & & 楽譜データ保持・進行ロジック & S & 6 \\
+233 & & NOTE送出モジュール & S & 4 \\
+234 & & パート別差分適用（node\_03/04/05 への展開） & S & 6 \\
+\midrule
+240 & 楽譜データ準備 & & & \\
+241 & & 課題曲4パートの選定 & Sa & 4 \\
+242 & & 4パート楽譜のヘッダ配列化（PROGMEM 形式） & Sa & 8 \\
+243 & & 楽譜データの ROM 埋込確認 & Sa & 2 \\
+\midrule
+250 & Processing 側実装 & & & \\
+251 & & NOTE受信モジュール & U & 6 \\
+252 & & 金管音色合成エンジン（倍音 + ADSR） & U & 16 \\
+253 & & 4パート同時発音管理（ボイスマネージャ） & U & 8 \\
+254 & & UI / モード表示（最小限） & U & 4 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{マイルストーン}：
+M3（W6 5/27 node\_01 拍検出デモ）、
+M4（W7 6/3 node\_01+node\_02 連携デモ）、
+M5（W9 6/17 4ノード同時演奏）
+
+\section{300 テストフェーズ}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.9cm} >{\raggedright\arraybackslash}p{2.0cm} >{\raggedright\arraybackslash}p{7.5cm} >{\centering\arraybackslash}p{1.0cm} >{\centering\arraybackslash}p{0.8cm} >{\raggedright\arraybackslash}p{1.5cm}}
+\toprule
+\textbf{番号} & \textbf{要素成果物} & \textbf{活動タスク} & \textbf{担当} & \textbf{工数h} & \textbf{TP/MOP} \\
+\midrule
+\endhead
+310 & 単体テスト & & & & \\
+311 & & 共通層単体（OrcProtocol / ModuleTimer） & S & 4 & — \\
+312 & & 拍検出ゴールデンテスト（記録IMU波形→期待発火） & S & 4 & MOP-3 \\
+313 & & 楽譜進行 状態機械テスト & S & 3 & — \\
+314 & & 音色生成 単体確認（聴感+波形目視） & U & 4 & — \\
+\midrule
+320 & 結合テスト & & & & \\
+321 & & node\_01 単体デモ（手振り→ログ拍出力） & S & 4 & — \\
+322 & & node\_01 + node\_02 結合（BEAT送受信） & S & 6 & — \\
+323 & & 4ノード同時 同期誤差計測 & ALL & 6 & MOP-1 \\
+324 & & 全ノード + Processing 全結合（実音出し） & ALL & 6 & — \\
+\midrule
+330 & システムテスト & & & & \\
+331 & & TP-1 拍検出精度（80/120/160 BPM） & S & 2 & MOP-3 \\
+332 & & TP-2 通信遅延 & S & 2 & MOP-2 \\
+333 & & TP-3 同期誤差（4ノード時刻合わせ） & ALL & 4 & MOP-1 \\
+334 & & TP-4 テンポ追従（80→120 BPM 階段変化） & S & 2 & MOP-4 \\
+335 & & TP-5 パケロス耐性（5\% 擬似パケロス） & S & 3 & MOP-5 \\
+336 & & TP-6 CPU 負荷（入力フェーズ 2ms 以下） & S & 2 & MOP-6 \\
+337 & & TP-7 起動時間（電源→演奏可能 5s 以下） & S & 2 & MOP-7 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{マイルストーン}：M7（W11 6/24 システム評価会）
+
+\section{400 ストレッチフェーズ}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.9cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{7.5cm} >{\centering\arraybackslash}p{1.0cm} >{\centering\arraybackslash}p{1.0cm}}
+\toprule
+\textbf{番号} & \textbf{要素成果物} & \textbf{活動タスク} & \textbf{担当} & \textbf{工数h} \\
+\midrule
+\endhead
+410 & 強弱推定 & & & \\
+411 & & 振幅 → velocity 推定アルゴ実装 & S & 4 \\
+412 & & CTRL パケットへの velocity 乗せ込み & S & 2 \\
+413 & & TP-8 強弱制御テスト（3段階分離） & S & 2 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{マイルストーン}：M6（W10 6/17 ストレッチ機能実装）
+
+\section{500 運用・発表}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.9cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{8.0cm} >{\centering\arraybackslash}p{1.0cm} >{\centering\arraybackslash}p{1.0cm}}
+\toprule
+\textbf{番号} & \textbf{要素成果物} & \textbf{活動タスク} & \textbf{担当} & \textbf{工数h} \\
+\midrule
+\endhead
+510 & 発表 & 発表準備・デモ調整 & ALL & 4 \\
+520 & 報告書 & 成果報告書（個人） & ALL & 各自 8 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{マイルストーン}：M8（W12 7/1 成果発表会）
+
+%==================================================
+\chapter{議事録 表1 ↔ 新 WBS 対応表}\label{chap:mapping}
+
+\section{17行の対応表}
+
+第2回議事録 表1 の全 17 行が、新WBSのどこへ移動したかを示す。
+\textbf{削除 3 行（LED 系）以外は新WBSに 1 対 1 で対応} している。
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{4.5cm} >{\centering\arraybackslash}p{1.2cm} >{\raggedright\arraybackslash}p{3.5cm} >{\centering\arraybackslash}p{1.0cm} >{\raggedright\arraybackslash}p{4.5cm}}
+\toprule
+\textbf{議事録 表1} & \textbf{議事録 担当} & \textbf{新WBS番号} & \textbf{新担当} & \textbf{移動理由} \\
+\midrule
+\endhead
+111 回路図の作成      & 斎藤 & 250 へ吸収（PBS側） & U & 内蔵IMU+WiFi構成のため別途回路図不要、Processing 機材構成に統合 \\
+112 必要な機材購入    & 梅澤 & §資源調達管理 へ & — & WBS活動タスクではなく調達 \\
+113 Arduino 間通信    & 塩澤 & 213 OrcNetModule & S & UDP実装と統合 \\
+114 Mac↔Arduino 通信  & 塩澤 & 213 OrcNetModule & S & 同上 \\
+121 加速度+Arduino 連携 & 梅澤 & 221 IMUドライバ & S & EMAモジュール化、Arduino 実装は塩澤に統一 \\
+122 加速度のピーク検出 & 斎藤 & 223 拍検出 & S & リネーム＋実装担当を塩澤に統一 \\
+123 指揮棒の作成      & 斎藤 & 非対象範囲 & — & ハード装着具は第2回議事録の成果物範囲外 \\
+211 回路の作成        & 塩澤 & 250 へ統合 & U & スピーカ/USB配線は Processing PC 側 \\
+212 音の作成          & 塩澤 & 252 音色合成エンジン & U & 担当を本来の Processing 担当 梅澤へ \\
+213 Processingコード  & 塩澤 & 251-254 全般 & U & 細分化、本来担当の梅澤へ \\
+221 LED 回路          & 梅澤 & \textcolor{warnred}{\textbf{削除（非対象）}} & — & 第2回議事録の成果物範囲に含まれない \\
+222 LED の入手        & 斎藤 & \textcolor{warnred}{\textbf{削除（非対象）}} & — & 同上 \\
+223 光らせるコード    & 塩澤 & \textcolor{warnred}{\textbf{削除（非対象）}} & — & 同上 \\
+311 UDP コード作成    & 塩澤 & 213 と統合 & S & 重複解消 \\
+312 UDP の環境テスト  & 梅澤 & 322 / 335 へ移動 & S/ALL & テストフェーズへ \\
+313 データの送信確認  & 斎藤 & 322 へ移動 & S & 結合テスト \\
+314 遅延の計測        & 梅澤 & 332 へ移動 & S & TP-2 として体系化 \\
+\bottomrule
+\end{longtable}
+
+\section{削除 3 行（LED 系）の根拠}
+
+\begin{tcolorbox}[colback=lightgray, colframe=noteyellow, title={\bfseries LED 系 3 タスクをスコープ外とする理由}, breakable]
+第2回議事録「\textbf{成果物の範囲の明確化}」に列挙された4項目は次のとおり：
+
+\begin{enumerate}
+  \item マイコンを振ってエッジ検出、WiFi（UDP）で拍の送信
+  \item 同期誤差 20ms 以内
+  \item 倍音データなどを元に根拠を持った音色作り
+  \item どの方向に振っても拍を検出可能
+\end{enumerate}
+
+LED 関連（指揮棒先端 LED の発光や強弱表現）は議論はされているが、
+この \textbf{確定スコープ}には含まれていない。
+WBS に入れると必達機能を圧迫するため、提出計画書 §1.2「非対象範囲」に
+記載する形でスコープから外す。
+\end{tcolorbox}
+
+\section{担当再配分の根拠}
+
+議事録 表1 では、塩澤・齋藤・梅澤の3人に「Arduino の作業」が
+ばらまかれていた。新WBSではこれを次の方針で集約した：
+
+\begin{itemize}
+  \item \textbf{Arduino 全般を塩澤に集約}：ADR-0005 で採用した
+        Embedded-Module-Architecture は責務分離が厳しく、共通層
+        （IModule・SystemData・ProjectConfig）を一人が通貫で設計した方が
+        モジュール境界を揃えやすい。設計書原案
+        （\texttt{design\_draft/sections/07\_wbs.md}）でも同方針で見積もり済み。
+  \item \textbf{Processing を梅澤に集約}：第1回議事録で「Processing は梅澤」
+        と明記されている本来の役割。議事録 表1 で塩澤に振られていた
+        \texttt{211 回路の作成 / 212 音の作成 / 213 Processing コード} は、
+        本来担当の梅澤に戻す。
+  \item \textbf{楽譜データを齋藤に集約}：第1回議事録で「ドレミファソラシド
+        などの音階は斎藤」と明記されている。議事録 表1 で齋藤に振られていた
+        \texttt{122 ピーク検出 / 123 指揮棒の作成} は Arduino 実装側の作業
+        なので塩澤に集約し、齋藤は楽譜選定とデータ化に専念する。
+\end{itemize}
+
+%==================================================
+\chapter{工数集計と担当配分の根拠}
+
+\section{工数集計}
+
+\begin{center}
+\begin{tabular}{lcl}
+\toprule
+\textbf{担当} & \textbf{合計工数h} & \textbf{備考} \\
+\midrule
+塩澤（S）   & 約 130 & design\_draft §7 の T1-T20 = 121h と整合 \\
+齋藤（Sa）  & 約 21  & 楽譜中心、Arduino 側は塩澤と並走でレビュー \\
+梅澤（U）   & 約 45  & Processing 一式、ADR-0004 の「タスク密度上がる」想定通り \\
+ALL         & 約 25  & 全員参加の設計合意・結合テスト・最終結合 \\
+\midrule
+\textbf{合計} & 約 221 & 13週で実装3人 + 設計合意工数 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{1人あたりの週間工数}
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{担当} & \textbf{個人工数h} & \textbf{週あたり（13週で割る）} \\
+\midrule
+塩澤 & 130 + 約 8 (ALL分) & 約 10.6 h/週 \\
+齋藤 & 21 + 約 8 (ALL分) & 約 2.2 h/週 \\
+梅澤 & 45 + 約 8 (ALL分) & 約 4.1 h/週 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+塩澤の負荷が突出しているのは、ADR-0005（EMA準拠）で5台分の共通層を
+一人が通貫設計する方針を取ったため。齋藤・梅澤は実機検証フェーズで
+ALL タスクに合流して実装3人の総工数を平準化する想定。
+
+\section{齋藤・梅澤の負荷が低めに見える件}
+
+齋藤は「楽譜選定 + データ化」という性質上、まとまった集中作業
+（一気に音符を入力）と、塩澤との楽譜進行ロジックすり合わせで時間を使う。
+梅澤は音色合成エンジン（252）に 16h を見積もっており、Processing の
+オーディオ処理経験次第で前後する。
+
+両者とも、必達フェーズ完了後はストレッチや LED 系（スコープ外項目）への
+合流余地を持たせる目的で、控えめ見積もりとしている。
+
+%==================================================
+\chapter{次のアクション}
+
+\section{チーム内レビュー手順}
+
+\begin{enumerate}
+  \item 本書 PDF をチーム共有（GitHub リポジトリの該当パス、
+        または Slack 等で URL 共有）
+  \item 第3回ミーティングで議題化：
+        \begin{itemize}
+          \item 議事録 表1 の構造的問題を確認
+          \item 新WBS（第4章）を読み合わせ、担当配分の合意を取る
+          \item LED 系をスコープ外とする判断の確認
+          \item ストレッチ機能（強弱推定）の優先度確認
+        \end{itemize}
+  \item 修正が入れば本書を更新（version を 0.2 等に上げる）
+  \item チーム合意が取れたら本書のWBSを提出計画書 §3.1 へ転記
+\end{enumerate}
+
+\section{計画書本体への反映タイミング}
+
+提出計画書（\texttt{plan\_template.tex}）は M2（W4 5/6）で確定版
+にする予定。本書のレビュー → 反映を W4 までに完了させる必要がある。
+逆算すると：
+
+\begin{itemize}
+  \item W3 第3回ミーティング（4/29 想定）で本書をレビュー
+  \item 修正反映を 5/2 までに完了
+  \item 5/3〜5/5 で計画書 §3.1 への転記
+  \item 5/6 計画書確定版を提出
+\end{itemize}
+
+\section{本書廃棄のタイミング}
+
+計画書本体への反映完了後、本フォルダ（\texttt{wbs\_proposal/}）は
+削除して構わない。経緯を残したい場合のみ、要点を抜粋して
+\texttt{docs/decisions/} に新規 ADR を作成する（例：
+\texttt{0006-wbs-redesign.md}）ことを推奨する。
+
+\end{document}

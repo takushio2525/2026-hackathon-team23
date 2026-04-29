@@ -1,0 +1,106 @@
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{plistings}
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  xleftmargin=1em,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+
+\newcommand{\cboxon}{$\boxtimes$}
+\newcommand{\cboxoff}{$\square$}
+
+\begin{document}
+
+{\LARGE\bfseries 生成AI利用申告書}
+\vspace{1em}
+
+\begin{itemize}
+  \item 氏名：塩澤 匠生
+  \item 学籍番号：25G1065
+  \item プログラムファイル名：\texttt{HCK02\_02.ino} / \texttt{HCK02\_02.pde}
+  \item 使用したAIツール：Claude Code (Opus 4.7)
+\end{itemize}
+
+\section*{1. 何に使ったか}
+提出課題1 では Arduino 側のシリアル出力から不要な日本語ラベルを取り除き，
+Serial Plotter に波形が正しく出るようにした．提出課題2 はその続きで，
+同じマイク入力を Processing のウィンドウに波形として描画する課題である．
+授業の例題1 では Arduino から Processing へ 1 バイト送って円の色を切り替える
+書き方までを学んだが，マイクのサンプルを連続して送って時系列の波形として
+描く書き方は扱われていなかった．そこで，Processing 側で受け取ったサンプルを
+波形として描画する方法を生成AIに相談した．Arduino 側 (\texttt{HCK02\_02.ino})
+は課題1 のコードから Serial Plotter 用に出していた上下の固定線
+(\texttt{0}, \texttt{1023}) を消しただけで，こちらは AI に相談していない．
+楽曲再生 (Minim) の部分も前回課題で書いたコードをそのまま流用した．
+
+\section*{2. AIへの指示（プロンプト）}
+\begin{lstlisting}
+課題1 で、Arduino 側は Serial.println(d) で 1 行 1 サンプルの整数を
+送るところまでできています。これを Processing のウィンドウに、
+左から右に流れる時系列の波形として描きたいです。
+- 授業の例題1 では Serial.write で 1 バイト送って、Processing 側で
+  serialEvent から read() を呼ぶ書き方を習いました
+- 今回は連続で送られてくる整数を受け取って、ウィンドウの左から右に
+  波形として並べて描きたいです
+Processing 側で、受信したサンプルをどんなバッファに貯めて、
+毎フレームどう描けばよいですか?
+\end{lstlisting}
+
+\section*{3. AIの出力の使い方}
+\begin{itemize}
+  \item \cboxoff そのまま使った
+  \item \cboxon 一部修正して使った
+  \item \cboxoff 参考にしただけ
+\end{itemize}
+$\rightarrow$ 上で選んだ理由：
+
+Processing 側で波形を描く部分（\texttt{serialEvent} と \texttt{draw}）は，AI が出して
+くれたものをほぼそのまま使った．一方で，Arduino 側 (\texttt{HCK02\_02.ino}) は提出課題1
+のコードからガイド線出力を消しただけで AI には相談しておらず，Processing 側の楽曲再生
+(Minim) 部分も前回課題で書いたコードを統合して載せている．これらをまとめて 1 つの
+提出物にしているので「一部修正して使った」を選んだ．
+
+\section*{4. 正しいと確認した方法}
+\begin{itemize}
+  \item Arduino IDE で \texttt{HCK02\_02.ino} がコンパイルでき，シリアルモニタ
+        に整数が 1 行ずつ流れることを確認した．
+  \item Arduino IDE の Serial Plotter で見える波形と，Processing のウィンドウに
+        描かれる波形が，同じように見えていることを確認した．
+  \item キー \texttt{p} を押すと前回課題と同じ楽曲が PC のスピーカから流れ，
+        その音をマイクが拾って波形がより大きく振れることを確認した．
+  \item Processing のコードを読み直し，おかしなことしてないか確認した．
+\end{itemize}
+
+\section*{5. 問題や間違い}
+\begin{itemize}
+  \item \cboxoff あった
+  \item \cboxon なかった
+\end{itemize}
+
+Serial Plotter で見える波形と Processing のウィンドウに描かれる波形が
+同じ動きをしていること，\texttt{p} キーで楽曲を再生したときに
+マイクが拾った音に応じて波形が大きく振れることを実機で確認できたので，
+AI に書いてもらった受信・描画ロジックに想定外のバグはないと判断した．
+
+\section*{6. 自分で工夫した点}
+直近 \texttt{DISPLAY\_SAMPLES} = 60 サンプルだけを画面幅に引き伸ばして描画するようにし，
+波形が流れる速さと見やすさのバランスを調整した．
+
+\section*{参考文献}
+\begin{itemize}
+  \item Arduino Reference: \\
+        \url{https://docs.arduino.cc/language-reference/}
+  \item Minim Reference:\\
+        \url{https://code.compartmental.net/minim/}
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,83 @@
+%% ============================================================
+%%  生成AI利用申告書 — テンプレート
+%%  ハッカソン1 提出課題用 (塩澤 / 2026)
+%%  コンパイル: docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%%              ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+%% ============================================================
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{plistings}  % 日本語コメント混在時の文字幅補正
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+\usepackage{pxjahyper}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  xleftmargin=1em,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+
+\newcommand{\cboxon}{$\boxtimes$}
+\newcommand{\cboxoff}{$\square$}
+
+\begin{document}
+
+{\LARGE\bfseries 生成AI利用申告書}
+\vspace{1em}
+
+\begin{itemize}
+  \item 氏名：
+  \item 学籍番号：
+  \item プログラムファイル名：
+  \item 使用したAIツール（例：ChatGPT など）：
+\end{itemize}
+
+\section*{1. 何に使ったか}
+今回の課題で、生成AIをどの部分に使いましたか。
+
+（例：エラー修正／コード作成／アイデア出し など）
+
+\section*{2. AIへの指示（プロンプト）}
+AIにどのような質問・指示を出しましたか。重要なものを1〜2個書いてください。
+
+（ここに記入）
+
+\section*{3. AIの出力の使い方}
+AIの出力をどのように使いましたか。
+\begin{itemize}
+  \item \cboxoff そのまま使った
+  \item \cboxoff 一部修正して使った
+  \item \cboxoff 参考にしただけ
+\end{itemize}
+$\rightarrow$ 上で選んだ理由を書いてください：
+
+\section*{4. 正しいと確認した方法}
+AIの出力が正しいと、どのように確認しましたか。
+
+（例）
+\begin{itemize}
+  \item 実行して動作を確認した
+  \item 自分で別の入力でテストした
+  \item コードを読んで意味を理解した
+\end{itemize}
+※ 具体的に書くこと
+
+\section*{5. 問題や間違い}
+AIの出力に問題や間違いはありましたか。
+\begin{itemize}
+  \item \cboxoff あった
+  \item \cboxoff なかった（※本当に？と思って確認した内容を書くこと）
+\end{itemize}
+確認した内容や気づいたこと：
+
+\section*{6. 自分で工夫した点}
+最終的なプログラムの中で、自分で考えて工夫したところを書いてください。
+
+\section*{参考文献}
+
+\end{document}

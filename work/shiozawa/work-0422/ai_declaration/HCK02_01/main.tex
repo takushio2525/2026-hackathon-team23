@@ -1,0 +1,123 @@
+\documentclass[a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage[top=18mm,bottom=18mm,left=22mm,right=22mm]{geometry}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{plistings}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+
+\titlespacing*{\section}{0pt}{0.5em}{0.1em}
+\setlength{\parskip}{0pt}
+\setlist[itemize]{itemsep=1pt,topsep=2pt,parsep=0pt,partopsep=0pt}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  xleftmargin=1em,
+  aboveskip=6pt, belowskip=6pt,
+  columns=flexible,
+}
+
+\newcommand{\cboxon}{$\boxtimes$}
+\newcommand{\cboxoff}{$\square$}
+
+\begin{document}
+
+{\LARGE\bfseries 生成AI利用申告書}
+
+\begin{itemize}
+  \item 氏名：塩澤 匠生
+  \item 学籍番号：25G1065
+  \item プログラムファイル名：\texttt{HCK02\_01.ino}
+  \item 使用したAIツール：Claude Code (Opus 4.7)
+\end{itemize}
+
+\section*{1. 何に使ったか}
+授業（ハッカソン1 第2回）の例題2 で作成した「マイク入力を Serial Plotter に
+表示する」プログラムを動かしたところ，最後のスライドのとおり波形が三角形のように
+カクついて，正弦波に見えなかった．提出課題1 はこの例題2 のプログラムを
+「シリアルモニタ（プロッタ）に正しく波形が表示されるよう」修正する課題なので，
+まず「配布された例題2 のプログラムだと，なぜうまく波形が表示されないのか」という
+原因の切り分けを生成AIに相談した．
+
+\section*{2. AIへの指示（プロンプト）}
+\begin{lstlisting}
+授業の例題2 で配布されたコードをそのまま動かすと，Serial Plotter での
+波形がギザギザの三角形のようになって正弦波に見えません．コードは
+こんな感じです:(例題２のコードを添付)
+何が行けないんでしょう
+\end{lstlisting}
+
+\section*{3. AIの出力の使い方}
+\begin{itemize}
+  \item \cboxoff そのまま使った
+  \item \cboxoff 一部修正して使った
+  \item \cboxon 参考にしただけ
+\end{itemize}
+$\rightarrow$ 上で選んだ理由：
+
+AI からは「一番のボトルネックは出力部分そのもの」と指摘された．要点は，
+\begin{itemize}
+  \item \texttt{"実測値:"}, \texttt{",振幅:"}, \texttt{",最大振幅:"},
+        \texttt{",最小振幅:"} という日本語ラベルを毎ループ \texttt{Serial.print} で
+        送っており，これだけで 1 サンプルあたり数十バイト送ることになる．
+  \item とくに日本語は UTF-8 で 1 文字 3 バイトなので，上のラベル 4 つだけで
+        45 バイト超．さらに 4 つの数値の文字列化と改行を合わせると
+        1 ループあたり 60--70 バイトを送ることになる．
+  \item 921600\,bps でも 1 バイト送るのに約 11\,$\mu$s かかるので，
+        60--70 バイト送ると 1 ループの送信時間だけで 700\,$\mu$s 以上かかる．
+        加えて電圧換算の \texttt{float} 計算（\texttt{pow} を含む）と
+        \texttt{analogRead} 自体の処理が乗るため，ループ周期はミリ秒オーダー
+        （実質 1\,kHz 前後）まで落ちる．これでは可聴域の音をサンプリングしきれず，
+        サンプル点の少なさで波形が三角形に見える．
+  \item 解決策は「シリアルに送る文字数を減らす」のが最優先．整数 1 つに絞れば
+        1 サンプルあたり 5--6 バイトになり，ループの大半を占めていた送信時間が
+        大きく減ってサンプリングが速くなる．
+
+        とのことだったので，「シリアルに送る文字数を減らす」ことを最優先にして，ループ内で余分な漢字を送らないようにした．
+\end{itemize}
+
+\section*{4. 正しいと確認した方法}
+\begin{itemize}
+  \item Arduino IDE で書き込み後，シリアルモニタを 921600\,bps で開き，
+        \texttt{<生値>,0,1023} の 1 行だけが流れている（\texttt{"実測値:"} などの
+        文字列が一切出ていない）ことを確認した
+  \item Serial Plotter に切り替えると，上下に \texttt{0} と \texttt{1023} の
+        ガイド線が常に表示され，縦軸が動かなくなったことを確認した．
+  \item Arduino IDE 側ではなく，Processing で書いた波形表示プログラム
+        （提出課題2 用の \texttt{HCK02\_02.pde}）を再生してシリアルから受信し，
+        ガタガタの三角形ではなく丸みのある波形として見えることを確認した．
+  \item 元のコードに戻したうえで，\texttt{Serial.print("実測値:")} などの
+        日本語ラベル出力を 1 行ずつコメントアウトしていったところ，
+        コメントアウトする行を増やすほど波形が滑らかになっていった．
+        これで「シリアル出力の文字数（とくに日本語ラベルのバイト数）が
+        ループ周期を支配していた」ことを再現実験で確かめた．
+\end{itemize}
+
+\section*{5. 問題や間違い}
+\begin{itemize}
+  \item \cboxoff あった
+  \item \cboxon なかった
+\end{itemize}
+
+Serial Plotter の波形が滑らかになって Y 軸も動かなくなり，元のコードに戻して
+日本語ラベルを 1 行ずつコメントアウトする再現実験でも，文字数を減らすほど
+波形が滑らかになっていくことを確かめられた．AI が指摘した
+「シリアル送信のバイト数がループ周期を支配していた」という説明と
+矛盾する挙動はなかった．
+
+\section*{6. 自分で工夫した点}
+電圧変換と日本語ラベル付きの出力を削除し，シリアルへは整数 1 本だけを送るようにした．
+あわせて，Serial Plotter の Y 軸が自動スケールで暴れないよう，波形の値とは別に
+\texttt{0} と \texttt{1023} を毎ループ併記してガイド線として表示するようにした．
+
+\section*{参考文献}
+\begin{itemize}
+  \item Arduino Reference: \\
+        \url{https://docs.arduino.cc/language-reference/}
+\end{itemize}
+
+\end{document}
