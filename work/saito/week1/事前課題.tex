@@ -1,0 +1,49 @@
+\documentclass[uplatex,dvipdfmx]{jlreq}
+\usepackage[fleqn,tbtags]{mathtools}
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet]{pxchfon} % must be after otf package
+\usepackage{stix2} %欧文＆数式フォント
+\usepackage[fleqn,tbtags]{mathtools} % 数式関連 (w/ amsmath)
+\usepackage{hira-stix} % ヒラギノフォント＆STIX2 フォント代替定義（Warning回避）
+\usepackage{url}
+
+\begin{document}
+
+\title{6軸慣性センサを用いた直感的な指揮システムの提案}
+\author{25G1053 齋藤翔太}
+%\date{2024年XX月XX日}
+\maketitle
+\section{社会的背景と技術的課題}
+近年，DTM（デスクトップミュージック）の普及により，作曲，編曲，録音，編集，ミキシング，マスタリングまでの音楽制作全般が
+個人のコンピュータ上で誰でも行えるようになったが，一方で，人間らしいテンポの揺らぎや，微妙な音の強弱などの
+「人間らしさ」を表現することが難しい．
+
+そのような「人間らしさ」を表現する方法の一つとして，身体動作による音楽表現がある．
+身体動作によって直接楽器を演奏できる仕組みは，個人の演奏の幅を広げる可能性を大いに秘めている．
+しかし，身体動作を音楽表現に変換には，精度やコストなどの技術的な課題は多い．
+
+\section{既存のシステム}
+既存技術として，テルミンやセンサを用いた身体動作を音楽表現に変換するシステムがある．
+
+\begin{enumerate}
+  \item テルミン：楽器の2本のアンテナから発する電波を，演奏者が手を近づけたり遠ざけたりする動きにより，
+音程・ボリュームを変化させることで，手を触れずに演奏する非接触楽器である\cite{ref:テルミン}．
+  \item カメラを用いたシステム：カメラで身体動作を捉え，画像処理技術を用いて音楽表現に変換するシステムである\cite{ref:画像認識}．
+\end{enumerate} 
+しかし，これらの楽器やシステムには，演奏技術の高さや，明暗などの環境条件に影響されるなどの課題がある．
+
+\section{提案するアイディア}
+そこで，6軸センサを用いた身体動作を音楽表現に変換し，指揮者の動きに合わせて音楽のテンポや強弱を変化させるシステムを提案する．
+6軸センサと通信用Arduinoを組み合わせた指揮棒の用い，振る大きさによって強弱を，振る速さによってテンポを変化させる．
+このシステムは，センサを用いることで，演奏者の動きを高精度に捉えることができ，環境条件の影響を受けにくいという利点がある．
+さらに，指揮者の動きに合わせて音楽のテンポや強弱を変化させることで，演奏者の表現力を高めることができる．
+提案する指揮システムは，演奏用Arduino4台とセンサを組み合わせて構築する．
+通信にはUDPを用い，センサからのデータをリアルタイムで音楽表現に変換することで，演奏用Arduinoが即座に反応できるようにする．
+
+
+\begin{thebibliography}{9}
+\bibitem{ref:テルミン} テルミン研究所, テルミンとは？, \url{https://thereminlab.com/whatstheremin/}.
+\bibitem{ref:画像認識} Semi-Conductor,Experiments with Google,\url{https://experiments.withgoogle.com/semi-conductor}.
+\end{thebibliography}
+
+\end{document} 
