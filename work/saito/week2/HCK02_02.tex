@@ -1,0 +1,66 @@
+\documentclass[uplatex,dvipdfmx]{jlreq}
+\usepackage[fleqn,tbtags]{mathtools}
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet]{pxchfon} % must be after otf package
+\usepackage{stix2} %欧文＆数式フォント
+\usepackage[fleqn,tbtags]{mathtools} % 数式関連 (w/ amsmath)
+\usepackage{hira-stix} % ヒラギノフォント＆STIX2 フォント代替定義（Warning回避）
+\usepackage{url}
+
+\begin{document}
+
+\title{生成AI利用申告書}
+\author{25G1053 齋藤　翔太}
+\maketitle
+
+\noindent
+\textbf{プログラムファイル名:} HCK02\_02.ino, HCK02\_02.pde \\
+\textbf{使用した AI ツール:} Gemini
+
+\section{何に使ったか}
+今回の課題において，Arduinoからのバイナリ通信（\texttt{Serial.write()}）の実装，およびProcessing側でのシリアル通信を用いた波形描画プログラムの作成に使用した．また，実行時に発生したクラッシュエラー（\texttt{null}エラー）の原因特定と解決策の検討にも使用した．
+
+\section{AIへの指示(プロンプト)}
+\begin{itemize}
+    \item 「Arduinoからprocessingに取得した波形のデータを送る方法についてヒントをください．」
+    \item 「実行したところシリアルモニターには「？」が羅列されてprocessingの方は真っ黒のままでした．原因はなんでしょうか．」
+    \item 「processing内のコンソールに，Error, disabling serialEvent() for /dev/cu.usbmodem34B7DA6448002 null という文がでました．」
+\end{itemize}
+
+\section{AI の出力の使い方}
+% 一部修正して使った
+
+% \vspace{0.5em}
+% \noindent
+% \textbf{上で選んだ理由:} \\
+AIから提案された \texttt{while (port.available() > 0)} を用いた受信バッファの処理や，\texttt{map()} 関数による画面サイズに合わせた座標変換の仕組みを理解した上で，自身のMac環境のポート名（/dev/cu.usbmodem34B7DA6448002）に合わせてプログラムを修正して組み込んだため．
+
+\section{正しいと確認した方法}
+\begin{itemize}
+    \item 修正したプログラムを実行し，作成した楽曲を入力して動作を確認した．
+    \item Processingのウィンドウ上に，緑色の波形が連続して途切れることなく描画されることを目視で確認し，コードの意図通りに動作していることを検証した．
+\end{itemize}
+
+\section{問題や間違い}
+% あった
+
+% \vspace{0.5em}
+% \noindent
+% \textbf{確認した内容や気づいたこと:} \\
+初期のプログラムでは，データ受信用の \texttt{serialEvent()} 内で線の描画や背景の更新を行っていたが，数十個のデータを受け取った直後に \texttt{null} エラーが発生し通信が強制終了する問題に直面した．エラーメッセージを基に確認した結果，Processing 4の仕様変更により，通信用の裏側のプロセスから直接画面を描画できないことが原因であると特定できたため，描画処理をメインの \texttt{draw()} ループ内に移す修正を行った．
+
+\section{自分で工夫した点}
+\begin{itemize}
+    \item Arduino側の処理負荷を下げるため，計算した電圧（float型）をそのまま送るのではなく，AD変換値（0〜1023）を単純に4で割って1バイト（0〜255）のバイナリデータとして \texttt{Serial.write()} で高速送信する方式を採用した．
+    \item エラーを回避しつつ高速な通信を取りこぼさないよう，描画処理をメインループである \texttt{draw()} 内に移動させ，\texttt{while} 文を用いて受信バッファにあるデータを一気に処理してから波形を描く安全な構造に改修した．
+    \item 波形の推移を視覚的に分かりやすくするため，黒背景に緑線を描くようにし，X座標の進み具合（\texttt{x += 2}）を調整して波の間隔を最適化した．
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{ref:processing_slide} 有本泰子．(2026)．Processingの使い方．
+\bibitem{ref:lecture} 有本泰子, \& 佐波孝彦. (2026). ハッカソン1 第2回 講義資料.
+\bibitem{ref:errar} はてなブログ.Processingのシリアル通信で「Error, disabling serialEvent()」というエラーがでたら.\url{https://kougaku-navi.hatenablog.com/entry/2019/10/10/153000}.(2026/04/27)
+\bibitem{refstroke} htsuda.net. 線の色と太さ : stroke, noStroke, strokeWeight. \url{https://htsuda.net/archives/1337}.(2026/04/27)
+\end{thebibliography}
+
+\end{document}

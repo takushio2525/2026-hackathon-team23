@@ -1,0 +1,68 @@
+\documentclass[a4paper,11pt]{jsarticle}
+\usepackage[utf8]{inputenc}
+\usepackage{amssymb} % チェックボックス用
+
+\begin{document}
+
+{\Large \textbf{生成AI 利用申告書}}
+
+\vspace{1em}
+
+\begin{itemize}
+    \item \textbf{氏名}: 梅澤颯太
+    \item \textbf{学籍番号}: 25G1021
+    \item \textbf{プログラムファイル名}: HCK02\_02.pde
+    \item \textbf{使用した AI ツール}: Gemini, Claude
+\end{itemize}
+
+\section*{1. 何に使ったか}
+今回の課題において，以下の目的で生成AIを利用しました．
+\begin{itemize}
+    \item 配列内のデータをずらす描画アルゴリズムの作成．
+    \item \texttt{Port not found} エラーの原因究明と解決策の確認．
+    \item Arduinoと連携するための通信データ仕様（文字送信と1バイト数値送信の違い）の理解．
+\end{itemize}
+
+\section*{2. AIへの指示（プロンプト）}
+AIに対して，主に以下のような質問・指示を出しました．
+\begin{itemize}
+    \item 「線を描画するための座標をどうすればいいかわからない」
+    \item 「配列をどう扱えばいいかわからないこれにはあと何が足りない？ 」
+    \item 「一旦出力された値を見たいんだけどどうすればいい？」
+\end{itemize}
+
+\section*{3. AI の出力の使い方}
+AI の出力をどのように使いましたか．
+\begin{itemize}
+    \item[$\square$] そのまま使った
+    \item[$\boxtimes$] 一部修正して使った
+    \item[$\square$] 参考にしただけ
+\end{itemize}
+\textbf{理由}:
+AIから提案された \texttt{p.read()} による配列のシフト処理はほぼ変わらず用いたが，波形の中心を合わせるオフセット値などは，マイクから送られてくる実測値に合わせて微調整した．
+
+\section*{4. 正しいと確認した方法}
+AI の出力が正しいと，どのように確認しましたか．
+\begin{itemize}
+    \item ArduinoをPCに接続してプログラムを実行し，マイクの音に反応して波形が右から左へ流れていく動作を確認した．
+    \item コンソールに出力された数値を見て，Arduino側で計算した値が1バイトのデータとして正しくPC側に届いていることを確認しました．
+\end{itemize}
+
+\section*{5. 問題や間違い}
+AIの出力に問題や間違いはありましたか．
+\begin{itemize}
+    \item[$\boxtimes$] あった
+    \item[$\square$] なかった
+\end{itemize}
+\textbf{確認した内容や気づいたこと}:
+当初Arduino側を14bitで読み取ろうとしていたが，write()関数でProcessingへ1バイト（8bit）送信する通信の仕様上，高精度にしても無意味であることに気づいた．
+
+\section*{6. 自分で工夫した点}
+最終的なプログラムの中で，自分で考えて工夫したところを書いてください．
+\begin{itemize}
+    \item AIの提案をそのまま使うのではなく，自身のマイクから実際に送られてくる数値に合わせて，波形のY座標を計算する中心のオフセット値を (waveData[i] - 180) * 2 のように自ら微調整し，画面中央に綺麗に波形が収まるように工夫した点．
+\end{itemize}
+
+\section*{参考文献}
+
+\end{document}
