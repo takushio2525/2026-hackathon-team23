@@ -9,7 +9,11 @@
 // SERIAL モードの動作:
 //   - 起動時に Serial ポート一覧を表示し、SERIAL_PORT_NAME のポートを開く
 //   - magic (0x52 0x4F リトルエンディアン) を待ち、20 B たまったら 1 パケットとして処理
-//   - NoteOn (gate=1) で発音、NoteOff (gate=0) または次の NoteOn で消音 (モノフォニック)
+//   - NoteOn (gate=1) パケット 1 個に「音の高さ + 長さ (durationMs)」が乗っており、
+//     attack して durationMs 経過後に scheduleAutoRelease() が自動消音する
+//   - 同じパートで次の NoteOn が来たらモノフォニックで前の音を即時 release
+//   - NoteOff (gate=0) パケットは仕様上 node_02 から送られないが、来た場合の互換
+//     パスとして triggerNoteOff() は残す
 //
 // 仕様書: meetings/0429_3回/事前課題共有/arduino_塩澤.pdf §2.3.3.5
 
@@ -137,7 +141,8 @@ void draw() {
     text("Active voices: " + activeVoices.size() +
          " (releasing: " + releasingVoices.size() + ")", 16, 190);
 
-    // release 完了したボイスを unpatch して回収
+    // durationMs 到達した Voice を release に移し、release 完了したものを unpatch
+    scheduleAutoRelease();
     reapReleasingVoices();
 
     // 波形描画
@@ -273,14 +278,30 @@ int voiceKey(int partId, int noteNumber) {
 
 void triggerNoteOn(int partId, int noteNumber, int velocity, int durationMs) {
     // モノフォニック化: 同じパートで鳴っている音は note 番号に関係なく止める。
-    // firmware 側で NoteOff が落ちることがあるため、ここで保険をかける。
     silenceAllOnPart(partId);
     int k = voiceKey(partId, noteNumber);
     float freq = 440.0f * pow(2.0f, (noteNumber - 69) / 12.0f);
     float amp  = constrain(velocity / 127.0f, 0.0f, 1.0f) * 0.4f;
     Voice v = new Voice(freq, amp);
-    v.attack();
+    v.attack(durationMs);   // durationMs 後に scheduleAutoRelease() が release を呼ぶ
     activeVoices.put(k, v);
+}
+
+// durationMs 経過した Voice を release に移行する。
+// node_02 は NoteOff パケットを送らないため、消音はこちらが担当する。
+void scheduleAutoRelease() {
+    int nowMs = millis();
+    Iterator<Map.Entry<Integer, Voice>> it = activeVoices.entrySet().iterator();
+    while (it.hasNext()) {
+        Map.Entry<Integer, Voice> e = it.next();
+        Voice v = e.getValue();
+        if (!v.releaseScheduled && nowMs >= v.noteOffAtMs) {
+            v.release();
+            v.releaseScheduled = true;
+            releasingVoices.add(v);
+            it.remove();
+        }
+    }
 }
 
 void triggerNoteOff(int partId, int noteNumber) {
@@ -333,6 +354,8 @@ class Voice {
     Line  amp;
     float maxAmp;
     int   releaseStartedAtMs = 0;
+    int   noteOffAtMs = 0;       // attack 時にセット: この時刻になったら自動消音
+    boolean releaseScheduled = false;
     boolean unpatched = false;
 
     Voice(float freq, float maxAmp) {
@@ -342,9 +365,10 @@ class Voice {
         this.amp.patch(osc.amplitude);
     }
 
-    void attack() {
+    void attack(int durationMs) {
         amp.activate(0.01f, 0.0f, maxAmp);  // 10 ms で立ち上げ
         osc.patch(out);
+        noteOffAtMs = millis() + durationMs;
     }
 
     void release() {
