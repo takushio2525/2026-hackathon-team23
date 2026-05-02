@@ -32,21 +32,53 @@ uint16_t durationQ8ToMs(uint16_t durationQ8, float bpm) {
 }
 
 // 楽譜の 1 イベントを発火 (NoteOn 予約 + NoteOff 時刻設定)
+// 細分音符 (subNote != 0) があれば、現在 BPM から ms を計算して予約スロットに積む。
 void fireScoreEvent(SystemData& data, const ScoreEvent& ev, uint32_t now) {
     const bool isRest = (ev.flags & 0x04) != 0 || ev.noteNumber == 0;
-    if (isRest) return;
+    if (!isRest) {
+        // velocity 合成: score × ctrl / 127
+        uint16_t v = ((uint16_t)ev.velocity * (uint16_t)data.ctrl.velocity) / 127;
+        if (v > 127) v = 127;
 
-    // velocity 合成: score × ctrl / 127
-    uint16_t v = ((uint16_t)ev.velocity * (uint16_t)data.ctrl.velocity) / 127;
+        const uint16_t durMs = durationQ8ToMs(ev.durationQ8, data.ctrl.bpm);
+        data.noteOut.noteNumber = ev.noteNumber;
+        data.noteOut.velocity   = (uint8_t)v;
+        data.noteOut.durationMs = durMs;
+        data.noteOut.pendingOn  = true;
+        data.score.noteIsSounding = true;
+        data.score.noteOffAtMs    = now + durMs;
+    }
+
+    // 細分音符の予約 (拍頭から subOffsetQ8/256 拍ぶん遅らせて発火)
+    if (ev.subNote != 0) {
+        const float bpm = (data.ctrl.bpm >= 1.0f) ? data.ctrl.bpm
+                                                  : logic_params::DEFAULT_BPM;
+        const float beats = (float)ev.subOffsetQ8 / 256.0f;
+        const uint32_t subDelayMs = (uint32_t)(beats * 60000.0f / bpm);
+        data.score.pendingSub          = true;
+        data.score.pendingSubAtMs      = now + subDelayMs;
+        data.score.pendingSubNote      = ev.subNote;
+        data.score.pendingSubVelocity  = ev.subVelocity;
+        data.score.pendingSubDurationMs = durationQ8ToMs(ev.subDurationQ8, bpm);
+    }
+}
+
+// 予約された細分音符の時刻が来ていれば NoteOn を出す。
+// applyPattern の先頭で呼び、楽譜進行 (4 分 BEAT 受信) と同一ループに重ならないようにする。
+void firePendingSub(SystemData& data, uint32_t now) {
+    if (!data.score.pendingSub) return;
+    if ((int32_t)(now - data.score.pendingSubAtMs) < 0) return;
+
+    uint16_t v = ((uint16_t)data.score.pendingSubVelocity *
+                  (uint16_t)data.ctrl.velocity) / 127;
     if (v > 127) v = 127;
-
-    const uint16_t durMs = durationQ8ToMs(ev.durationQ8, data.ctrl.bpm);
-    data.noteOut.noteNumber = ev.noteNumber;
+    data.noteOut.noteNumber = data.score.pendingSubNote;
     data.noteOut.velocity   = (uint8_t)v;
-    data.noteOut.durationMs = durMs;
+    data.noteOut.durationMs = data.score.pendingSubDurationMs;
     data.noteOut.pendingOn  = true;
     data.score.noteIsSounding = true;
-    data.score.noteOffAtMs    = now + durMs;
+    data.score.noteOffAtMs    = now + data.score.pendingSubDurationMs;
+    data.score.pendingSub = false;
 }
 
 void updatePerformerLed(SystemData& data) {
@@ -71,6 +103,10 @@ void updatePerformerLed(SystemData& data) {
 void applyPattern(SystemData& data) {
     using namespace logic_params;
     const uint32_t now = millis();
+
+    // 0. 予約された細分音符 (8 分音符等) の発火判定。
+    //    前ループまでに fireScoreEvent から積まれた予約が、現時刻に達していれば発音する。
+    firePendingSub(data, now);
 
     // 2. 演奏状態遷移 (Idle -> WaitStart -> Playing のみ。BPM 起点の自走は持たない)
     switch (data.performer.state) {
@@ -112,18 +148,28 @@ void applyPattern(SystemData& data) {
         // 未来時刻 (diff < 0) は次ループまで待機
     }
 
-    // 6. 楽譜進行 (effectiveBeatNo = firedBeatNo - startBeatNo 以下のイベントを順次発火)
+    // 6. 楽譜進行 (effectiveBeatNo = firedBeatNo - startBeatNo の拍にあるイベントだけ発火)
+    // 「1 振り = 1 拍」を厳密に保証するため == 比較で当該拍だけ発火する。
+    // 同一 beatAt に複数行ある場合 (和音・同時発音) は while で全部発火する。
+    // 過去の取りこぼし拍は意図的にスキップ (UDP は 2 連冗長で守られているのでまず起きない)。
     if (fired) {
         const int32_t effective =
             (int32_t)firedBeatNo - (int32_t)ORC_RECEIVER_CONFIG.startBeatNo;
-        if (effective >= 0) {
+        if (effective >= 1) {
             // 同じ effective で再発火しないよう lastFiredEffectiveBeat を見る
             const bool alreadyFired =
                 (data.score.lastFiredEffectiveBeat != 0xFFFF) &&
                 ((uint16_t)effective <= data.score.lastFiredEffectiveBeat);
             if (!alreadyFired) {
+                // beatAt < effective の遅れたイベントは捨てる (currentEventIndex を進める)
                 while (data.score.currentEventIndex < kScoreLength &&
-                       kScore[data.score.currentEventIndex].beatAt <=
+                       kScore[data.score.currentEventIndex].beatAt <
+                           (uint16_t)effective) {
+                    data.score.currentEventIndex++;
+                }
+                // beatAt == effective のイベントだけを順次発火
+                while (data.score.currentEventIndex < kScoreLength &&
+                       kScore[data.score.currentEventIndex].beatAt ==
                            (uint16_t)effective) {
                     fireScoreEvent(data,
                                    kScore[data.score.currentEventIndex], now);

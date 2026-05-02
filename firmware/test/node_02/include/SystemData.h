@@ -41,6 +41,14 @@ struct ScoreProgressData {
     bool     noteIsSounding = false;
     uint32_t noteOffAtMs = 0;
     uint16_t lastFiredEffectiveBeat = 0xFFFF;  // 同 BEAT で再発火しないため
+    // ── 細分音符 (8 分音符など) の予約発火スロット ──
+    // BEAT 受信時に fireScoreEvent から積まれ、applyPattern の先頭で時刻到達を判定する。
+    // 後続の BEAT で新しい予約が来たら上書きされる (1 BEAT につき高々 1 個の subdivision)。
+    bool     pendingSub = false;
+    uint32_t pendingSubAtMs = 0;
+    uint8_t  pendingSubNote = 0;
+    uint8_t  pendingSubVelocity = 0;
+    uint16_t pendingSubDurationMs = 0;
 };
 
 struct SystemData {
