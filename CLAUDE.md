@@ -30,8 +30,15 @@
 
 ### ファームウェア（PlatformIO）
 
+仕様準拠のテスト実装は `firmware/test/` 配下、本番想定の素テンプレは
+`firmware/production/` 配下。
+
 ```bash
-cd firmware/node_01 && pio run
+# 仕様準拠のテスト版 (XIAO ESP32-S3 Sense + GY-521)
+cd firmware/test/node_01 && pio run
+
+# 本番想定の素テンプレ
+cd firmware/production/node_01 && pio run
 ```
 
 ### LaTeX 報告書
