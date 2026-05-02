@@ -106,7 +106,10 @@ void applyPattern(SystemData& data) {
     //    前ループまでに fireScoreEvent から積まれた予約が、現時刻に達していれば発音する。
     firePendingSub(data, now);
 
-    // 2. 演奏状態遷移 (Idle -> WaitStart -> Playing のみ。BPM 起点の自走は持たない)
+    // 2. 演奏状態遷移 (Idle -> WaitStart -> Playing)
+    // テスト構成 (楽器 1 台) では時計同期もマスタ時刻判定も不要なため、
+    // Playing への遷移条件は「最初の BEAT を受信した」だけにする。
+    // sync.converged 待ちや startBeatNo 待ちで Playing に入れず鳴らない症状を排除。
     switch (data.performer.state) {
         case PerformerState::Idle:
             if (data.orcNet.wifiConnected) {
@@ -114,8 +117,7 @@ void applyPattern(SystemData& data) {
             }
             break;
         case PerformerState::WaitStart:
-            if (data.sync.converged && data.receiver.hasFirstBeat &&
-                data.receiver.lastBeatNo >= ORC_RECEIVER_CONFIG.startBeatNo) {
+            if (data.receiver.hasFirstBeat) {
                 data.performer.state = PerformerState::Playing;
             }
             break;
@@ -124,49 +126,29 @@ void applyPattern(SystemData& data) {
             break;
     }
 
-    // 4. 発音判定 (Playing 中に保留 BEAT があるときだけ発火)
+    // 4. 発音判定: Playing 中に保留 BEAT があれば「即発火」する。
+    // 旧実装は playAtMasterMs (送信時刻 + 50ms lookahead) と masterNow を比較し、
+    // grace 100ms を超えると BEAT を破棄していたが、sync.offsetMs のジッタや applyPattern
+    // ループ周期 5ms との相互作用で正常な BEAT まで捨てるケースがあったため撤廃。
+    // node_02 は受信した順に 1 BEAT = 1 拍進める純粋イベント駆動とする。
     bool     fired = false;
-    uint16_t firedBeatNo = 0;
-
     if (data.performer.state == PerformerState::Playing &&
         data.receiver.pending.valid) {
-        // マスタ時刻 = 自時計 + offsetMs
-        const uint32_t masterNow = now + (uint32_t)data.sync.offsetMs;
-        const uint32_t playAt = data.receiver.pending.playAtMasterMs;
-        const int32_t  diff   = (int32_t)(masterNow - playAt);
-
-        if (diff >= 0) {
-            // grace 内なら発火、超過なら破棄
-            if (diff <= (int32_t)ORC_RECEIVER_CONFIG.expiredGraceMs) {
-                fired = true;
-                firedBeatNo = data.receiver.pending.beatNo;
-            }
-            data.receiver.pending.valid = false;
-        }
-        // 未来時刻 (diff < 0) は次ループまで待機
+        fired = true;
+        data.receiver.pending.valid = false;
     }
 
-    // 6. 楽譜進行: BEAT 1 個 = currentEventIndex を 1 個進める純粋 index 駆動。
-    // ScoreEvent.beatAt はソートとログ読みやすさのための参考値で、進行判定には
-    // 使わない。末尾まで来たら先頭に戻ってループ再生する。
+    // 6. 楽譜進行: BEAT 1 個 = currentEventIndex を 1 個進める。
+    // ScoreEvent.beatAt はログ読みやすさ用の参考値。末尾まで来たら先頭に戻ってループ。
+    // 重複排除は OrcReceiverModule の段階で済んでいる (同じ beatNo は pending に
+    // 積まれない) ので、ここでは何の条件もなく単純に 1 個進める。
     if (fired) {
-        const int32_t effective =
-            (int32_t)firedBeatNo - (int32_t)ORC_RECEIVER_CONFIG.startBeatNo;
-        if (effective >= 1) {
-            // 同 effective で再発火しないよう lastFiredEffectiveBeat を見る (保険)
-            const bool alreadyFired =
-                (data.score.lastFiredEffectiveBeat != 0xFFFF) &&
-                ((uint16_t)effective <= data.score.lastFiredEffectiveBeat);
-            if (!alreadyFired) {
-                if (data.score.currentEventIndex < kScoreLength) {
-                    fireScoreEvent(data,
-                                   kScore[data.score.currentEventIndex], now);
-                    data.score.currentEventIndex++;
-                    if (data.score.currentEventIndex >= kScoreLength) {
-                        data.score.currentEventIndex = 0;  // 末尾まで来たらループ
-                    }
-                }
-                data.score.lastFiredEffectiveBeat = (uint16_t)effective;
+        if (data.score.currentEventIndex < kScoreLength) {
+            fireScoreEvent(data,
+                           kScore[data.score.currentEventIndex], now);
+            data.score.currentEventIndex++;
+            if (data.score.currentEventIndex >= kScoreLength) {
+                data.score.currentEventIndex = 0;  // ループ
             }
         }
     }
