@@ -4,15 +4,18 @@
 //   pio device monitor -d firmware/test/node_02
 //
 // 楽器ノードの判断ロジック
+// 設計方針: BPM はあくまで補助 (8 分音符の細分化や durationMs 計算で使用)。
+// score の進行は「実 BEAT 受信ごとに 1 拍進める」純粋イベント駆動とし、
+// BPM 起点の自走 (旧 SelfRun) は行わない。
+//
 // 仕様 §2.4.3.5 の処理フロー:
 //   1. 時計オフセット更新 (受信側で済 — Receiver が data.sync を更新)
-//   2. 演奏状態遷移 (Idle -> WaitStart -> Playing -> SelfRun)
+//   2. 演奏状態遷移 (Idle -> WaitStart -> Playing)
 //   3. 保留 BEAT のキューイング (受信側で済 — data.receiver.pending)
 //   4. マスタ時刻判定 (発音粒度)
-//   5. 仮想 BEAT 内挿 (SelfRun 中)
-//   6. 楽譜進行
-//   7. velocity 合成
-//   8. NoteOff 判定
+//   5. 楽譜進行 (BEAT 受信ごとに発火)
+//   6. velocity 合成
+//   7. NoteOff 判定
 #include <Arduino.h>
 
 #include "SystemData.h"
@@ -21,13 +24,8 @@
 
 namespace {
 
-// 1 拍の長さ ms を BPM から計算 (0 除算と異常 BPM をガード)
-uint32_t beatPeriodMs(float bpm) {
-    if (bpm < 1.0f) bpm = logic_params::DEFAULT_BPM;
-    return (uint32_t)(60000.0f / bpm);
-}
-
 // durationQ8 を ms に変換 (Q8: 256 = 1 拍)
+// BPM は CTRL から受け取った参考値。NoteOff の予定時刻計算に使う補助。
 uint16_t durationQ8ToMs(uint16_t durationQ8, float bpm) {
     const float beats = (float)durationQ8 / 256.0f;
     return (uint16_t)(beats * 60000.0f / (bpm < 1.0f ? logic_params::DEFAULT_BPM : bpm));
@@ -65,10 +63,6 @@ void updatePerformerLed(SystemData& data) {
         case PerformerState::Playing:
             data.led.solidOn = true;
             break;
-        case PerformerState::SelfRun:
-            data.led.solidOn = false;
-            data.led.blinkIntervalMs = LED_SELF_RUN_MS;
-            break;
     }
 }
 
@@ -78,7 +72,7 @@ void applyPattern(SystemData& data) {
     using namespace logic_params;
     const uint32_t now = millis();
 
-    // 2. 演奏状態遷移
+    // 2. 演奏状態遷移 (Idle -> WaitStart -> Playing のみ。BPM 起点の自走は持たない)
     switch (data.performer.state) {
         case PerformerState::Idle:
             if (data.orcNet.wifiConnected) {
@@ -92,23 +86,11 @@ void applyPattern(SystemData& data) {
             }
             break;
         case PerformerState::Playing:
-            if (data.receiver.lastBeatMs != 0 &&
-                now - data.receiver.lastBeatMs > ORC_RECEIVER_CONFIG.beatTimeoutMs) {
-                data.performer.state = PerformerState::SelfRun;
-                data.score.virtualBeatNo = data.receiver.lastBeatNo;
-                data.score.virtualBeatNextMs = now + beatPeriodMs(data.ctrl.bpm);
-            }
-            break;
-        case PerformerState::SelfRun:
-            // 実 BEAT が直近 200 ms 以内に届いていれば復帰
-            if (data.receiver.lastBeatMs != 0 &&
-                now - data.receiver.lastBeatMs <= SELF_RUN_RECOVER_MS) {
-                data.performer.state = PerformerState::Playing;
-            }
+            // BEAT が長く来なくても Playing に留まる。次の BEAT で自然に再開する。
             break;
     }
 
-    // 4-5. 発音判定 (firedBeatNo を決定)
+    // 4. 発音判定 (Playing 中に保留 BEAT があるときだけ発火)
     bool     fired = false;
     uint16_t firedBeatNo = 0;
 
@@ -128,14 +110,6 @@ void applyPattern(SystemData& data) {
             data.receiver.pending.valid = false;
         }
         // 未来時刻 (diff < 0) は次ループまで待機
-    } else if (data.performer.state == PerformerState::SelfRun) {
-        // 仮想 BEAT 内挿 (マスタ時刻判定はバイパス)
-        if ((int32_t)(now - data.score.virtualBeatNextMs) >= 0) {
-            data.score.virtualBeatNo += 1;
-            data.score.virtualBeatNextMs = now + beatPeriodMs(data.ctrl.bpm);
-            fired = true;
-            firedBeatNo = data.score.virtualBeatNo;
-        }
     }
 
     // 6. 楽譜進行 (effectiveBeatNo = firedBeatNo - startBeatNo 以下のイベントを順次発火)

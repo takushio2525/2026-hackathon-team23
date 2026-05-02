@@ -58,7 +58,7 @@ void OrcReceiverModule::updateInput(SystemData& data) {
             data.receiver.lastBeatNo = bn;
             data.receiver.hasFirstBeat = true;
         }
-        // 重複でも lastBeatMs は更新する (SelfRun 判定用)
+        // 重複でも lastBeatMs は更新する (受信タイムアウト監視・診断ログ用)
         data.receiver.lastBeatMs = millis();
     }
 }

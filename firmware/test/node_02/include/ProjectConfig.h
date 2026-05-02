@@ -27,7 +27,6 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
 inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
     /*partId=*/              0x02,    // 金管 1
     /*startBeatNo=*/         0,       // 輪唱の入り拍 (このパートは先頭から)
-    /*beatTimeoutMs=*/       1500,
     /*clockSyncEmaAlpha=*/   0.10f,
     /*clockSyncMinSamples=*/ 5,
     /*expiredGraceMs=*/      100,
@@ -47,7 +46,5 @@ inline const StatusLedConfig STATUS_LED_CONFIG = {
 namespace logic_params {
     constexpr uint16_t LED_IDLE_MS       = 1000;
     constexpr uint16_t LED_WAIT_START_MS = 500;
-    constexpr uint16_t LED_SELF_RUN_MS   = 200;
-    constexpr uint32_t SELF_RUN_RECOVER_MS = 200;  // 実 BEAT 復帰の閾値
     constexpr float    DEFAULT_BPM = 120.0f;
 }

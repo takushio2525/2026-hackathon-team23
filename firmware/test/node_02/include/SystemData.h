@@ -17,7 +17,6 @@ enum class PerformerState : uint8_t {
     Idle      = 0,
     WaitStart = 1,
     Playing   = 2,
-    SelfRun   = 3,
 };
 
 struct SyncLogicData {
@@ -42,9 +41,6 @@ struct ScoreProgressData {
     bool     noteIsSounding = false;
     uint32_t noteOffAtMs = 0;
     uint16_t lastFiredEffectiveBeat = 0xFFFF;  // 同 BEAT で再発火しないため
-    // SelfRun 用の仮想 BEAT 内挿
-    uint16_t virtualBeatNo = 0;
-    uint32_t virtualBeatNextMs = 0;
 };
 
 struct SystemData {

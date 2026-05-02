@@ -49,7 +49,6 @@ const char* perfStateName(PerformerState s) {
         case PerformerState::Idle:      return "Idle";
         case PerformerState::WaitStart: return "WaitStart";
         case PerformerState::Playing:   return "Playing";
-        case PerformerState::SelfRun:   return "SelfRun";
     }
     return "?";
 }
@@ -109,7 +108,7 @@ void dumpPeriodic(const SystemData& d) {
                           ? 0 : (now - d.receiver.lastBeatMs);
     DBG_PRINTF(
         "[N2 t=%lu st=%s wifi=%d sync=%s(off=%ld n=%u) ctrl=(bpm=%5.1f v=%u s=%u) "
-        "recv=(no=%u ago=%lu) pend=%d score=(idx=%u snd=%d vBeat=%u)]\n",
+        "recv=(no=%u ago=%lu) pend=%d score=(idx=%u snd=%d)]\n",
         (unsigned long)now,
         perfStateName(d.performer.state),
         d.orcNet.wifiConnected ? 1 : 0,
@@ -121,8 +120,7 @@ void dumpPeriodic(const SystemData& d) {
         (unsigned long)ago,
         d.receiver.pending.valid ? 1 : 0,
         (unsigned)d.score.currentEventIndex,
-        d.score.noteIsSounding ? 1 : 0,
-        (unsigned)d.score.virtualBeatNo);
+        d.score.noteIsSounding ? 1 : 0);
 }
 #endif  // SERIAL_DEBUG
 
