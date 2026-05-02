@@ -129,6 +129,10 @@ void applyPattern(SystemData& data) {
                     }
                     sGravityUnitReady = true;
                 }
+                // Conducting 遷移直後は LPF 内部に Calibrating 中の動きが残っている
+                // 場合があり、そのまま判定すると余分な BEAT が 1 発出る。
+                // 一度 |alongG| が LO 未満に戻る (= 静止状態に落ち着く) まで発火しない。
+                sBeatArmed = false;
                 data.calibration.done = true;
                 data.conductor.state = ConductorState::Conducting;
             }
