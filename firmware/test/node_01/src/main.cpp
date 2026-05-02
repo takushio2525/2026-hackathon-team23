@@ -15,6 +15,7 @@
 #include "OrcNetModule.h"
 #include "OrcSenderModule.h"
 #include "StatusLedModule.h"
+#include "SerialDebug.h"
 
 void applyPattern(SystemData& data);
 
@@ -35,23 +36,93 @@ IModule* gOutputs[] = { &gSender, &gLed, &gNet };
 
 constexpr size_t MAX_RETRY = 3;
 
-void initWithRetry(IModule* m) {
+void initWithRetry(IModule* m, const char* name) {
     bool ok = false;
     for (size_t i = 0; i < MAX_RETRY && !ok; ++i) {
         ok = m->init();
         if (!ok) delay(50);
     }
     m->enabled = ok;
+    DBG_PRINTF("[N1 INIT] %s = %s\n", name, ok ? "OK" : "NG");
 }
+
+#if SERIAL_DEBUG
+const char* stateName(ConductorState s) {
+    switch (s) {
+        case ConductorState::Idle:        return "Idle";
+        case ConductorState::Calibrating: return "Calibrating";
+        case ConductorState::Conducting:  return "Conducting";
+        case ConductorState::Fallback:    return "Fallback";
+    }
+    return "?";
+}
+
+constexpr uint32_t DUMP_INTERVAL_MS = 200;
+uint32_t       gLastDumpMs = 0;
+ConductorState gPrevState  = ConductorState::Idle;
+bool           gPrevWifi   = false;
+uint16_t       gPrevBeatNo = 0;
+
+void dumpPeriodic(const SystemData& d) {
+    const uint32_t now = millis();
+    if (now - gLastDumpMs < DUMP_INTERVAL_MS) return;
+    gLastDumpMs = now;
+    DBG_PRINTF(
+        "[N1 t=%lu st=%s wifi=%d imu=%d acc=(%6.2f,%6.2f,%6.2f) n=%4.2f bpm=%5.1f beatNo=%u ctrlSeq=%lu beatSeq=%lu]\n",
+        (unsigned long)now,
+        stateName(d.conductor.state),
+        d.orcNet.wifiConnected ? 1 : 0,
+        d.imu.ready ? 1 : 0,
+        d.imu.accLpf[0], d.imu.accLpf[1], d.imu.accLpf[2],
+        d.imu.accNorm,
+        d.tempo.bpm,
+        (unsigned)d.beat.beatNo,
+        (unsigned long)d.sender.ctrlSeq,
+        (unsigned long)d.sender.beatSeq);
+}
+
+void dumpEdges(const SystemData& d) {
+    if (d.conductor.state != gPrevState) {
+        DBG_PRINTF("[N1 EVT STATE] %s -> %s (gravity=(%6.3f,%6.3f,%6.3f))\n",
+                   stateName(gPrevState), stateName(d.conductor.state),
+                   d.calibration.gravityOffset[0],
+                   d.calibration.gravityOffset[1],
+                   d.calibration.gravityOffset[2]);
+        gPrevState = d.conductor.state;
+    }
+    if (d.orcNet.wifiConnected != gPrevWifi) {
+        DBG_PRINTF("[N1 EVT WIFI] connected=%d\n",
+                   d.orcNet.wifiConnected ? 1 : 0);
+        gPrevWifi = d.orcNet.wifiConnected;
+    }
+    if (d.beat.beatNo != gPrevBeatNo) {
+        DBG_PRINTF("[N1 EVT BEAT] no=%u t=%lu playAt=%lu bpm=%5.1f\n",
+                   (unsigned)d.beat.beatNo,
+                   (unsigned long)d.beat.lastBeatMs,
+                   (unsigned long)d.beat.playAtMasterMs,
+                   d.tempo.bpm);
+        gPrevBeatNo = d.beat.beatNo;
+    }
+}
+#endif  // SERIAL_DEBUG
 
 }  // namespace
 
 void setup() {
-    Serial.begin(115200);
+    DBG_BEGIN(115200);
+    DBG_WAIT_HOST(1500);
+    DBG_PRINTLN("");
+    DBG_PRINTLN("=== node_01 (conductor) boot ===");
+
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     Wire.setClock(400000);
 
-    for (auto* m : gAll) initWithRetry(m);
+    initWithRetry(&gNet,    "OrcNetModule");
+    initWithRetry(&gImu,    "ImuModule");
+    initWithRetry(&gSender, "OrcSenderModule");
+    initWithRetry(&gLed,    "StatusLedModule");
+
+    DBG_PRINTLN("[N1 INIT] done");
 }
 
 void loop() {
@@ -62,4 +133,8 @@ void loop() {
     for (auto* m : gOutputs) {
         if (m->enabled) m->updateOutput(gData);
     }
+#if SERIAL_DEBUG
+    dumpEdges(gData);
+    dumpPeriodic(gData);
+#endif
 }
