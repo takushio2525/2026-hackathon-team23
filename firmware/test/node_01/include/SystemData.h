@@ -26,6 +26,7 @@ struct BeatLogicData {
     uint32_t lastBeatMs = 0;
     uint32_t playAtMasterMs = 0;
     bool     armed = true;         // ヒステリシス: 次の HI 超えで BEAT を撃てる状態か
+    float    dynAlongG = 0.0f;     // 動加速度の重力方向成分 (デバッグ可視化用)
 };
 
 struct TempoLogicData {
