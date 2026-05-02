@@ -146,32 +146,25 @@ void applyPattern(SystemData& data) {
         // 未来時刻 (diff < 0) は次ループまで待機
     }
 
-    // 6. 楽譜進行 (effectiveBeatNo = firedBeatNo - startBeatNo の拍にあるイベントだけ発火)
-    // 「1 振り = 1 拍」を厳密に保証するため == 比較で当該拍だけ発火する。
-    // 同一 beatAt に複数行ある場合 (和音・同時発音) は while で全部発火する。
-    // 過去の取りこぼし拍は意図的にスキップ (UDP は 2 連冗長で守られているのでまず起きない)。
+    // 6. 楽譜進行: BEAT 1 個 = currentEventIndex を 1 個進める純粋 index 駆動。
+    // ScoreEvent.beatAt はソートとログ読みやすさのための参考値で、進行判定には
+    // 使わない。末尾まで来たら先頭に戻ってループ再生する。
     if (fired) {
         const int32_t effective =
             (int32_t)firedBeatNo - (int32_t)ORC_RECEIVER_CONFIG.startBeatNo;
         if (effective >= 1) {
-            // 同じ effective で再発火しないよう lastFiredEffectiveBeat を見る
+            // 同 effective で再発火しないよう lastFiredEffectiveBeat を見る (保険)
             const bool alreadyFired =
                 (data.score.lastFiredEffectiveBeat != 0xFFFF) &&
                 ((uint16_t)effective <= data.score.lastFiredEffectiveBeat);
             if (!alreadyFired) {
-                // beatAt < effective の遅れたイベントは捨てる (currentEventIndex を進める)
-                while (data.score.currentEventIndex < kScoreLength &&
-                       kScore[data.score.currentEventIndex].beatAt <
-                           (uint16_t)effective) {
-                    data.score.currentEventIndex++;
-                }
-                // beatAt == effective のイベントだけを順次発火
-                while (data.score.currentEventIndex < kScoreLength &&
-                       kScore[data.score.currentEventIndex].beatAt ==
-                           (uint16_t)effective) {
+                if (data.score.currentEventIndex < kScoreLength) {
                     fireScoreEvent(data,
                                    kScore[data.score.currentEventIndex], now);
                     data.score.currentEventIndex++;
+                    if (data.score.currentEventIndex >= kScoreLength) {
+                        data.score.currentEventIndex = 0;  // 末尾まで来たらループ
+                    }
                 }
                 data.score.lastFiredEffectiveBeat = (uint16_t)effective;
             }
