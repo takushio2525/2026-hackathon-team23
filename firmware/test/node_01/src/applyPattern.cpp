@@ -22,6 +22,10 @@ bool     sLpfInit = false;
 uint32_t sLastBeatMs = 0;
 float    sBpmEma = 120.0f;
 bool     sBpmInit = false;
+// 拍検出ヒステリシスの「次の BEAT を撃てる状態か」フラグ。
+// true: HI を超えれば BEAT 発火可
+// false: 既に発火済み。dynNorm が LO 未満に戻るまで再発火を抑止
+bool     sBeatArmed = true;
 
 void updateLed(SystemData& data) {
     using namespace logic_params;
@@ -136,12 +140,21 @@ void applyPattern(SystemData& data) {
 
     // 2-3. 拍検出 + テンポ推定 (Conducting 時のみ実行)
     // 判定は重力補正後の動加速度ノルム dynNorm を使う。
+    // ヒステリシス: HI を超えた瞬間にだけ 1 BEAT 発火し、dynNorm が LO を
+    // 一旦下回るまで次の発火を許可しない。これで「振り下ろし1回 = BEAT 1個」が確定する。
     if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
-        if (data.imu.dynNorm > BEAT_DYN_THRESHOLD_G &&
+        // 解除: 動加速度が低い領域に戻ったら次の振りを受け付ける
+        if (!sBeatArmed && data.imu.dynNorm < BEAT_DYN_LO_G) {
+            sBeatArmed = true;
+        }
+        data.beat.armed = sBeatArmed;
+        // 立ち上がり: アームド + HI 超え + refractory 経過で発火
+        if (sBeatArmed && data.imu.dynNorm > BEAT_DYN_HI_G &&
             now - sLastBeatMs >= BEAT_REFRACTORY_MS) {
             data.beat.event = true;
             data.beat.beatNo += 1;
             data.beat.lastBeatMs = now;
+            sBeatArmed = false;  // 次の解除まで発火停止
 
             if (sLastBeatMs != 0) {
                 const uint32_t intervalMs = now - sLastBeatMs;
