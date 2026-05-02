@@ -51,8 +51,10 @@ namespace logic_params {
     constexpr float    LPF_ALPHA               = 0.10f;
     // 拍検出閾値: 動加速度 (= LPF 後 - キャリブ重力) のノルムがこれを超えたら拍。
     // 重力 1g は引かれているので、純粋な振り下ろし加速度の大きさで判定する。
-    // 仕様書の 1.8g は重力込みノルム前提だったため、動加速度換算で 0.8g に置き換え。
-    constexpr float    BEAT_DYN_THRESHOLD_G    = 0.80f;
+    // 経緯: 仕様書の 1.8g は重力込み前提で、そのままだと届かなかった。0.8g に
+    // 下げたら小さい揺れで誤検出する (= 勝手に進む) ため、中間の 1.2g に調整。
+    // 重力込み 1.8g は姿勢により動加速度 0.9〜1.5g 相当、その中央付近を狙う。
+    constexpr float    BEAT_DYN_THRESHOLD_G    = 1.20f;
     constexpr uint32_t BEAT_REFRACTORY_MS      = 250;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
     constexpr float    BPM_MIN                 = 40.0f;
