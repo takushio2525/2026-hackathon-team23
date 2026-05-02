@@ -69,19 +69,5 @@ void NoteSenderModule::updateOutput(SystemData& data) {
         data.noteSender.lastSentMs = now;
         data.noteOut.pendingOn = false;
     }
-    if (data.noteOut.pendingOff) {
-        const uint32_t seq = ++data.noteSender.noteSeq;
-#if SERIAL_DEBUG
-        (void)seq;
-        DBG_PRINTF("[N2 NOTE_OFF] part=0x%02X note=%u                      seq=%lu t=%lu\n",
-                   (unsigned)cfg_.partId,
-                   (unsigned)data.noteOut.noteNumber,
-                   (unsigned long)seq,
-                   (unsigned long)now);
-#else
-        buildAndSend(cfg_.partId, /*gate=*/0, seq, now, data.noteOut);
-#endif
-        data.noteSender.lastSentMs = now;
-        data.noteOut.pendingOff = false;
-    }
+    // NoteOff パケットは送らない: Processing 側が durationMs から自動消音する。
 }

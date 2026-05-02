@@ -31,7 +31,9 @@ uint16_t durationQ8ToMs(uint16_t durationQ8, float bpm) {
     return (uint16_t)(beats * 60000.0f / (bpm < 1.0f ? logic_params::DEFAULT_BPM : bpm));
 }
 
-// 楽譜の 1 イベントを発火 (NoteOn 予約 + NoteOff 時刻設定)
+// 楽譜の 1 イベントを発火 (NoteOn 予約のみ)。
+// 消音は Processing 側が NotePacket.durationMs から自動で行うため、ここでは
+// noteIsSounding 等の追跡は不要。
 // 細分音符 (subNote != 0) があれば、現在 BPM から ms を計算して予約スロットに積む。
 void fireScoreEvent(SystemData& data, const ScoreEvent& ev, uint32_t now) {
     const bool isRest = (ev.flags & 0x04) != 0 || ev.noteNumber == 0;
@@ -45,8 +47,6 @@ void fireScoreEvent(SystemData& data, const ScoreEvent& ev, uint32_t now) {
         data.noteOut.velocity   = (uint8_t)v;
         data.noteOut.durationMs = durMs;
         data.noteOut.pendingOn  = true;
-        data.score.noteIsSounding = true;
-        data.score.noteOffAtMs    = now + durMs;
     }
 
     // 細分音符の予約 (拍頭から subOffsetQ8/256 拍ぶん遅らせて発火)
@@ -76,8 +76,6 @@ void firePendingSub(SystemData& data, uint32_t now) {
     data.noteOut.velocity   = (uint8_t)v;
     data.noteOut.durationMs = data.score.pendingSubDurationMs;
     data.noteOut.pendingOn  = true;
-    data.score.noteIsSounding = true;
-    data.score.noteOffAtMs    = now + data.score.pendingSubDurationMs;
     data.score.pendingSub = false;
 }
 
@@ -180,11 +178,8 @@ void applyPattern(SystemData& data) {
         }
     }
 
-    // 8. NoteOff 判定
-    if (data.score.noteIsSounding && (int32_t)(now - data.score.noteOffAtMs) >= 0) {
-        data.noteOut.pendingOff = true;
-        data.score.noteIsSounding = false;
-    }
+    // (旧 NoteOff 判定はここにあったが、消音は Processing 側で durationMs から
+    // 自動で行うため、node_02 では NoteOff パケットを送らない。)
 
     // LED
     updatePerformerLed(data);
