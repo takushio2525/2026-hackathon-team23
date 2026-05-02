@@ -1,3 +1,7 @@
+// Build (run from project root) — shared by node_01 and node_02:
+//   pio run -d firmware/test/node_01     # 指揮者ノード
+//   pio run -d firmware/test/node_02     # 楽器 1
+//
 // 「ある基準時刻からの経過 ms」を返す軽量タイマ
 // 周期判定やタイムアウト判定に使う
 #pragma once

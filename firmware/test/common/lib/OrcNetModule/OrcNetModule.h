@@ -1,3 +1,7 @@
+// Build (run from project root) — shared by node_01 and node_02:
+//   pio run -d firmware/test/node_01     # 指揮者ノード (SoftAp)
+//   pio run -d firmware/test/node_02     # 楽器 1 (Sta)
+//
 // WiFi 接続維持 + UDP マルチキャスト送受信を集約する IModule 実装
 // 指揮者ノード(SoftAp)と楽器ノード(Sta)で共有する
 #pragma once

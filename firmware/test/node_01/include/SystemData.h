@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_01
+//   pio run -d firmware/test/node_01 -t upload
+//   pio device monitor -d firmware/test/node_01
+//
 // 指揮者ノードの全モジュール共有データを集約
 // EMA 規約: モジュール間は SystemData のフィールド経由でのみ通信する
 #pragma once

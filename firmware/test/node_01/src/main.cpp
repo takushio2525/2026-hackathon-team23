@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_01
+//   pio run -d firmware/test/node_01 -t upload
+//   pio device monitor -d firmware/test/node_01
+//
 // 指揮者ノード node_01 のエントリポイント
 // EMA の 3 フェーズループ (入力 -> ロジック -> 出力) を loop() で回す
 #include <Arduino.h>

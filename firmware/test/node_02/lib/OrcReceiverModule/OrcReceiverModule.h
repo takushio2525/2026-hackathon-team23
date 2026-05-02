@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 楽器ノード入力モジュール
 // data.orcNet (生の受信ペイロード) を読み、時計同期 / 受理 BEAT キュー / CTRL 状態を整形して
 // data.sync / data.receiver / data.ctrl に書き出す

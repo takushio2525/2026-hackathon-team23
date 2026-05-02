@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 楽器ノード node_02 の全モジュール共有データ
 // 仕様 §2.4.3.3 SystemData (抜粋) に準拠
 #pragma once

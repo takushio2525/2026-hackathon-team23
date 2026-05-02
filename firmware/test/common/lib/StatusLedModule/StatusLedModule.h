@@ -1,3 +1,7 @@
+// Build (run from project root) — shared by node_01 and node_02:
+//   pio run -d firmware/test/node_01     # 指揮者ノード
+//   pio run -d firmware/test/node_02     # 楽器 1
+//
 // 状態に応じた LED 点滅を担当する IModule 実装
 // applyPattern() が data.led.blinkIntervalMs / solidOn を更新する
 #pragma once

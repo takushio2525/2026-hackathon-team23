@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_01
+//   pio run -d firmware/test/node_01 -t upload
+//   pio device monitor -d firmware/test/node_01
+//
 // 指揮者ノードの判断ロジック
 // 仕様 §2.4.2.4 の処理フロー:
 //   1. IIR LPF + ノルム計算

@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 金管 1 (node_02) の楽譜データ
 // 仕様 §2.4.3.4: ScoreEvent.beatAt は startBeatNo 相対 (各パート 0 始まり)
 #pragma once

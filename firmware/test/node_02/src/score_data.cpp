@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 金管 1 のテスト用楽譜
 // テスト目的: 「ドレミファミレド」(C4, D4, E4, F4, E4, D4, C4) を 1 拍ずつ進行
 // MIDI: 60=C4, 62=D4, 64=E4, 65=F4
