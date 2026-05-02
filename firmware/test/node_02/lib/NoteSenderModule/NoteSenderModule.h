@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 楽器ノード出力モジュール
 // data.noteOut.pendingOn / pendingOff を見て NotePacket (20 B) を組み立て、
 // USB Serial で 1 対 1 接続の Mac へ書き出す

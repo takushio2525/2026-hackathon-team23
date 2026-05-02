@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 楽器ノードの判断ロジック
 // 仕様 §2.4.3.5 の処理フロー:
 //   1. 時計オフセット更新 (受信側で済 — Receiver が data.sync を更新)

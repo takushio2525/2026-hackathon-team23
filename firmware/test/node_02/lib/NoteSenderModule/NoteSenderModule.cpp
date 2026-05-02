@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+
 #include "NoteSenderModule.h"
 #include "SystemData.h"
 #include "OrcProtocol.h"

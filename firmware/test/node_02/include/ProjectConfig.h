@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 楽器ノード node_02 (金管 1) の設定一元化
 // 4 台共通コードのうち、ここと score_data.* だけが差分
 #pragma once

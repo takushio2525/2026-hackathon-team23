@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_01
+//   pio run -d firmware/test/node_01 -t upload
+//   pio device monitor -d firmware/test/node_01
+//
 // 指揮者ノード専用の出力モジュール
 // applyPattern() が決めた拍/テンポ/状態を CTRL/BEAT パケットに組み立て、
 // data.orcNet.pendingCtrl / pendingBeat に積む。実送信は OrcNetModule が行う。

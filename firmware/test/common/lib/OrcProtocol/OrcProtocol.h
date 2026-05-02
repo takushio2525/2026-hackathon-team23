@@ -1,3 +1,7 @@
+// Build (run from project root) — shared by node_01 and node_02:
+//   pio run -d firmware/test/node_01     # 指揮者ノード
+//   pio run -d firmware/test/node_02     # 楽器 1
+//
 // CTRL / BEAT / NOTE 共通の 20 バイト固定パケット定義
 // 仕様: 共通ヘッダ 12 B + ペイロード 8 B、リトルエンディアン
 #pragma once

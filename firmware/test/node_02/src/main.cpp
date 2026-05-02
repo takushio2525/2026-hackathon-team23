@@ -1,3 +1,8 @@
+// Build / Upload / Monitor (run from project root):
+//   pio run -d firmware/test/node_02
+//   pio run -d firmware/test/node_02 -t upload
+//   pio device monitor -d firmware/test/node_02
+//
 // 楽器ノード node_02 のエントリポイント (Arduino UNO R4 WiFi)
 // 3 フェーズループを loopIntervalMs (5 ms) 間隔で回す
 #include <Arduino.h>

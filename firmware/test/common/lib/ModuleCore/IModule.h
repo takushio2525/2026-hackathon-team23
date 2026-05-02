@@ -1,3 +1,7 @@
+// Build (run from project root) — shared by node_01 and node_02:
+//   pio run -d firmware/test/node_01     # 指揮者ノード
+//   pio run -d firmware/test/node_02     # 楽器 1
+//
 // EMA 準拠の入出力モジュール抽象基底クラス
 // SystemData は各ノードが include/SystemData.h で定義する前方宣言型
 #pragma once
