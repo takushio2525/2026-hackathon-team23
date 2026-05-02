@@ -62,23 +62,41 @@ uint32_t       gLastDumpMs = 0;
 ConductorState gPrevState  = ConductorState::Idle;
 bool           gPrevWifi   = false;
 uint16_t       gPrevBeatNo = 0;
+// 区間内ピーク (200ms ごとにリセット)。dump はスポット値だと動きの瞬間を取り逃がすため、
+// IMU が ready になる毎フレーム (5ms 周期) にこの 2 つを更新して可視化する。
+float          gPeakNraw   = 0.0f;  // 生加速度ノルム (重力込み)
+float          gPeakNdyn   = 0.0f;  // 動加速度ノルム (重力補正後 = 拍判定対象)
+
+void trackPeak(const SystemData& d) {
+    if (!d.imu.ready) return;
+    const float nraw = sqrtf(d.imu.acc[0] * d.imu.acc[0] +
+                             d.imu.acc[1] * d.imu.acc[1] +
+                             d.imu.acc[2] * d.imu.acc[2]);
+    if (nraw > gPeakNraw) gPeakNraw = nraw;
+    if (d.imu.dynNorm > gPeakNdyn) gPeakNdyn = d.imu.dynNorm;
+}
 
 void dumpPeriodic(const SystemData& d) {
     const uint32_t now = millis();
     if (now - gLastDumpMs < DUMP_INTERVAL_MS) return;
     gLastDumpMs = now;
     DBG_PRINTF(
-        "[N1 t=%lu st=%s wifi=%d imu=%d acc=(%6.2f,%6.2f,%6.2f) n=%4.2f bpm=%5.1f beatNo=%u ctrlSeq=%lu beatSeq=%lu]\n",
+        "[N1 t=%lu st=%s wifi=%d imu=%d acc=(%6.2f,%6.2f,%6.2f) n=%4.2f dyn=%4.2f peakRaw=%4.2f peakDyn=%4.2f bpm=%5.1f beatNo=%u ctrlSeq=%lu beatSeq=%lu]\n",
         (unsigned long)now,
         stateName(d.conductor.state),
         d.orcNet.wifiConnected ? 1 : 0,
         d.imu.ready ? 1 : 0,
         d.imu.accLpf[0], d.imu.accLpf[1], d.imu.accLpf[2],
         d.imu.accNorm,
+        d.imu.dynNorm,
+        gPeakNraw,
+        gPeakNdyn,
         d.tempo.bpm,
         (unsigned)d.beat.beatNo,
         (unsigned long)d.sender.ctrlSeq,
         (unsigned long)d.sender.beatSeq);
+    gPeakNraw = 0.0f;
+    gPeakNdyn = 0.0f;
 }
 
 void dumpEdges(const SystemData& d) {
@@ -134,6 +152,7 @@ void loop() {
         if (m->enabled) m->updateOutput(gData);
     }
 #if SERIAL_DEBUG
+    trackPeak(gData);   // 5ms 周期でピーク追跡 (dump はスポット値を補完)
     dumpEdges(gData);
     dumpPeriodic(gData);
 #endif

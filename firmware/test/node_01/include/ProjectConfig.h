@@ -49,7 +49,10 @@ inline const StatusLedConfig STATUS_LED_CONFIG = {
 // applyPattern() のロジック係数
 namespace logic_params {
     constexpr float    LPF_ALPHA               = 0.10f;
-    constexpr float    BEAT_ACCEL_THRESHOLD_G  = 1.80f;
+    // 拍検出閾値: 動加速度 (= LPF 後 - キャリブ重力) のノルムがこれを超えたら拍。
+    // 重力 1g は引かれているので、純粋な振り下ろし加速度の大きさで判定する。
+    // 仕様書の 1.8g は重力込みノルム前提だったため、動加速度換算で 0.8g に置き換え。
+    constexpr float    BEAT_DYN_THRESHOLD_G    = 0.80f;
     constexpr uint32_t BEAT_REFRACTORY_MS      = 250;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
     constexpr float    BPM_MIN                 = 40.0f;

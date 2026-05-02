@@ -18,10 +18,14 @@ struct ImuConfig {
 
 struct ImuData {
     bool     ready = false;          // この周期で読めたか
-    float    acc[3]   = {0, 0, 0};   // 生加速度 (g)
+    float    acc[3]   = {0, 0, 0};   // 生加速度 (g, 重力込み)
     float    gyro[3]  = {0, 0, 0};   // 生角速度 (dps)
-    float    accLpf[3] = {0, 0, 0};  // LPF 後の加速度 (applyPattern が更新)
-    float    accNorm = 0;            // LPF 後ノルム (g)
+    float    accLpf[3] = {0, 0, 0};  // LPF 後の加速度 (g, 重力込み)
+    float    accNorm = 0;            // LPF 後ノルム (g, 重力込み)
+    // 動加速度 = LPF 後 - キャリブ済み重力ベクトル。拍検出はこちらで判定する。
+    // Calibrating 完了前は gravityOffset=0 のため accLpf と等しい。
+    float    dynAcc[3] = {0, 0, 0};
+    float    dynNorm = 0;
     uint32_t sampleAtMs = 0;
 };
 
