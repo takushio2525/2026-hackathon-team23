@@ -11,6 +11,7 @@
 | `lib/OrcProtocol/` | CTRL / BEAT / NOTE の 20 B パケット定義 (`magic=0x4F52`) |
 | `lib/OrcNetModule/` | WiFi UDP マルチキャスト送受信 (SoftAp / Sta 切替) |
 | `lib/StatusLedModule/` | 状態に応じた LED 点滅出力 |
+| `lib/SerialDebug/` | `SERIAL_DEBUG` フラグで切替えるシリアルデバッグマクロ (`DBG_PRINTF` 等) |
 
 ## 約束事
 

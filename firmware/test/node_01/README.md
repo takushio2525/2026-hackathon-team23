@@ -33,6 +33,19 @@ pio run -t upload        # 書き込み
 pio device monitor       # シリアルモニタ
 ```
 
+## シリアルデバッグ出力 (SERIAL_DEBUG)
+
+`platformio.ini` の `-DSERIAL_DEBUG=1` (既定) でデバッグ出力が有効。
+`pio device monitor` を開くと以下が流れる:
+
+- 起動時: 各モジュール `init()` の OK/NG
+- 周期 (200 ms): `[N1 t=… st=Conducting wifi=1 imu=1 acc=(…) n=… bpm=… beatNo=… ctrlSeq=… beatSeq=…]`
+- イベント: `[N1 EVT STATE]` 状態遷移 / `[N1 EVT WIFI]` リンク変化 /
+  `[N1 EVT BEAT]` 拍検出時の no/playAt/bpm
+
+無効化したいときは `-DSERIAL_DEBUG=0` に変更。マクロが空展開されるので
+コードサイズも実行時コストも 0 になる。
+
 ## 構成
 
 ```
