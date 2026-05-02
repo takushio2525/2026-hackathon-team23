@@ -1,16 +1,15 @@
 // Arduino オーケストラ — 楽器ノードからの NOTE パケットを受けて音を鳴らす
 // 仕様準拠: magic=0x4F52 でフレーム同期 → 20 B 固定 → type=3 (NOTE) を再生
 //
-// 動作:
-//   - 起動時に Serial ポート一覧を表示し、SERIAL_PORT_INDEX 番のポートを開く
-//   - magic (0x52 0x4F リトルエンディアン) を待ち、20 B たまったら 1 パケットとして処理
-//   - NoteOn (gate=1) で発音、NoteOff (gate=0) または durationMs 経過で消音
+// 2 つのモードを持つ。起動時は LOOP モード (ハード不要でテスト可能):
+//   LOOP   : 内蔵メロディ「ドレミファミレド」を BPM 120 で自動再生する
+//   SERIAL : 楽器ノード (UNO R4 WiFi) からのバイナリ NotePacket を再生する
+//   キー 'l' で LOOP、's' で SERIAL に切替
 //
-// 使い方:
-//   1. 楽器ノード (UNO R4 WiFi) を Mac に USB 接続
-//   2. このスケッチを Run
-//   3. コンソールに表示される Serial ポート一覧を見て、UNO R4 のポート番号を
-//      SERIAL_PORT_INDEX に設定して再起動
+// SERIAL モードの動作:
+//   - 起動時に Serial ポート一覧を表示し、SERIAL_PORT_NAME のポートを開く
+//   - magic (0x52 0x4F リトルエンディアン) を待ち、20 B たまったら 1 パケットとして処理
+//   - NoteOn (gate=1) で発音、NoteOff (gate=0) または次の NoteOn で消音 (モノフォニック)
 //
 // 仕様書: meetings/0429_3回/事前課題共有/arduino_塩澤.pdf §2.3.3.5
 
@@ -50,6 +49,20 @@ HashMap<Integer, Voice> activeVoices = new HashMap<Integer, Voice>();
 ArrayList<Voice> releasingVoices = new ArrayList<Voice>();
 final float RELEASE_SEC = 0.06f;
 
+// ─── ループ再生モード ──────────────────────────────
+//   起動時はこちら。シリアル接続不要で音だけテストできる。
+final int  MODE_LOOP   = 0;
+final int  MODE_SERIAL = 1;
+int        currentMode = MODE_LOOP;
+
+// 内蔵メロディ (firmware/test/node_02/src/score_data.cpp の冒頭と同じ「ドレミファミレド」)
+final int[] LOOP_MELODY    = { 60, 62, 64, 65, 64, 62, 60 };
+final int   LOOP_BPM       = 120;
+final int   LOOP_PART_ID   = 0x02;
+final int   LOOP_VELOCITY  = 100;
+int         loopIdx        = 0;
+int         loopNextOnAtMs = 0;
+
 // ─── 表示用 ────────────────────────────────────────
 String  lastEventLabel = "(no events yet)";
 int     receivedCount = 0;
@@ -58,10 +71,13 @@ int     lastConductorState = 0;
 int     lastBeatNo = 0;
 
 void setup() {
-    size(720, 320);
+    size(720, 340);
     minim = new Minim(this);
     out = minim.getLineOut(Minim.STEREO, 1024, 44100);
 
+    println("=== Orchestra Test Player ===");
+    println("Mode: LOOP (press 's' to switch to SERIAL, 'l' to switch back to LOOP)");
+    println("");
     println("Available serial ports:");
     String[] ports = Serial.list();
     for (int i = 0; i < ports.length; i++) {
@@ -100,20 +116,25 @@ void setup() {
 void draw() {
     background(20);
     noStroke();
-    fill(60, 200, 120);
+    fill(currentMode == MODE_LOOP ? color(220, 160, 60) : color(60, 200, 120));
     rect(0, 0, width, 4);
+
+    // ループ再生は draw() の cadence で進める
+    updateLoopPlayback();
 
     fill(220);
     textSize(13);
     text("Orchestra Test Player", 16, 26);
-    text("Connected: " + (port != null), 16, 50);
-    text("Received packets: " + receivedCount, 16, 70);
-    text("Last event: " + lastEventLabel, 16, 90);
-    text("BPM (×8): " + lastBpmQ8 + " → " + nf(lastBpmQ8 / 8.0f, 0, 2), 16, 110);
-    text("Conductor state: " + stateLabel(lastConductorState), 16, 130);
-    text("Last beatNo: " + lastBeatNo, 16, 150);
+    text("Mode: " + (currentMode == MODE_LOOP ? "LOOP (BPM " + LOOP_BPM + ")" : "SERIAL")
+         + "   [l]=LOOP  [s]=SERIAL", 16, 46);
+    text("Connected: " + (port != null), 16, 70);
+    text("Received packets: " + receivedCount, 16, 90);
+    text("Last event: " + lastEventLabel, 16, 110);
+    text("BPM (×8): " + lastBpmQ8 + " → " + nf(lastBpmQ8 / 8.0f, 0, 2), 16, 130);
+    text("Conductor state: " + stateLabel(lastConductorState), 16, 150);
+    text("Last beatNo: " + lastBeatNo, 16, 170);
     text("Active voices: " + activeVoices.size() +
-         " (releasing: " + releasingVoices.size() + ")", 16, 170);
+         " (releasing: " + releasingVoices.size() + ")", 16, 190);
 
     // release 完了したボイスを unpatch して回収
     reapReleasingVoices();
@@ -121,10 +142,46 @@ void draw() {
     // 波形描画
     stroke(80, 220, 120);
     noFill();
-    int wy = 240;
+    int wy = 260;
     for (int i = 0; i < out.bufferSize() - 1; i++) {
         line(i, wy - out.left.get(i) * 60, i + 1, wy - out.left.get(i + 1) * 60);
     }
+}
+
+void keyPressed() {
+    if (key == 'l' || key == 'L') {
+        switchMode(MODE_LOOP);
+    } else if (key == 's' || key == 'S') {
+        switchMode(MODE_SERIAL);
+    }
+}
+
+void switchMode(int mode) {
+    if (mode == currentMode) return;
+    currentMode = mode;
+    // 切替時は鳴っている音を全部止める
+    silenceAllParts();
+    if (mode == MODE_LOOP) {
+        loopIdx = 0;
+        loopNextOnAtMs = millis();  // すぐ最初の音を鳴らす
+        println("[MODE] -> LOOP");
+    } else {
+        println("[MODE] -> SERIAL");
+    }
+}
+
+// LOOP モード: BPM 120 で 1 拍ごとに次の音を鳴らす。
+// モノフォニックなので triggerNoteOn が前の音を自動的に止める。
+void updateLoopPlayback() {
+    if (currentMode != MODE_LOOP) return;
+    int nowMs = millis();
+    if (nowMs < loopNextOnAtMs) return;
+    int note = LOOP_MELODY[loopIdx];
+    int beatPeriodMs = (int)(60000.0f / LOOP_BPM);
+    triggerNoteOn(LOOP_PART_ID, note, LOOP_VELOCITY, beatPeriodMs);
+    lastEventLabel = "LOOP NoteOn note=" + note + " (idx=" + loopIdx + "/" + LOOP_MELODY.length + ")";
+    loopIdx = (loopIdx + 1) % LOOP_MELODY.length;
+    loopNextOnAtMs = nowMs + beatPeriodMs;
 }
 
 String stateLabel(int s) {
@@ -186,13 +243,16 @@ void handlePacket(byte[] buf) {
         int velocity   = u8(buf[14]);
         int gate       = u8(buf[15]);
         int durationMs = u16le(buf[16], buf[17]);
-        if (gate == 1) {
-            triggerNoteOn(partId, noteNumber, velocity, durationMs);
-            lastEventLabel = "NoteOn part=" + partId + " note=" + noteNumber +
-                             " v=" + velocity + " dur=" + durationMs + "ms";
-        } else {
-            triggerNoteOff(partId, noteNumber);
-            lastEventLabel = "NoteOff part=" + partId + " note=" + noteNumber;
+        // LOOP モード中は受信した NoteOn を無視する。CTRL/BEAT は表示用に取り込む。
+        if (currentMode == MODE_SERIAL) {
+            if (gate == 1) {
+                triggerNoteOn(partId, noteNumber, velocity, durationMs);
+                lastEventLabel = "NoteOn part=" + partId + " note=" + noteNumber +
+                                 " v=" + velocity + " dur=" + durationMs + "ms";
+            } else {
+                triggerNoteOff(partId, noteNumber);
+                lastEventLabel = "NoteOff part=" + partId + " note=" + noteNumber;
+            }
         }
     } else if (type == TYPE_CTRL) {
         // 楽器ノードの USB Serial には CTRL は通常流れないが、デバッグ用に対応
@@ -228,6 +288,16 @@ void triggerNoteOff(int partId, int noteNumber) {
     if (v != null) {
         v.release();
         releasingVoices.add(v);
+    }
+}
+
+void silenceAllParts() {
+    Iterator<Map.Entry<Integer, Voice>> it = activeVoices.entrySet().iterator();
+    while (it.hasNext()) {
+        Voice v = it.next().getValue();
+        v.release();
+        releasingVoices.add(v);
+        it.remove();
     }
 }
 
