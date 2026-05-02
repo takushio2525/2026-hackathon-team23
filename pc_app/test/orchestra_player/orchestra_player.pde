@@ -17,6 +17,8 @@
 import processing.serial.*;
 import ddf.minim.*;
 import ddf.minim.ugens.*;
+import java.util.Iterator;
+import java.util.Map;
 
 // ─── 設定 ──────────────────────────────────────────
 // 楽器ノード (UNO R4 WiFi) の USB シリアルポート名を直接指定する。
@@ -44,6 +46,9 @@ boolean inFrame = false;
 Minim       minim;
 AudioOutput out;
 HashMap<Integer, Voice> activeVoices = new HashMap<Integer, Voice>();
+// release 中で unpatch 待ちのボイス。draw() から完了したものを回収する
+ArrayList<Voice> releasingVoices = new ArrayList<Voice>();
+final float RELEASE_SEC = 0.06f;
 
 // ─── 表示用 ────────────────────────────────────────
 String  lastEventLabel = "(no events yet)";
@@ -107,7 +112,11 @@ void draw() {
     text("BPM (×8): " + lastBpmQ8 + " → " + nf(lastBpmQ8 / 8.0f, 0, 2), 16, 110);
     text("Conductor state: " + stateLabel(lastConductorState), 16, 130);
     text("Last beatNo: " + lastBeatNo, 16, 150);
-    text("Active voices: " + activeVoices.size(), 16, 170);
+    text("Active voices: " + activeVoices.size() +
+         " (releasing: " + releasingVoices.size() + ")", 16, 170);
+
+    // release 完了したボイスを unpatch して回収
+    reapReleasingVoices();
 
     // 波形描画
     stroke(80, 220, 120);
@@ -202,8 +211,10 @@ int voiceKey(int partId, int noteNumber) {
 }
 
 void triggerNoteOn(int partId, int noteNumber, int velocity, int durationMs) {
+    // モノフォニック化: 同じパートで鳴っている音は note 番号に関係なく止める。
+    // firmware 側で NoteOff が落ちることがあるため、ここで保険をかける。
+    silenceAllOnPart(partId);
     int k = voiceKey(partId, noteNumber);
-    triggerNoteOff(partId, noteNumber);  // 既発音は止める
     float freq = 440.0f * pow(2.0f, (noteNumber - 69) / 12.0f);
     float amp  = constrain(velocity / 127.0f, 0.0f, 1.0f) * 0.4f;
     Voice v = new Voice(freq, amp);
@@ -214,7 +225,35 @@ void triggerNoteOn(int partId, int noteNumber, int velocity, int durationMs) {
 void triggerNoteOff(int partId, int noteNumber) {
     int k = voiceKey(partId, noteNumber);
     Voice v = activeVoices.remove(k);
-    if (v != null) v.release();
+    if (v != null) {
+        v.release();
+        releasingVoices.add(v);
+    }
+}
+
+void silenceAllOnPart(int partId) {
+    Iterator<Map.Entry<Integer, Voice>> it = activeVoices.entrySet().iterator();
+    while (it.hasNext()) {
+        Map.Entry<Integer, Voice> e = it.next();
+        if ((e.getKey() >> 8) == partId) {
+            Voice v = e.getValue();
+            v.release();
+            releasingVoices.add(v);
+            it.remove();
+        }
+    }
+}
+
+void reapReleasingVoices() {
+    int nowMs = millis();
+    Iterator<Voice> it = releasingVoices.iterator();
+    while (it.hasNext()) {
+        Voice v = it.next();
+        if (nowMs - v.releaseStartedAtMs >= (int)(RELEASE_SEC * 1000) + 5) {
+            v.unpatchNow();
+            it.remove();
+        }
+    }
 }
 
 // シンプルなサイン波 + 線形 ADSR ボイス
@@ -222,6 +261,8 @@ class Voice {
     Oscil osc;
     Line  amp;
     float maxAmp;
+    int   releaseStartedAtMs = 0;
+    boolean unpatched = false;
 
     Voice(float freq, float maxAmp) {
         this.maxAmp = maxAmp;
@@ -236,8 +277,14 @@ class Voice {
     }
 
     void release() {
-        amp.activate(0.06f, maxAmp, 0.0f);  // 60 ms で減衰
-        // 短時間後に unpatch する代わりに、ここでは即 unpatch
+        // 振幅だけ落として patch は維持。実際の unpatch は reapReleasingVoices() で行う
+        amp.activate(RELEASE_SEC, maxAmp, 0.0f);
+        releaseStartedAtMs = millis();
+    }
+
+    void unpatchNow() {
+        if (unpatched) return;
         osc.unpatch(out);
+        unpatched = true;
     }
 }
