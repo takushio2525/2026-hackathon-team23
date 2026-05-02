@@ -50,7 +50,7 @@ void applyPattern(SystemData& data) {
     using namespace logic_params;
     const uint32_t now = millis();
 
-    // 1. IIR LPF + ノルム計算
+    // 1. IIR LPF + ノルム計算 + 動加速度 (重力補正後) の計算
     if (data.imu.ready) {
         if (!sLpfInit) {
             for (int i = 0; i < 3; ++i) sLpfAcc[i] = data.imu.acc[i];
@@ -65,6 +65,14 @@ void applyPattern(SystemData& data) {
         data.imu.accNorm = sqrtf(sLpfAcc[0] * sLpfAcc[0] +
                                  sLpfAcc[1] * sLpfAcc[1] +
                                  sLpfAcc[2] * sLpfAcc[2]);
+        // 動加速度 = LPF 後 - キャリブ重力。Calibrating 中は gravityOffset=0 なので
+        // dyn=accLpf となり、Conducting 遷移直後はほぼ 0 から始まる。
+        for (int i = 0; i < 3; ++i) {
+            data.imu.dynAcc[i] = sLpfAcc[i] - data.calibration.gravityOffset[i];
+        }
+        data.imu.dynNorm = sqrtf(data.imu.dynAcc[0] * data.imu.dynAcc[0] +
+                                 data.imu.dynAcc[1] * data.imu.dynAcc[1] +
+                                 data.imu.dynAcc[2] * data.imu.dynAcc[2]);
     }
 
     // 4. 状態遷移
@@ -127,8 +135,9 @@ void applyPattern(SystemData& data) {
     }
 
     // 2-3. 拍検出 + テンポ推定 (Conducting 時のみ実行)
+    // 判定は重力補正後の動加速度ノルム dynNorm を使う。
     if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
-        if (data.imu.accNorm > BEAT_ACCEL_THRESHOLD_G &&
+        if (data.imu.dynNorm > BEAT_DYN_THRESHOLD_G &&
             now - sLastBeatMs >= BEAT_REFRACTORY_MS) {
             data.beat.event = true;
             data.beat.beatNo += 1;
