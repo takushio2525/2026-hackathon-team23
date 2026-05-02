@@ -49,18 +49,13 @@ inline const StatusLedConfig STATUS_LED_CONFIG = {
 // applyPattern() のロジック係数
 namespace logic_params {
     constexpr float    LPF_ALPHA               = 0.10f;
-    // 拍検出は「重力方向への投影成分」で振り下ろし方向だけを見る方式。
-    // dynAlongG = dynAcc・gravityUnit が大きく負 (= 重力と逆向きの加速度 =
-    // センサが下に投げ出される動き = 振り下ろし) のピークを 1 BEAT として検出。
-    // 振り上げ・振り戻しは正方向の加速度になるので発火しない。
-    // ヒステリシス: HI を超えたら発火、|dynAlongG| が LO 未満に戻るまで再発火不可。
-    //
-    // 経緯: ノルムだけで判定していたとき、振り下ろしと振り戻しの両方が大きい
-    // ノルムを示し 1 振りで 2 BEAT 出たり、arm が 0 から戻れない区間で BEAT が
-    // 飛ぶタイミングが歪んだりしていた。重力方向に射影して向きを見ることで解消。
-    constexpr float    BEAT_DOWN_HI_G          = 0.80f;  // 振り下ろしの発火しきい (重力方向の動加速度 |g|)
-    constexpr float    BEAT_DOWN_LO_G          = 0.20f;  // 解除しきい (|dynAlongG| がこれ未満に戻ったら次を許可)
-    constexpr uint32_t BEAT_REFRACTORY_MS      = 250;    // 保険: 連続発火の最小間隔
+    // 拍検出閾値: 動加速度 (= LPF 後 - キャリブ重力) のノルムがこれを超えたら拍。
+    // 重力 1g は引かれているので、純粋な振り下ろし加速度の大きさで判定する。
+    // 経緯: 仕様書の 1.8g は重力込み前提で、そのままだと届かなかった。0.8g に
+    // 下げたら小さい揺れで誤検出する (= 勝手に進む) ため、中間の 1.2g に調整。
+    // 重力込み 1.8g は姿勢により動加速度 0.9〜1.5g 相当、その中央付近を狙う。
+    constexpr float    BEAT_DYN_THRESHOLD_G    = 1.20f;
+    constexpr uint32_t BEAT_REFRACTORY_MS      = 250;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
     constexpr float    BPM_MIN                 = 40.0f;
     constexpr float    BPM_MAX                 = 240.0f;

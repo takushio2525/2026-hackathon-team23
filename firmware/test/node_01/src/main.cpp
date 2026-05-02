@@ -81,7 +81,7 @@ void dumpPeriodic(const SystemData& d) {
     if (now - gLastDumpMs < DUMP_INTERVAL_MS) return;
     gLastDumpMs = now;
     DBG_PRINTF(
-        "[N1 t=%lu st=%s wifi=%d imu=%d acc=(%6.2f,%6.2f,%6.2f) n=%4.2f dyn=%4.2f alongG=%+5.2f peakRaw=%4.2f peakDyn=%4.2f arm=%d bpm=%5.1f beatNo=%u ctrlSeq=%lu beatSeq=%lu]\n",
+        "[N1 t=%lu st=%s wifi=%d imu=%d acc=(%6.2f,%6.2f,%6.2f) n=%4.2f dyn=%4.2f peakRaw=%4.2f peakDyn=%4.2f bpm=%5.1f beatNo=%u ctrlSeq=%lu beatSeq=%lu]\n",
         (unsigned long)now,
         stateName(d.conductor.state),
         d.orcNet.wifiConnected ? 1 : 0,
@@ -89,10 +89,8 @@ void dumpPeriodic(const SystemData& d) {
         d.imu.accLpf[0], d.imu.accLpf[1], d.imu.accLpf[2],
         d.imu.accNorm,
         d.imu.dynNorm,
-        d.beat.dynAlongG,
         gPeakNraw,
         gPeakNdyn,
-        d.beat.armed ? 1 : 0,
         d.tempo.bpm,
         (unsigned)d.beat.beatNo,
         (unsigned long)d.sender.ctrlSeq,
