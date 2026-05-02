@@ -49,13 +49,17 @@ inline const StatusLedConfig STATUS_LED_CONFIG = {
 // applyPattern() のロジック係数
 namespace logic_params {
     constexpr float    LPF_ALPHA               = 0.10f;
-    // 拍検出はヒステリシス付きの立ち上がりエッジ検出にしている。
-    // 「dynNorm が LO 以下に一旦戻ってから HI を超えた瞬間」だけ 1 BEAT 発火。
-    // これで 1 振りの中の過渡振動や、静止時の微小ドリフトによる連発を防ぐ。
-    // 経緯: 単純な閾値超えだと振り下ろし1回で複数 BEAT が出て、Processing 側で
-    // 「ずっと音が流れる」状態になっていたため、エッジ検出に置き換えた。
-    constexpr float    BEAT_DYN_HI_G           = 1.20f;  // 発火しきい (振り下ろしのピーク)
-    constexpr float    BEAT_DYN_LO_G           = 0.40f;  // 解除しきい (これ未満に戻ったら次を許可)
+    // 拍検出は「重力方向への投影成分」で振り下ろし方向だけを見る方式。
+    // dynAlongG = dynAcc・gravityUnit が大きく負 (= 重力と逆向きの加速度 =
+    // センサが下に投げ出される動き = 振り下ろし) のピークを 1 BEAT として検出。
+    // 振り上げ・振り戻しは正方向の加速度になるので発火しない。
+    // ヒステリシス: HI を超えたら発火、|dynAlongG| が LO 未満に戻るまで再発火不可。
+    //
+    // 経緯: ノルムだけで判定していたとき、振り下ろしと振り戻しの両方が大きい
+    // ノルムを示し 1 振りで 2 BEAT 出たり、arm が 0 から戻れない区間で BEAT が
+    // 飛ぶタイミングが歪んだりしていた。重力方向に射影して向きを見ることで解消。
+    constexpr float    BEAT_DOWN_HI_G          = 0.80f;  // 振り下ろしの発火しきい (重力方向の動加速度 |g|)
+    constexpr float    BEAT_DOWN_LO_G          = 0.20f;  // 解除しきい (|dynAlongG| がこれ未満に戻ったら次を許可)
     constexpr uint32_t BEAT_REFRACTORY_MS      = 250;    // 保険: 連続発火の最小間隔
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
     constexpr float    BPM_MIN                 = 40.0f;
