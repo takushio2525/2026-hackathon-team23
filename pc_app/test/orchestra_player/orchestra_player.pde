@@ -1,9 +1,9 @@
 // Arduino オーケストラ — 楽器ノードからの NOTE パケットを受けて音を鳴らす
 // 仕様準拠: magic=0x4F52 でフレーム同期 → 20 B 固定 → type=3 (NOTE) を再生
 //
-// 2 つのモードを持つ。起動時は LOOP モード (ハード不要でテスト可能):
-//   LOOP   : 内蔵メロディ「ドレミファミレド」を BPM 120 で自動再生する
-//   SERIAL : 楽器ノード (UNO R4 WiFi) からのバイナリ NotePacket を再生する
+// 2 つのモードを持つ。起動時は SERIAL モード (本番動作):
+//   SERIAL : 楽器ノード (UNO R4 WiFi) からのバイナリ NotePacket を再生する (デフォルト)
+//   LOOP   : 内蔵メロディ「ドレミファミレド」を BPM 120 で自動再生する (ハード不要のオフライン確認用)
 //   キー 'l' で LOOP、's' で SERIAL に切替
 //
 // SERIAL モードの動作:
@@ -50,10 +50,11 @@ ArrayList<Voice> releasingVoices = new ArrayList<Voice>();
 final float RELEASE_SEC = 0.06f;
 
 // ─── ループ再生モード ──────────────────────────────
-//   起動時はこちら。シリアル接続不要で音だけテストできる。
+//   起動時のデフォルトは SERIAL (UNO からの NotePacket を発音する本番動作)。
+//   LOOP はハードなしで音出しを確認したいときに 'l' で明示的に入る確認用モード。
 final int  MODE_LOOP   = 0;
 final int  MODE_SERIAL = 1;
-int        currentMode = MODE_LOOP;
+int        currentMode = MODE_SERIAL;
 
 // 内蔵メロディ (firmware/test/node_02/src/score_data.cpp の冒頭と同じ「ドレミファミレド」)
 final int[] LOOP_MELODY    = { 60, 62, 64, 65, 64, 62, 60 };
@@ -76,7 +77,7 @@ void setup() {
     out = minim.getLineOut(Minim.STEREO, 1024, 44100);
 
     println("=== Orchestra Test Player ===");
-    println("Mode: LOOP (press 's' to switch to SERIAL, 'l' to switch back to LOOP)");
+    println("Mode: SERIAL (press 'l' to switch to LOOP for offline test, 's' to come back)");
     println("");
     println("Available serial ports:");
     String[] ports = Serial.list();
