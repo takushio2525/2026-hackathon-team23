@@ -41,6 +41,10 @@ void buildAndSend(uint8_t partId, uint8_t gate, uint32_t seq, uint32_t now,
     pkt.payload.reserved[0] = 0;
     pkt.payload.reserved[1] = 0;
     Serial.write(reinterpret_cast<const uint8_t*>(&pkt), sizeof(pkt));
+    // UNO R4 WiFi の USB CDC は小さい書き込みを内部バッファで束ねるため、
+    // flush() を呼んで即座にホスト (Processing) へ送り出す。
+    // これがないとパケットがまとめて到着し、発音が「ためてバースト」状態になる。
+    Serial.flush();
 }
 #endif
 
