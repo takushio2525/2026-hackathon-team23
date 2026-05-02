@@ -19,8 +19,12 @@ import ddf.minim.*;
 import ddf.minim.ugens.*;
 
 // ─── 設定 ──────────────────────────────────────────
-final int SERIAL_PORT_INDEX = 0;     // Serial.list() のインデックス
-final int SERIAL_BAUD       = 115200;
+// 楽器ノード (UNO R4 WiFi) の USB シリアルポート名を直接指定する。
+// Mac で `ls /dev/cu.*` するか、起動時にコンソールへ出る一覧で確認できる。
+// SERIAL_PORT_NAME が空文字 ("") のときだけ SERIAL_PORT_INDEX にフォールバック。
+final String SERIAL_PORT_NAME  = "/dev/cu.usbmodem34B7DA64482C2";
+final int    SERIAL_PORT_INDEX = 0;     // フォールバック用 (Serial.list() のインデックス)
+final int    SERIAL_BAUD       = 115200;
 
 // ─── パケット仕様 ────────────────────────────────────
 final int  PACKET_SIZE = 20;
@@ -62,10 +66,25 @@ void setup() {
         println("(!) No serial ports detected. Plug in the instrument node and restart.");
         return;
     }
-    int idx = constrain(SERIAL_PORT_INDEX, 0, ports.length - 1);
-    println("Opening: " + ports[idx]);
+    // 1) SERIAL_PORT_NAME に一致するポートを最優先で選ぶ
+    String chosen = null;
+    if (SERIAL_PORT_NAME != null && SERIAL_PORT_NAME.length() > 0) {
+        for (String p : ports) {
+            if (p.equals(SERIAL_PORT_NAME)) { chosen = p; break; }
+        }
+        if (chosen == null) {
+            println("(!) SERIAL_PORT_NAME '" + SERIAL_PORT_NAME +
+                    "' が見つかりません。SERIAL_PORT_INDEX にフォールバックします。");
+        }
+    }
+    // 2) 見つからなければ SERIAL_PORT_INDEX を使う
+    if (chosen == null) {
+        int idx = constrain(SERIAL_PORT_INDEX, 0, ports.length - 1);
+        chosen = ports[idx];
+    }
+    println("Opening: " + chosen);
     try {
-        port = new Serial(this, ports[idx], SERIAL_BAUD);
+        port = new Serial(this, chosen, SERIAL_BAUD);
         port.buffer(1);
     } catch (Exception e) {
         println("(!) Failed to open serial port: " + e.getMessage());
