@@ -31,26 +31,22 @@ bool     sBpmInit = false;
 // 拍は Armed -> Idle のリリースエッジで判定する (= 振り終わりタイミング)。
 enum class BeatGate : uint8_t { Idle, Armed };
 
-BeatGate sGate         = BeatGate::Idle;
-float    sVel[3]       = {0, 0, 0};   // 動加速度の時間積分 (m/s) — Armed 中のみ更新
-float    sPathLen      = 0.0f;        // |sVel| の時間積分 (m)   — Armed 中のみ更新
-float    sArmedPeakDyn = 0.0f;        // Armed 中の dynNorm 最大値 (デバッグ用)
-uint32_t sArmedAtMs    = 0;           // Armed に入った時刻
-uint32_t sLastImuMs    = 0;           // 直前に積分した IMU サンプル時刻
-// 直前に終了した Armed セッションの最終結果。dump で「振りごとに何が起きたか」
-// を可視化するため、新しい Armed が始まるまで保持する。
-float    sLastArmedPath  = 0.0f;
-float    sLastArmedPeak  = 0.0f;
-uint16_t sLastArmedDurMs = 0;
-bool     sLastArmedAdopt = false;
+BeatGate sGate              = BeatGate::Idle;
+float    sVel[3]            = {0, 0, 0};   // 動加速度の時間積分 (m/s) — Armed 中のみ更新
+float    sPathLen           = 0.0f;        // |sVel| の時間積分 (m)   — Armed 中のみ更新
+float    sArmedPeakDyn      = 0.0f;        // Armed 中の dynNorm 最大値 (デバッグ用)
+uint32_t sArmedAtMs         = 0;           // Armed に入った時刻
+uint32_t sLastImuMs         = 0;           // 直前に積分した IMU サンプル時刻
+bool     sBeatFiredInArmed  = false;       // 現 Armed セッション中に既に発火したか
 
 void gateToIdle() {
-    sGate         = BeatGate::Idle;
+    sGate              = BeatGate::Idle;
     sVel[0] = sVel[1] = sVel[2] = 0.0f;
-    sPathLen      = 0.0f;
-    sArmedPeakDyn = 0.0f;
-    sArmedAtMs    = 0;
-    sLastImuMs    = 0;
+    sPathLen           = 0.0f;
+    sArmedPeakDyn      = 0.0f;
+    sArmedAtMs         = 0;
+    sLastImuMs         = 0;
+    sBeatFiredInArmed  = false;
 }
 
 void updateLed(SystemData& data) {
@@ -194,49 +190,46 @@ void applyPattern(SystemData& data) {
         }
     }
 
-    // 2-3. 拍検出 (ゲート式ステートマシン)
+    // 2-3. 拍検出 (ゲート式ステートマシン + 早期発火)
     //   Idle:  dynNorm > BEAT_DYN_THRESHOLD_G で Armed に遷移し積分を開始
-    //   Armed: 以下のいずれかでリリース判定に入る
-    //          (a) dynNorm < BEAT_RELEASE_G        (絶対値: 完全停止)
-    //          (b) dynNorm < peak * BEAT_RELEASE_RATIO (相対値: ピークアウト後減衰)
-    //          (c) Armed 開始から BEAT_ARMED_TIMEOUT_MS 経過 (保険)
-    //          リリース時点で sPathLen >= 閾値 かつ refractory 経過なら拍確定。
-    //          (a)(b)(c) いずれの経路でも採用条件は同じ (取りこぼし防止)。
-    //   突入直後 BEAT_ARMED_MIN_HOLD_MS は (a)(b) を抑制し、突入直後の単発
-    //   ノイズで即リリースしてしまうのを防ぐ。
+    //   Armed:
+    //     [発火] sPathLen が BEAT_FIRE_PATH_M に達した瞬間に拍を発火
+    //            (Armed セッション中 1 回のみ、refractory も AND)。
+    //            振り始めから ~100ms で発火するので体感的に振りと同期する。
+    //     [リリース] 以下のいずれかで Idle に戻して次の振りに備える
+    //       (a) dynNorm < BEAT_RELEASE_G   (絶対値: 完全停止)
+    //       (b) dynNorm < peak * BEAT_RELEASE_RATIO (相対値: ピークアウト)
+    //       (c) Armed 開始から BEAT_ARMED_TIMEOUT_MS 経過 (保険)
+    //       リリース判定にも pathOk を AND し、弱い振り (path 未達) では
+    //       timeout 経由でしか Idle に戻らない (誤った早期リリース防止)。
+    //       minHoldOk で突入直後の単発ノイズによる即リリースも防ぐ。
     if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
         switch (sGate) {
             case BeatGate::Idle:
                 if (data.imu.dynNorm > BEAT_DYN_THRESHOLD_G) {
-                    sGate         = BeatGate::Armed;
-                    sArmedAtMs    = now;
-                    sArmedPeakDyn = data.imu.dynNorm;
+                    sGate              = BeatGate::Armed;
+                    sArmedAtMs         = now;
+                    sArmedPeakDyn      = data.imu.dynNorm;
                     sVel[0] = sVel[1] = sVel[2] = 0.0f;
-                    sPathLen      = 0.0f;
-                    sLastImuMs    = 0;
+                    sPathLen           = 0.0f;
+                    sLastImuMs         = 0;
+                    sBeatFiredInArmed  = false;
                 }
                 break;
 
             case BeatGate::Armed: {
                 const uint32_t armedFor    = now - sArmedAtMs;
-                const bool pathOk          = sPathLen >= BEAT_PATH_THRESHOLD_M;
+                const bool pathOk          = sPathLen >= BEAT_FIRE_PATH_M;
                 const bool minHoldOk       = armedFor >= BEAT_ARMED_MIN_HOLD_MS;
-                const bool releaseAbs      = data.imu.dynNorm < BEAT_RELEASE_G;
-                const bool releaseRatio    = (sArmedPeakDyn > 0.0f) &&
-                                             (data.imu.dynNorm <
-                                              sArmedPeakDyn * BEAT_RELEASE_RATIO);
-                // path がまだ届いていないならリリースを抑制 (= もっと振らせる)。
-                // 振り下ろし加速ピーク直後の dynNorm 落下で 100ms 以内に Armed
-                // が終わってしまい、積分量が 1〜2cm しか積めない問題を回避する。
-                const bool released        = minHoldOk && pathOk &&
-                                             (releaseAbs || releaseRatio);
-                const bool timeout         = armedFor >= BEAT_ARMED_TIMEOUT_MS;
-                if (released || timeout) {
+
+                // ── 早期発火 ──
+                // Armed 中、まだ未発火で path 閾値到達 + refractory 経過なら
+                // その瞬間に拍を出す。Armed セッション中は再発火しない。
+                if (!sBeatFiredInArmed && pathOk) {
                     const bool refractoryOk = (now - sLastBeatMs) >= BEAT_REFRACTORY_MS;
-                    const bool adopted      = pathOk && refractoryOk;
-                    if (adopted) {
-                        data.beat.event = true;
-                        data.beat.beatNo += 1;
+                    if (refractoryOk) {
+                        data.beat.event      = true;
+                        data.beat.beatNo    += 1;
                         data.beat.lastBeatMs = now;
 
                         if (sLastBeatMs != 0) {
@@ -257,23 +250,29 @@ void applyPattern(SystemData& data) {
                                 data.tempo.nextBeatPredictedMs = now + periodMs;
                             }
                         }
-                        sLastBeatMs = now;
+                        sLastBeatMs       = now;
+                        sBeatFiredInArmed = true;
                     }
-                    // 振りごとのサマリを 1 行で出力 (拍検出のチューニング用)
+                }
+
+                // ── リリース判定 (Idle 復帰のみ) ──
+                const bool releaseAbs   = data.imu.dynNorm < BEAT_RELEASE_G;
+                const bool releaseRatio = (sArmedPeakDyn > 0.0f) &&
+                                          (data.imu.dynNorm <
+                                           sArmedPeakDyn * BEAT_RELEASE_RATIO);
+                const bool released     = minHoldOk && pathOk &&
+                                          (releaseAbs || releaseRatio);
+                const bool timeout      = armedFor >= BEAT_ARMED_TIMEOUT_MS;
+                if (released || timeout) {
                     const char* reason = timeout ? "timeout"
                                        : releaseAbs ? "abs"
                                        : "ratio";
-                    DBG_PRINTF("[N1 ARM_END dur=%lu peak=%4.2f path=%5.3f reason=%s adopt=%s]\n",
+                    DBG_PRINTF("[N1 ARM_END dur=%lu peak=%4.2f path=%5.3f reason=%s fired=%s]\n",
                                (unsigned long)armedFor,
                                sArmedPeakDyn,
                                sPathLen,
                                reason,
-                               adopted ? "YES" : "NO");
-                    // 直前セッションを保存してから Idle へ
-                    sLastArmedPath  = sPathLen;
-                    sLastArmedPeak  = sArmedPeakDyn;
-                    sLastArmedDurMs = (armedFor > 65535u) ? 65535u : (uint16_t)armedFor;
-                    sLastArmedAdopt = adopted;
+                               sBeatFiredInArmed ? "YES" : "NO");
                     gateToIdle();
                     data.beat.pathLenM = 0.0f;
                 }
