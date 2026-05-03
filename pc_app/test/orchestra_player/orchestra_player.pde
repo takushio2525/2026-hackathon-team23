@@ -11,9 +11,11 @@
 //   - magic (0x52 0x4F リトルエンディアン) を待ち、20 B たまったら 1 パケットとして処理
 //   - NoteOn (gate=1) パケット 1 個に「音の高さ + 長さ (durationMs)」が乗っており、
 //     attack して durationMs 経過後に scheduleAutoRelease() が自動消音する
-//   - 同じパートで次の NoteOn が来たらモノフォニックで前の音を即時 release
+//   - **ポリフォニック**: 前の音を止めずに重ねて鳴らす (1 楽器ノード内でも、複数音が
+//     重なる楽譜に対応)。Minim の AudioOutput への patch 数が増えすぎないよう
+//     MAX_POLYPHONY で上限を設け、超えたら最古の active を強制 release する。
 //   - NoteOff (gate=0) パケットは仕様上 node_02 から送られないが、来た場合の互換
-//     パスとして triggerNoteOff() は残す
+//     パスとして triggerNoteOff() は残す (一致する Voice を全部 release)
 //
 // 仕様書: meetings/0429_3回/事前課題共有/arduino_塩澤.pdf §2.3.3.5
 
@@ -21,7 +23,6 @@ import processing.serial.*;
 import ddf.minim.*;
 import ddf.minim.ugens.*;
 import java.util.Iterator;
-import java.util.Map;
 
 // ─── 設定 ──────────────────────────────────────────
 // 楽器ノード (UNO R4 WiFi) の USB シリアルポート名を直接指定する。
@@ -48,10 +49,15 @@ boolean inFrame = false;
 // ─── オーディオ ────────────────────────────────────
 Minim       minim;
 AudioOutput out;
-HashMap<Integer, Voice> activeVoices = new HashMap<Integer, Voice>();
+// ポリフォニック: 同時に鳴っている Voice を順に保持する (最古が先頭)。
+ArrayList<Voice> activeVoices = new ArrayList<Voice>();
 // release 中で unpatch 待ちのボイス。draw() から完了したものを回収する
 ArrayList<Voice> releasingVoices = new ArrayList<Voice>();
 final float RELEASE_SEC = 0.06f;
+// AudioOutput への同時 patch 数が増えすぎると Minim 内部で不安定になることがあるため
+// 同時発音数の上限を設ける。超えたら最古の active から強制 release してリソース確保。
+// 4 楽器 × 同時数音くらいまでは余裕を持って鳴らせる値にしている。
+final int MAX_POLYPHONY = 16;
 
 // ─── ループ再生モード ──────────────────────────────
 //   起動時のデフォルトは SERIAL (UNO からの NotePacket を発音する本番動作)。
@@ -61,7 +67,7 @@ final int  MODE_SERIAL = 1;
 int        currentMode = MODE_SERIAL;
 
 // 内蔵メロディ (firmware/test/node_02/src/score_data.cpp の冒頭と同じ「ドレミファミレド」)
-// LOOP_PART_ID は LOOP モードでだけ使う Voice 鍵の一部。SERIAL モードでは
+// LOOP_PART_ID は LOOP モードでだけ使う partId。SERIAL モードでは
 // 受信した NotePacket の partId をそのまま使うので、Mac に繋いでいる楽器ノードが
 // node_02 (0x02) / node_03 (0x03) / node_04 (0x04) のいずれでもそのまま動く。
 // LOOP モードのオフライン再生で使う partId を変えたい場合だけここを書き換える。
@@ -146,6 +152,7 @@ void draw() {
     text("Last partId: " + (lastPartId < 0 ? "(none)" :
          "0x" + hex(lastPartId, 2)), 16, 190);
     text("Active voices: " + activeVoices.size() +
+         " / " + MAX_POLYPHONY +
          " (releasing: " + releasingVoices.size() + ")", 16, 210);
 
     // durationMs 到達した Voice を release に移し、release 完了したものを unpatch
@@ -155,7 +162,7 @@ void draw() {
     // 波形描画
     stroke(80, 220, 120);
     noFill();
-    int wy = 260;
+    int wy = 280;
     for (int i = 0; i < out.bufferSize() - 1; i++) {
         line(i, wy - out.left.get(i) * 60, i + 1, wy - out.left.get(i + 1) * 60);
     }
@@ -184,7 +191,6 @@ void switchMode(int mode) {
 }
 
 // LOOP モード: BPM 120 で 1 拍ごとに次の音を鳴らす。
-// モノフォニックなので triggerNoteOn が前の音を自動的に止める。
 void updateLoopPlayback() {
     if (currentMode != MODE_LOOP) return;
     int nowMs = millis();
@@ -282,29 +288,30 @@ void handlePacket(byte[] buf) {
 }
 
 // ─── 発音管理 ──────────────────────────────────────
-int voiceKey(int partId, int noteNumber) {
-    return (partId << 8) | (noteNumber & 0xFF);
-}
 
 void triggerNoteOn(int partId, int noteNumber, int velocity, int durationMs) {
-    // モノフォニック化: 同じパートで鳴っている音は note 番号に関係なく止める。
-    silenceAllOnPart(partId);
-    int k = voiceKey(partId, noteNumber);
+    // ポリフォニック: 前の音を止めずに重ねて鳴らす。
+    // 上限を超えていたら最古の active を強制 release してリソース枯渇を防ぐ。
+    while (activeVoices.size() >= MAX_POLYPHONY) {
+        Voice oldest = activeVoices.remove(0);
+        oldest.release();
+        oldest.releaseScheduled = true;
+        releasingVoices.add(oldest);
+    }
     float freq = 440.0f * pow(2.0f, (noteNumber - 69) / 12.0f);
     float amp  = constrain(velocity / 127.0f, 0.0f, 1.0f) * 0.4f;
-    Voice v = new Voice(freq, amp);
+    Voice v = new Voice(partId, noteNumber, freq, amp);
     v.attack(durationMs);   // durationMs 後に scheduleAutoRelease() が release を呼ぶ
-    activeVoices.put(k, v);
+    activeVoices.add(v);
 }
 
 // durationMs 経過した Voice を release に移行する。
 // node_02 は NoteOff パケットを送らないため、消音はこちらが担当する。
 void scheduleAutoRelease() {
     int nowMs = millis();
-    Iterator<Map.Entry<Integer, Voice>> it = activeVoices.entrySet().iterator();
+    Iterator<Voice> it = activeVoices.iterator();
     while (it.hasNext()) {
-        Map.Entry<Integer, Voice> e = it.next();
-        Voice v = e.getValue();
+        Voice v = it.next();
         if (!v.releaseScheduled && nowMs >= v.noteOffAtMs) {
             v.release();
             v.releaseScheduled = true;
@@ -314,32 +321,38 @@ void scheduleAutoRelease() {
     }
 }
 
+// 互換用: gate=0 の NotePacket が来たら、partId+noteNumber が一致する Voice を全部 release。
+// ポリフォニックにしたので「同じ音が複数鳴っている」ケースにも対応する。
 void triggerNoteOff(int partId, int noteNumber) {
-    int k = voiceKey(partId, noteNumber);
-    Voice v = activeVoices.remove(k);
-    if (v != null) {
-        v.release();
-        releasingVoices.add(v);
+    Iterator<Voice> it = activeVoices.iterator();
+    while (it.hasNext()) {
+        Voice v = it.next();
+        if (v.partId == partId && v.noteNumber == noteNumber) {
+            v.release();
+            v.releaseScheduled = true;
+            releasingVoices.add(v);
+            it.remove();
+        }
     }
 }
 
 void silenceAllParts() {
-    Iterator<Map.Entry<Integer, Voice>> it = activeVoices.entrySet().iterator();
-    while (it.hasNext()) {
-        Voice v = it.next().getValue();
+    for (Voice v : activeVoices) {
         v.release();
+        v.releaseScheduled = true;
         releasingVoices.add(v);
-        it.remove();
     }
+    activeVoices.clear();
 }
 
+// 特定 partId の音だけ全部止める (現状未使用。将来「このパートだけミュート」等で利用想定)
 void silenceAllOnPart(int partId) {
-    Iterator<Map.Entry<Integer, Voice>> it = activeVoices.entrySet().iterator();
+    Iterator<Voice> it = activeVoices.iterator();
     while (it.hasNext()) {
-        Map.Entry<Integer, Voice> e = it.next();
-        if ((e.getKey() >> 8) == partId) {
-            Voice v = e.getValue();
+        Voice v = it.next();
+        if (v.partId == partId) {
             v.release();
+            v.releaseScheduled = true;
             releasingVoices.add(v);
             it.remove();
         }
@@ -360,6 +373,8 @@ void reapReleasingVoices() {
 
 // シンプルなサイン波 + 線形 ADSR ボイス
 class Voice {
+    int   partId;
+    int   noteNumber;
     Oscil osc;
     Line  amp;
     float maxAmp;
@@ -368,7 +383,9 @@ class Voice {
     boolean releaseScheduled = false;
     boolean unpatched = false;
 
-    Voice(float freq, float maxAmp) {
+    Voice(int partId, int noteNumber, float freq, float maxAmp) {
+        this.partId = partId;
+        this.noteNumber = noteNumber;
         this.maxAmp = maxAmp;
         this.osc = new Oscil(freq, 0, Waves.SINE);
         this.amp = new Line();
