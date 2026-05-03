@@ -218,60 +218,71 @@ void applyPattern(SystemData& data) {
                 break;
 
             case BeatGate::Armed: {
-                const uint32_t armedFor    = now - sArmedAtMs;
-                const bool pathOk          = sPathLen >= BEAT_FIRE_PATH_M;
-                const bool minHoldOk       = armedFor >= BEAT_ARMED_MIN_HOLD_MS;
+                const uint32_t armedFor = now - sArmedAtMs;
+                const bool pathOk       = sPathLen >= BEAT_FIRE_PATH_M;
+                const bool minHoldOk    = armedFor >= BEAT_ARMED_MIN_HOLD_MS;
+
+                bool        shouldExit  = false;
+                const char* exitReason  = "";
 
                 // ── 早期発火 ──
-                // Armed 中、まだ未発火で path 閾値到達 + refractory 経過なら
-                // その瞬間に拍を出す。Armed セッション中は再発火しない。
-                if (!sBeatFiredInArmed && pathOk) {
-                    const bool refractoryOk = (now - sLastBeatMs) >= BEAT_REFRACTORY_MS;
-                    if (refractoryOk) {
-                        data.beat.event      = true;
-                        data.beat.beatNo    += 1;
-                        data.beat.lastBeatMs = now;
+                // path 閾値 + refractory 経過で発火し、即 Idle に戻す。
+                // 同じ振りの後半 (= 振り戻し) で再度 Armed に入っても、
+                // refractory が効いて再発火しない (= 1 振り = 1 拍を保証)。
+                if (pathOk && (now - sLastBeatMs) >= BEAT_REFRACTORY_MS) {
+                    data.beat.event      = true;
+                    data.beat.beatNo    += 1;
+                    data.beat.lastBeatMs = now;
 
-                        if (sLastBeatMs != 0) {
-                            const uint32_t intervalMs = now - sLastBeatMs;
-                            if (intervalMs > 0) {
-                                const float instBpm = 60000.0f / (float)intervalMs;
-                                if (!sBpmInit) {
-                                    sBpmEma  = instBpm;
-                                    sBpmInit = true;
-                                } else {
-                                    sBpmEma = (1.0f - BPM_EMA_ALPHA) * sBpmEma +
-                                              BPM_EMA_ALPHA * instBpm;
-                                }
-                                if (sBpmEma < BPM_MIN) sBpmEma = BPM_MIN;
-                                if (sBpmEma > BPM_MAX) sBpmEma = BPM_MAX;
-                                data.tempo.bpm = sBpmEma;
-                                const uint32_t periodMs = (uint32_t)(60000.0f / sBpmEma);
-                                data.tempo.nextBeatPredictedMs = now + periodMs;
+                    if (sLastBeatMs != 0) {
+                        const uint32_t intervalMs = now - sLastBeatMs;
+                        if (intervalMs > 0) {
+                            const float instBpm = 60000.0f / (float)intervalMs;
+                            if (!sBpmInit) {
+                                sBpmEma  = instBpm;
+                                sBpmInit = true;
+                            } else {
+                                sBpmEma = (1.0f - BPM_EMA_ALPHA) * sBpmEma +
+                                          BPM_EMA_ALPHA * instBpm;
                             }
+                            if (sBpmEma < BPM_MIN) sBpmEma = BPM_MIN;
+                            if (sBpmEma > BPM_MAX) sBpmEma = BPM_MAX;
+                            data.tempo.bpm = sBpmEma;
+                            const uint32_t periodMs = (uint32_t)(60000.0f / sBpmEma);
+                            data.tempo.nextBeatPredictedMs = now + periodMs;
                         }
-                        sLastBeatMs       = now;
-                        sBeatFiredInArmed = true;
+                    }
+                    sLastBeatMs       = now;
+                    sBeatFiredInArmed = true;
+                    shouldExit        = true;
+                    exitReason        = "fired";
+                }
+
+                // ── リリース判定 (発火しなかったケース用) ──
+                if (!shouldExit) {
+                    const bool releaseAbs   = data.imu.dynNorm < BEAT_RELEASE_G;
+                    const bool releaseRatio = (sArmedPeakDyn > 0.0f) &&
+                                              (data.imu.dynNorm <
+                                               sArmedPeakDyn * BEAT_RELEASE_RATIO);
+                    // pathOk を AND することで、弱い振り (path 未達) は
+                    // timeout 経由でしか抜けない (= 早期リリース誤動作を防止)。
+                    const bool released = minHoldOk && pathOk &&
+                                          (releaseAbs || releaseRatio);
+                    const bool timeout  = armedFor >= BEAT_ARMED_TIMEOUT_MS;
+                    if (released || timeout) {
+                        shouldExit = true;
+                        exitReason = timeout ? "timeout"
+                                   : releaseAbs ? "abs"
+                                   : "ratio";
                     }
                 }
 
-                // ── リリース判定 (Idle 復帰のみ) ──
-                const bool releaseAbs   = data.imu.dynNorm < BEAT_RELEASE_G;
-                const bool releaseRatio = (sArmedPeakDyn > 0.0f) &&
-                                          (data.imu.dynNorm <
-                                           sArmedPeakDyn * BEAT_RELEASE_RATIO);
-                const bool released     = minHoldOk && pathOk &&
-                                          (releaseAbs || releaseRatio);
-                const bool timeout      = armedFor >= BEAT_ARMED_TIMEOUT_MS;
-                if (released || timeout) {
-                    const char* reason = timeout ? "timeout"
-                                       : releaseAbs ? "abs"
-                                       : "ratio";
+                if (shouldExit) {
                     DBG_PRINTF("[N1 ARM_END dur=%lu peak=%4.2f path=%5.3f reason=%s fired=%s]\n",
                                (unsigned long)armedFor,
                                sArmedPeakDyn,
                                sPathLen,
-                               reason,
+                               exitReason,
                                sBeatFiredInArmed ? "YES" : "NO");
                     gateToIdle();
                     data.beat.pathLenM = 0.0f;
