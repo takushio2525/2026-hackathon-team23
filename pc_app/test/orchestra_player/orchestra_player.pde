@@ -23,6 +23,7 @@ import processing.serial.*;
 import ddf.minim.*;
 import ddf.minim.ugens.*;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 // ─── 設定 ──────────────────────────────────────────
 // 楽器ノード (UNO R4 WiFi) の USB シリアルポート名を直接指定する。
@@ -45,6 +46,11 @@ Serial port;
 byte[]  rxBuf = new byte[PACKET_SIZE];
 int     rxIdx = 0;
 boolean inFrame = false;
+// serialEvent は Serial スレッドから呼ばれる一方で、handlePacket → triggerNoteOn は
+// Voice / activeVoices を触るため Animation スレッド (draw) と競合する。
+// ConcurrentLinkedQueue にパケットを溜めて draw() で消化することで、
+// Voice 操作を draw スレッド一本に揃える (ConcurrentModificationException 防止)。
+ConcurrentLinkedQueue<byte[]> packetQueue = new ConcurrentLinkedQueue<byte[]>();
 
 // ─── オーディオ ────────────────────────────────────
 Minim       minim;
@@ -135,6 +141,10 @@ void draw() {
     fill(currentMode == MODE_LOOP ? color(220, 160, 60) : color(60, 200, 120));
     rect(0, 0, width, 4);
 
+    // serialEvent (Serial スレッド) が溜めたパケットを draw() スレッドで消化する。
+    // ここで初めて handlePacket → triggerNoteOn が呼ばれるので Voice 操作は単一スレッド。
+    drainPackets();
+
     // ループ再生は draw() の cadence で進める
     updateLoopPlayback();
 
@@ -214,6 +224,8 @@ String stateLabel(int s) {
 }
 
 // ─── シリアル受信 ──────────────────────────────────
+// Serial スレッドから呼ばれる。Voice には触らず、20 B 揃ったパケットを
+// packetQueue に積むだけにする。実際の発音処理は drainPackets() で draw() スレッドが行う。
 void serialEvent(Serial p) {
     while (p.available() > 0) {
         int b = p.read();
@@ -238,11 +250,22 @@ void serialEvent(Serial p) {
         } else {
             rxBuf[rxIdx++] = (byte) b;
             if (rxIdx >= PACKET_SIZE) {
-                handlePacket(rxBuf);
+                // rxBuf を直接渡すと次パケットで上書きされるのでコピーして渡す
+                byte[] copy = new byte[PACKET_SIZE];
+                System.arraycopy(rxBuf, 0, copy, 0, PACKET_SIZE);
+                packetQueue.offer(copy);
                 rxIdx = 0;
                 inFrame = false;
             }
         }
+    }
+}
+
+// draw() の冒頭で呼ばれる。serialEvent が積んだパケットを順に処理する。
+void drainPackets() {
+    byte[] pkt;
+    while ((pkt = packetQueue.poll()) != null) {
+        handlePacket(pkt);
     }
 }
 
