@@ -9,6 +9,11 @@
 |---|---|
 | `orchestra_player/` | 1 楽器ノード ↔ 1 Mac の音色合成 (Minim サイン波) |
 
+複数の楽器ノード (node_02 / 03 / 04) を鳴らすときは、**Mac と Processing インスタンスを
+楽器ノードごとに用意する** (1 楽器 = 1 Mac)。Processing 側は受信した
+`partId` をそのまま `Voice` のキーに使うため、partId が 0x02 / 0x03 / 0x04 の
+いずれでもコード変更なしで動く (画面の `Last partId` 表示で確認可能)。
+
 ## 必要なもの
 
 - [Processing IDE](https://processing.org/download) (最新版)
@@ -16,12 +21,17 @@
 
 ## 実行手順
 
-1. 指揮者ノード (`firmware/test/node_01`) と楽器ノード (`firmware/test/node_02`) を
-   電源 ON にする
+1. 指揮者ノード (`firmware/test/node_01`) と楽器ノード
+   (`firmware/test/node_02` / `node_03` / `node_04` のいずれか) を電源 ON にする
 2. 楽器ノードを Mac に USB Type-C で接続する (Mac が自動でシリアルポートを生成)
 3. Processing IDE で `orchestra_player/orchestra_player.pde` を開く
-4. Run。コンソールに出るシリアルポート一覧から UNO R4 のポート番号を確認し、
-   スケッチ先頭の `SERIAL_PORT_INDEX` を該当インデックスに書き換えて再 Run
+4. ポート選択を 2 通りから選ぶ:
+   - **推奨: ポート名で指定**。Mac で `ls /dev/cu.*` でポート名を調べ、スケッチ先頭の
+     `SERIAL_PORT_NAME` をそのポート名に書き換える。Mac ごとにポート名は異なる
+     ので、各 Mac で 1 度だけ書き換えればよい
+   - フォールバック: `SERIAL_PORT_NAME = ""` のときだけ `SERIAL_PORT_INDEX` の番号
+     (`Serial.list()` の 0 始まりインデックス) で選ぶ
+5. Run。Processing コンソールに開いたポート名と「`Last partId: 0xXX`」が出れば成功
 
 ## パケット仕様 (受信)
 
