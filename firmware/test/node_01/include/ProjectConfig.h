@@ -70,14 +70,15 @@ namespace logic_params {
     // Armed が長引いたら強制終了。普通の振り下ろしは 200〜500 ms 程度。
     // タイムアウトでも path/refractory を満たせば拍として採用する (取りこぼし防止)。
     constexpr uint32_t BEAT_ARMED_TIMEOUT_MS   = 800;
-    // 拍検出の追加ゲート: Armed に入ってから振り終わるまでに動かした
-    // 「経路長」 (= 速度ノルムの時間積分) がこの距離以上であること。
-    // 瞬間ピークだけが立つ細かい揺れを除外する AND 条件。
-    // ※積分は Armed の間だけ走るので、起動からのノイズ蓄積は混じらない。
-    // 実機ログ (Armed 50〜100 ms) で path がほとんど積まれなかったため、
-    // 10 cm では到達せず常に NO 採用。Armed 100 ms × 2 g 想定の半分の
-    // 5 cm から始める。実機の ARM_END ログを見て再調整する。
-    constexpr float    BEAT_PATH_THRESHOLD_M   = 0.05f;
+    // 拍検出の追加ゲート: Armed セッション中に積み上がった「擬似経路長」が
+    // この値以上であること。瞬間ピークだけが立つ細かい揺れを除外する AND 条件。
+    // ※実体: dynAcc を二重積分した |v| の時間積分で、二重積分ドリフトと |v| の
+    //   単調増加で実際の手の移動距離 (数 cm) より大きく膨らむ。
+    //   実機ログ (Armed 500〜800 ms の本振り) で path = 2.4〜4.5 m が出る一方、
+    //   振り戻し / ノイズ振り (Armed < 100 ms) では path < 0.1 m に留まる。
+    //   両者の間の安全圏として 0.30 m に設定する。物理的な距離としての意味は
+    //   ない (= "swing intensity" 的な指標と解釈する)。
+    constexpr float    BEAT_PATH_THRESHOLD_M   = 0.30f;
     // g -> m/s^2 変換係数 (ISO 標準重力)
     constexpr float    GRAVITY_MS2             = 9.80665f;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
