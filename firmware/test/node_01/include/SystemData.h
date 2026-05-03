@@ -25,6 +25,9 @@ struct BeatLogicData {
     uint16_t beatNo = 0;
     uint32_t lastBeatMs = 0;
     uint32_t playAtMasterMs = 0;
+    // 前回拍からの経路長 (= |v| の時間積分, m 単位)。拍検出の AND ゲート用。
+    // 拍確定 / 状態遷移などでゼロリセットされる。
+    float    pathLenM = 0.0f;
 };
 
 struct TempoLogicData {

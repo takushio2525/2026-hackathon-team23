@@ -57,6 +57,16 @@ namespace logic_params {
     // 重力込み 1.8g は姿勢により動加速度 0.9〜1.5g 相当、その中央付近を狙う。
     constexpr float    BEAT_DYN_THRESHOLD_G    = 1.20f;
     constexpr uint32_t BEAT_REFRACTORY_MS      = 250;
+    // 拍検出の追加ゲート: 前回拍からの「経路長」 (= 速度ノルムの時間積分) が
+    // この距離以上動いていなければ拍として採用しない。瞬間ピークだけが立つ
+    // 細かい揺れを除外するための AND 条件。10 cm = 0.10 m。
+    constexpr float    BEAT_PATH_THRESHOLD_M   = 0.10f;
+    // 静止判定 (Zero-Velocity Update): 動加速度ノルムがこの値未満の状態が
+    // BEAT_STILL_RESET_MS 続いたら速度を 0 にリセットしてドリフトを抜く。
+    constexpr float    BEAT_STILL_THRESHOLD_G  = 0.05f;
+    constexpr uint32_t BEAT_STILL_RESET_MS     = 100;
+    // g -> m/s^2 変換係数 (ISO 標準重力)
+    constexpr float    GRAVITY_MS2             = 9.80665f;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
     constexpr float    BPM_MIN                 = 40.0f;
     constexpr float    BPM_MAX                 = 240.0f;
