@@ -7,17 +7,20 @@
 
 bool StatusLedModule::init() {
     pinMode(cfg_.pin, OUTPUT);
-    digitalWrite(cfg_.pin, LOW);
+    // activeLow=true なら HIGH が消灯、活性化レベルは下記 onLevel_ で扱う
+    digitalWrite(cfg_.pin, cfg_.activeLow ? HIGH : LOW);
     ledOn_ = false;
     lastToggleMs_ = millis();
     return true;
 }
 
 void StatusLedModule::updateOutput(SystemData& data) {
+    const uint8_t onLevel  = cfg_.activeLow ? LOW  : HIGH;
+    const uint8_t offLevel = cfg_.activeLow ? HIGH : LOW;
     uint32_t now = millis();
     if (data.led.solidOn) {
         if (!ledOn_) {
-            digitalWrite(cfg_.pin, HIGH);
+            digitalWrite(cfg_.pin, onLevel);
             ledOn_ = true;
         }
         return;
@@ -27,6 +30,6 @@ void StatusLedModule::updateOutput(SystemData& data) {
     if (now - lastToggleMs_ >= period) {
         lastToggleMs_ = now;
         ledOn_ = !ledOn_;
-        digitalWrite(cfg_.pin, ledOn_ ? HIGH : LOW);
+        digitalWrite(cfg_.pin, ledOn_ ? onLevel : offLevel);
     }
 }

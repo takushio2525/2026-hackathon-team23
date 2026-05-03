@@ -42,8 +42,9 @@ inline const OrcSenderConfig ORC_SENDER_CONFIG = {
 };
 
 inline const StatusLedConfig STATUS_LED_CONFIG = {
-    /*pin=*/             LED_BUILTIN,
+    /*pin=*/             LED_BUILTIN,   // XIAO ESP32-S3 では GPIO21 (User LED)
     /*blinkIntervalMs=*/ 500,
+    /*activeLow=*/       true,          // XIAO ESP32-S3 の User LED は LOW で点灯
 };
 
 // applyPattern() のロジック係数

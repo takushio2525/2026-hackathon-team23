@@ -10,7 +10,8 @@
 
 struct StatusLedConfig {
     uint8_t  pin;
-    uint16_t blinkIntervalMs;  // 既定の点滅周期
+    uint16_t blinkIntervalMs;   // 既定の点滅周期
+    bool     activeLow;         // true: LOW で点灯 (XIAO ESP32-S3 等)、false: HIGH で点灯
 };
 
 struct StatusLedData {
