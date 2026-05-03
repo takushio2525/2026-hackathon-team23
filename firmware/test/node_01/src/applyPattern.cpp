@@ -196,12 +196,15 @@ void applyPattern(SystemData& data) {
     //     [発火] sPathLen が BEAT_FIRE_PATH_M に達した瞬間に拍を発火
     //            (Armed セッション中 1 回のみ、refractory も AND)。
     //            振り始めから ~100ms で発火するので体感的に振りと同期する。
+    //            ※発火しても Armed は維持する。これが 1 振り=1 拍の鍵で、
+    //              「発火→即 Idle→次サンプルで dyn 高いまま再 Arm→refractory
+    //              境界で再発火」という連続発火ループを防ぐ。
     //     [リリース] 以下のいずれかで Idle に戻して次の振りに備える
     //       (a) dynNorm < BEAT_RELEASE_G   (絶対値: 完全停止)
     //       (b) dynNorm < peak * BEAT_RELEASE_RATIO (相対値: ピークアウト)
     //       (c) Armed 開始から BEAT_ARMED_TIMEOUT_MS 経過 (保険)
-    //       リリース判定にも pathOk を AND し、弱い振り (path 未達) では
-    //       timeout 経由でしか Idle に戻らない (誤った早期リリース防止)。
+    //       未発火セッションでは pathOk も AND して弱い振りの早期リリースを防ぐ
+    //       (発火済セッションは pathOk が自明なので無条件)。
     //       minHoldOk で突入直後の単発ノイズによる即リリースも防ぐ。
     if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
         switch (sGate) {
@@ -222,14 +225,12 @@ void applyPattern(SystemData& data) {
                 const bool pathOk       = sPathLen >= BEAT_FIRE_PATH_M;
                 const bool minHoldOk    = armedFor >= BEAT_ARMED_MIN_HOLD_MS;
 
-                bool        shouldExit  = false;
-                const char* exitReason  = "";
-
-                // ── 早期発火 ──
-                // path 閾値 + refractory 経過で発火し、即 Idle に戻す。
-                // 同じ振りの後半 (= 振り戻し) で再度 Armed に入っても、
-                // refractory が効いて再発火しない (= 1 振り = 1 拍を保証)。
-                if (pathOk && (now - sLastBeatMs) >= BEAT_REFRACTORY_MS) {
+                // ── 早期発火: 1 Armed セッションに 1 回まで ──
+                // path 閾値 + refractory 経過で発火する。Idle には戻さず Armed を
+                // 維持し、リリース or timeout が来るのを待つ。これにより 1 振り
+                // 中の二重発火を構造的に防ぐ。
+                if (!sBeatFiredInArmed && pathOk &&
+                    (now - sLastBeatMs) >= BEAT_REFRACTORY_MS) {
                     data.beat.event      = true;
                     data.beat.beatNo    += 1;
                     data.beat.lastBeatMs = now;
@@ -254,30 +255,23 @@ void applyPattern(SystemData& data) {
                     }
                     sLastBeatMs       = now;
                     sBeatFiredInArmed = true;
-                    shouldExit        = true;
-                    exitReason        = "fired";
                 }
 
-                // ── リリース判定 (発火しなかったケース用) ──
-                if (!shouldExit) {
-                    const bool releaseAbs   = data.imu.dynNorm < BEAT_RELEASE_G;
-                    const bool releaseRatio = (sArmedPeakDyn > 0.0f) &&
-                                              (data.imu.dynNorm <
-                                               sArmedPeakDyn * BEAT_RELEASE_RATIO);
-                    // pathOk を AND することで、弱い振り (path 未達) は
-                    // timeout 経由でしか抜けない (= 早期リリース誤動作を防止)。
-                    const bool released = minHoldOk && pathOk &&
-                                          (releaseAbs || releaseRatio);
-                    const bool timeout  = armedFor >= BEAT_ARMED_TIMEOUT_MS;
-                    if (released || timeout) {
-                        shouldExit = true;
-                        exitReason = timeout ? "timeout"
-                                   : releaseAbs ? "abs"
-                                   : "ratio";
-                    }
-                }
-
-                if (shouldExit) {
+                // ── リリース判定 ──
+                // 発火/未発火どちらでも評価する。
+                // 発火済なら pathOk は自明なので無条件で release/timeout で抜ける。
+                // 未発火なら pathOk を AND して弱い振りでの早期リリースを防止。
+                const bool releaseAbs   = data.imu.dynNorm < BEAT_RELEASE_G;
+                const bool releaseRatio = (sArmedPeakDyn > 0.0f) &&
+                                          (data.imu.dynNorm <
+                                           sArmedPeakDyn * BEAT_RELEASE_RATIO);
+                const bool released = minHoldOk && (releaseAbs || releaseRatio) &&
+                                      (sBeatFiredInArmed || pathOk);
+                const bool timeout  = armedFor >= BEAT_ARMED_TIMEOUT_MS;
+                if (released || timeout) {
+                    const char* exitReason = timeout ? "timeout"
+                                            : releaseAbs ? "abs"
+                                            : "ratio";
                     DBG_PRINTF("[N1 ARM_END dur=%lu peak=%4.2f path=%5.3f reason=%s fired=%s]\n",
                                (unsigned long)armedFor,
                                sArmedPeakDyn,
