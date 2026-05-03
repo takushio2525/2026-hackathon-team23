@@ -219,15 +219,19 @@ void applyPattern(SystemData& data) {
 
             case BeatGate::Armed: {
                 const uint32_t armedFor    = now - sArmedAtMs;
+                const bool pathOk          = sPathLen >= BEAT_PATH_THRESHOLD_M;
                 const bool minHoldOk       = armedFor >= BEAT_ARMED_MIN_HOLD_MS;
                 const bool releaseAbs      = data.imu.dynNorm < BEAT_RELEASE_G;
                 const bool releaseRatio    = (sArmedPeakDyn > 0.0f) &&
                                              (data.imu.dynNorm <
                                               sArmedPeakDyn * BEAT_RELEASE_RATIO);
-                const bool released        = minHoldOk && (releaseAbs || releaseRatio);
+                // path がまだ届いていないならリリースを抑制 (= もっと振らせる)。
+                // 振り下ろし加速ピーク直後の dynNorm 落下で 100ms 以内に Armed
+                // が終わってしまい、積分量が 1〜2cm しか積めない問題を回避する。
+                const bool released        = minHoldOk && pathOk &&
+                                             (releaseAbs || releaseRatio);
                 const bool timeout         = armedFor >= BEAT_ARMED_TIMEOUT_MS;
                 if (released || timeout) {
-                    const bool pathOk       = sPathLen >= BEAT_PATH_THRESHOLD_M;
                     const bool refractoryOk = (now - sLastBeatMs) >= BEAT_REFRACTORY_MS;
                     const bool adopted      = pathOk && refractoryOk;
                     if (adopted) {

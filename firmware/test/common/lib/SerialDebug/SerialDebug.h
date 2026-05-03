@@ -38,7 +38,9 @@ inline void waitForHost(uint32_t timeoutMs = 1500) {
 // 揺れるので、自前で vsnprintf してから write する。
 inline void dbgPrintf(const char* fmt, ...) {
 #if SERIAL_DEBUG
-    char buf[160];
+    // node_01 の dump 行は ~175 文字あり、160 では末尾が切れて改行が落ち、
+    // 次の行と連結して見えてしまうので 256 まで広げる。スタック消費は微増のみ。
+    char buf[256];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf, sizeof(buf), fmt, ap);
