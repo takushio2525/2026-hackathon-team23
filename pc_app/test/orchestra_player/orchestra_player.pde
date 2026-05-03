@@ -61,6 +61,10 @@ final int  MODE_SERIAL = 1;
 int        currentMode = MODE_SERIAL;
 
 // 内蔵メロディ (firmware/test/node_02/src/score_data.cpp の冒頭と同じ「ドレミファミレド」)
+// LOOP_PART_ID は LOOP モードでだけ使う Voice 鍵の一部。SERIAL モードでは
+// 受信した NotePacket の partId をそのまま使うので、Mac に繋いでいる楽器ノードが
+// node_02 (0x02) / node_03 (0x03) / node_04 (0x04) のいずれでもそのまま動く。
+// LOOP モードのオフライン再生で使う partId を変えたい場合だけここを書き換える。
 final int[] LOOP_MELODY    = { 60, 62, 64, 65, 64, 62, 60 };
 final int   LOOP_BPM       = 120;
 final int   LOOP_PART_ID   = 0x02;
@@ -74,6 +78,7 @@ int     receivedCount = 0;
 int     lastBpmQ8 = 0;
 int     lastConductorState = 0;
 int     lastBeatNo = 0;
+int     lastPartId = -1;   // 直近に受けた NotePacket の partId (未受信は -1)
 
 void setup() {
     size(720, 340);
@@ -138,8 +143,10 @@ void draw() {
     text("BPM (×8): " + lastBpmQ8 + " → " + nf(lastBpmQ8 / 8.0f, 0, 2), 16, 130);
     text("Conductor state: " + stateLabel(lastConductorState), 16, 150);
     text("Last beatNo: " + lastBeatNo, 16, 170);
+    text("Last partId: " + (lastPartId < 0 ? "(none)" :
+         "0x" + hex(lastPartId, 2)), 16, 190);
     text("Active voices: " + activeVoices.size() +
-         " (releasing: " + releasingVoices.size() + ")", 16, 190);
+         " (releasing: " + releasingVoices.size() + ")", 16, 210);
 
     // durationMs 到達した Voice を release に移し、release 完了したものを unpatch
     scheduleAutoRelease();
@@ -249,15 +256,18 @@ void handlePacket(byte[] buf) {
         int velocity   = u8(buf[14]);
         int gate       = u8(buf[15]);
         int durationMs = u16le(buf[16], buf[17]);
+        lastPartId = partId;   // どの楽器ノードから受けたか可視化 (1 対 1 構成でも有用)
         // LOOP モード中は受信した NoteOn を無視する。CTRL/BEAT は表示用に取り込む。
         if (currentMode == MODE_SERIAL) {
             if (gate == 1) {
                 triggerNoteOn(partId, noteNumber, velocity, durationMs);
-                lastEventLabel = "NoteOn part=" + partId + " note=" + noteNumber +
+                lastEventLabel = "NoteOn part=0x" + hex(partId, 2) +
+                                 " note=" + noteNumber +
                                  " v=" + velocity + " dur=" + durationMs + "ms";
             } else {
                 triggerNoteOff(partId, noteNumber);
-                lastEventLabel = "NoteOff part=" + partId + " note=" + noteNumber;
+                lastEventLabel = "NoteOff part=0x" + hex(partId, 2) +
+                                 " note=" + noteNumber;
             }
         }
     } else if (type == TYPE_CTRL) {
