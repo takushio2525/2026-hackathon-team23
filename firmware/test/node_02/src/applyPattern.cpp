@@ -126,16 +126,24 @@ void applyPattern(SystemData& data) {
             break;
     }
 
-    // 4. 発音判定: Playing 中に保留 BEAT があれば「即発火」する。
-    // 旧実装は playAtMasterMs (送信時刻 + 50ms lookahead) と masterNow を比較し、
-    // grace 100ms を超えると BEAT を破棄していたが、sync.offsetMs のジッタや applyPattern
-    // ループ周期 5ms との相互作用で正常な BEAT まで捨てるケースがあったため撤廃。
-    // node_02 は受信した順に 1 BEAT = 1 拍進める純粋イベント駆動とする。
-    bool     fired = false;
+    // 4. 発音判定: マスタ時刻 playAtMasterMs に揃えて発火する (本来の同期設計)。
+    //   targetLocalMs = playAtMasterMs - sync.offsetMs (マスタ時刻 → 自分のローカル ms)
+    //   - waitMs <= 0 (既に到来 or 受信遅延): 即発火 (期限切れでも捨てない。捨てると鳴らなくなる)
+    //   - waitMs >  0: この周期は何もしない。次ループで再評価し時刻到来したら発火する
+    // 各スレーブが同じ playAtMasterMs に対してそれぞれの sync.offsetMs を引いて
+    // 待つため、複数スレーブの発音はマスタ時刻基準で自然に揃う。
+    // 旧即発火版は受信遅延ぶんスレーブ間でズレていたが、本実装ではそのズレが消える。
+    bool fired = false;
     if (data.performer.state == PerformerState::Playing &&
         data.receiver.pending.valid) {
-        fired = true;
-        data.receiver.pending.valid = false;
+        const int32_t targetLocalMs =
+            (int32_t)data.receiver.pending.playAtMasterMs - data.sync.offsetMs;
+        const int32_t waitMs = targetLocalMs - (int32_t)now;
+        if (waitMs <= 0) {
+            fired = true;
+            data.receiver.pending.valid = false;
+        }
+        // waitMs > 0: 次ループで再評価 (pending は valid のまま残す)
     }
 
     // 6. 楽譜進行: BEAT 1 個 = currentEventIndex を 1 個進める。
