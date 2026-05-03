@@ -280,8 +280,13 @@ void applyPattern(SystemData& data) {
                 break;
             }
         }
-    } else {
-        // Conducting 以外ではゲートを必ず Idle に戻しておく
+    } else if (data.conductor.state != ConductorState::Conducting) {
+        // Conducting でない状態 (Idle / Calibrating / Fallback) に入ったら
+        // ゲートを必ず Idle に戻す。
+        // ※「Conducting だが imu.ready=false」のループではここに来ない。
+        //   ImuModule は 5ms 周期でサンプルするので loop の大半は ready=false で
+        //   通過するため、ここで gateToIdle すると Armed が次ループで毎回潰され、
+        //   積分が走らず ARM_END も出ない致命的バグになる。
         if (sGate != BeatGate::Idle) gateToIdle();
     }
 
