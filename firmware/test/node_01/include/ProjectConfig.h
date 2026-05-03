@@ -57,7 +57,9 @@ namespace logic_params {
     // 重力込み 1.8g は姿勢により動加速度 0.9〜1.5g 相当、その中央付近を狙う。
     // 拍検出の本体閾値 (Armed 突入トリガ)。振り下ろし加速のピーク値を狙う。
     constexpr float    BEAT_DYN_THRESHOLD_G    = 1.20f;
-    constexpr uint32_t BEAT_REFRACTORY_MS      = 250;
+    // 不応期: 1 振りの中で「振り下ろし -> 振り戻し」の両方を 2 拍として
+    // 拾わないために必要。350 ms = 約 170 BPM 上限。普通の指揮なら十分。
+    constexpr uint32_t BEAT_REFRACTORY_MS      = 350;
     // 振り終わり (リリース) 判定: 以下の OR でリリースと見なす。
     //   (a) 動加速度が BEAT_RELEASE_G 未満 (= 完全停止)
     //   (b) 動加速度が Armed 中ピークの BEAT_RELEASE_RATIO 未満
@@ -72,12 +74,12 @@ namespace logic_params {
     constexpr uint32_t BEAT_ARMED_TIMEOUT_MS   = 800;
     // 早期発火の閾値 (= "swing intensity" の最低ライン)。
     // Armed セッション中、擬似経路長 sPathLen がこの値に達した瞬間に拍を発火
-    // する。振り始め (= Armed 突入) から ~100 ms 程度で到達するため、振りと
-    // 音がほぼ同時に感じられる。リリース判定 (Armed 終了) は別系統で行うので
-    // この発火と timing は独立。
-    // ノイズや微小振り (Armed < 100 ms) は path < 0.1 m に留まるため、
-    // この閾値を超えず誤発火しない。
-    constexpr float    BEAT_FIRE_PATH_M        = 0.10f;
+    // する。本振りなら Armed 突入から ~150 ms 程度で到達するため、振りと
+    // 音がほぼ同時に感じられる。
+    // 0.10 では軽い振れ (peak 1.3 g 程度) でも 100 ms で蓄積して誤発火した
+    // ため 0.20 に引き上げ。発火後は即 Idle に戻すので Armed セッション中の
+    // 二重発火はない (1 振り = 1 拍が保証される)。
+    constexpr float    BEAT_FIRE_PATH_M        = 0.20f;
     // g -> m/s^2 変換係数 (ISO 標準重力)
     constexpr float    GRAVITY_MS2             = 9.80665f;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
