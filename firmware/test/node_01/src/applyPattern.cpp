@@ -23,17 +23,27 @@ uint32_t sLastBeatMs = 0;
 float    sBpmEma = 120.0f;
 bool     sBpmInit = false;
 
-// 経路長ゲート用の状態 (前回拍 / 状態遷移でリセット)
-float    sVel[3]       = {0, 0, 0};   // 動加速度の時間積分 (m/s)
-float    sPathLen      = 0.0f;        // |sVel| の時間積分 (m)
-uint32_t sLastImuMs    = 0;           // 直前に積分した IMU サンプル時刻
-uint32_t sStillSinceMs = 0;           // 静止が始まった時刻 (0 = 静止判定中でない)
+// 拍検出のゲートステート。
+//   Idle  : 動加速度が小さい状態。積分しない (ノイズ蓄積なし)。
+//   Armed : dynNorm > BEAT_DYN_THRESHOLD_G で突入。Armed 中だけ
+//           dynAcc を積分して経路長 sPathLen を計算する。
+// 拍は Armed -> Idle のリリースエッジで判定する (= 振り終わりタイミング)。
+enum class BeatGate : uint8_t { Idle, Armed };
 
-void resetMotion() {
+BeatGate sGate         = BeatGate::Idle;
+float    sVel[3]       = {0, 0, 0};   // 動加速度の時間積分 (m/s) — Armed 中のみ更新
+float    sPathLen      = 0.0f;        // |sVel| の時間積分 (m)   — Armed 中のみ更新
+float    sArmedPeakDyn = 0.0f;        // Armed 中の dynNorm 最大値 (デバッグ用)
+uint32_t sArmedAtMs    = 0;           // Armed に入った時刻
+uint32_t sLastImuMs    = 0;           // 直前に積分した IMU サンプル時刻
+
+void resetGate() {
+    sGate         = BeatGate::Idle;
     sVel[0] = sVel[1] = sVel[2] = 0.0f;
     sPathLen      = 0.0f;
+    sArmedPeakDyn = 0.0f;
+    sArmedAtMs    = 0;
     sLastImuMs    = 0;
-    sStillSinceMs = 0;
 }
 
 void updateLed(SystemData& data) {
@@ -87,22 +97,19 @@ void applyPattern(SystemData& data) {
                                  data.imu.dynAcc[1] * data.imu.dynAcc[1] +
                                  data.imu.dynAcc[2] * data.imu.dynAcc[2]);
 
-        // 動加速度を二重積分して経路長 sPathLen を求める。
-        // Conducting 中でキャリブ済のときだけ積分する。それ以外は積分状態をリセット。
+        // Armed 中のみ dynAcc を二重積分して経路長 sPathLen を更新する。
+        // Idle 中は積分しないので、起動からのノイズが蓄積することはない。
         if (data.conductor.state == ConductorState::Conducting &&
-            data.calibration.done) {
+            data.calibration.done && sGate == BeatGate::Armed) {
             const uint32_t sampleMs = data.imu.sampleAtMs ? data.imu.sampleAtMs : now;
             if (sLastImuMs == 0) {
-                // 初回: 基準時刻だけ覚えて積分はスキップ
                 sLastImuMs = sampleMs;
             } else {
                 const uint32_t dtMs = sampleMs - sLastImuMs;
                 sLastImuMs = sampleMs;
-                // 5ms 周期想定。loop 遅延などで dt が大きく飛んだサンプルは
-                // ドリフト源になるので捨てる (50 ms より長い穴は信用しない)。
+                // 5ms 周期想定。loop 遅延で dt が飛んだサンプルは捨てる。
                 if (dtMs > 0 && dtMs <= 50) {
                     const float dt = dtMs * 0.001f;
-                    // a (g) -> a (m/s^2)
                     for (int i = 0; i < 3; ++i) {
                         sVel[i] += data.imu.dynAcc[i] * GRAVITY_MS2 * dt;
                     }
@@ -110,24 +117,14 @@ void applyPattern(SystemData& data) {
                                               sVel[1] * sVel[1] +
                                               sVel[2] * sVel[2]);
                     sPathLen += vNorm * dt;
-                    // ZUPT: 静止 (動加速度が小さい状態) が一定時間続いたら
-                    // 速度をゼロに戻してドリフトを抜く。経路長は維持する
-                    // (今のジェスチャの累積を消したくないので)。
-                    if (data.imu.dynNorm < BEAT_STILL_THRESHOLD_G) {
-                        if (sStillSinceMs == 0) {
-                            sStillSinceMs = sampleMs;
-                        } else if (sampleMs - sStillSinceMs >= BEAT_STILL_RESET_MS) {
-                            sVel[0] = sVel[1] = sVel[2] = 0.0f;
-                        }
-                    } else {
-                        sStillSinceMs = 0;
-                    }
                 }
             }
+            if (data.imu.dynNorm > sArmedPeakDyn) sArmedPeakDyn = data.imu.dynNorm;
             data.beat.pathLenM = sPathLen;
         } else {
-            resetMotion();
-            data.beat.pathLenM = 0.0f;
+            // Conducting でない or Idle ゲート時: 積分は走らせない。
+            // pathLen は前回確定値を 0 にしてデバッグの見え方を揃える。
+            data.beat.pathLenM = sPathLen;
         }
     }
 
@@ -190,45 +187,67 @@ void applyPattern(SystemData& data) {
         }
     }
 
-    // 2-3. 拍検出 + テンポ推定 (Conducting 時のみ実行)
-    // 判定は (a) 動加速度ノルム dynNorm がピーク閾値を超え、かつ
-    //        (b) 前回拍からの経路長 sPathLen が一定距離を超え、かつ
-    //        (c) 不応期 BEAT_REFRACTORY_MS を経過、の AND。
-    // (b) を加えたのは、瞬間的なピークだけが立つ細かい揺れを除外するため。
+    // 2-3. 拍検出 (ゲート式ステートマシン)
+    //   Idle:  dynNorm > BEAT_DYN_THRESHOLD_G で Armed に遷移し積分を開始
+    //   Armed: 振り終わり (dynNorm < BEAT_RELEASE_G) のリリースエッジで判定
+    //          - sPathLen >= BEAT_PATH_THRESHOLD_M (= 振った距離が十分)
+    //          - now - sLastBeatMs >= BEAT_REFRACTORY_MS (= 不応期を経過)
+    //          を満たせば拍確定。いずれにせよ Idle に戻して次の振りに備える。
+    //   保険:  Armed が BEAT_ARMED_TIMEOUT_MS 以上続いたら強制 Idle。
     if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
-        if (data.imu.dynNorm > BEAT_DYN_THRESHOLD_G &&
-            sPathLen >= BEAT_PATH_THRESHOLD_M &&
-            now - sLastBeatMs >= BEAT_REFRACTORY_MS) {
-            data.beat.event = true;
-            data.beat.beatNo += 1;
-            data.beat.lastBeatMs = now;
-
-            if (sLastBeatMs != 0) {
-                const uint32_t intervalMs = now - sLastBeatMs;
-                if (intervalMs > 0) {
-                    const float instBpm = 60000.0f / (float)intervalMs;
-                    if (!sBpmInit) {
-                        sBpmEma = instBpm;
-                        sBpmInit = true;
-                    } else {
-                        sBpmEma = (1.0f - BPM_EMA_ALPHA) * sBpmEma +
-                                  BPM_EMA_ALPHA * instBpm;
-                    }
-                    if (sBpmEma < BPM_MIN) sBpmEma = BPM_MIN;
-                    if (sBpmEma > BPM_MAX) sBpmEma = BPM_MAX;
-                    data.tempo.bpm = sBpmEma;
-                    const uint32_t periodMs = (uint32_t)(60000.0f / sBpmEma);
-                    data.tempo.nextBeatPredictedMs = now + periodMs;
+        switch (sGate) {
+            case BeatGate::Idle:
+                if (data.imu.dynNorm > BEAT_DYN_THRESHOLD_G) {
+                    sGate         = BeatGate::Armed;
+                    sArmedAtMs    = now;
+                    sArmedPeakDyn = data.imu.dynNorm;
+                    sVel[0] = sVel[1] = sVel[2] = 0.0f;
+                    sPathLen      = 0.0f;
+                    sLastImuMs    = 0;
                 }
+                break;
+
+            case BeatGate::Armed: {
+                const bool released   = data.imu.dynNorm < BEAT_RELEASE_G;
+                const bool timeout    = (now - sArmedAtMs) >= BEAT_ARMED_TIMEOUT_MS;
+                if (released || timeout) {
+                    const bool pathOk      = sPathLen >= BEAT_PATH_THRESHOLD_M;
+                    const bool refractoryOk = (now - sLastBeatMs) >= BEAT_REFRACTORY_MS;
+                    if (released && pathOk && refractoryOk) {
+                        data.beat.event = true;
+                        data.beat.beatNo += 1;
+                        data.beat.lastBeatMs = now;
+
+                        if (sLastBeatMs != 0) {
+                            const uint32_t intervalMs = now - sLastBeatMs;
+                            if (intervalMs > 0) {
+                                const float instBpm = 60000.0f / (float)intervalMs;
+                                if (!sBpmInit) {
+                                    sBpmEma  = instBpm;
+                                    sBpmInit = true;
+                                } else {
+                                    sBpmEma = (1.0f - BPM_EMA_ALPHA) * sBpmEma +
+                                              BPM_EMA_ALPHA * instBpm;
+                                }
+                                if (sBpmEma < BPM_MIN) sBpmEma = BPM_MIN;
+                                if (sBpmEma > BPM_MAX) sBpmEma = BPM_MAX;
+                                data.tempo.bpm = sBpmEma;
+                                const uint32_t periodMs = (uint32_t)(60000.0f / sBpmEma);
+                                data.tempo.nextBeatPredictedMs = now + periodMs;
+                            }
+                        }
+                        sLastBeatMs = now;
+                    }
+                    // 採用/不採用にかかわらず Idle に戻す
+                    resetGate();
+                    data.beat.pathLenM = 0.0f;
+                }
+                break;
             }
-            sLastBeatMs = now;
-            // 拍を採用したので速度・経路長を初期化して次の拍に備える。
-            // sLastImuMs は維持して dt を継続させる。
-            sVel[0] = sVel[1] = sVel[2] = 0.0f;
-            sPathLen      = 0.0f;
-            sStillSinceMs = 0;
-            data.beat.pathLenM = 0.0f;
         }
+    } else {
+        // Conducting 以外ではゲートを必ず Idle に戻しておく
+        if (sGate != BeatGate::Idle) resetGate();
     }
 
     // LED 状態
