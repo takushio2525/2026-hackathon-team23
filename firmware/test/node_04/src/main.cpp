@@ -108,7 +108,7 @@ void dumpPeriodic(const SystemData& d) {
                           ? 0 : (now - d.receiver.lastBeatMs);
     DBG_PRINTF(
         "[N4 t=%lu st=%s wifi=%d sync=%s(off=%ld n=%u) ctrl=(bpm=%5.1f v=%u s=%u) "
-        "recv=(no=%u ago=%lu) pend=%d score=(idx=%u snd=%d)]\n",
+        "recv=(no=%u ago=%lu) pend=%d score=(idx=%u)]\n",
         (unsigned long)now,
         perfStateName(d.performer.state),
         d.orcNet.wifiConnected ? 1 : 0,
@@ -119,8 +119,7 @@ void dumpPeriodic(const SystemData& d) {
         (unsigned)d.receiver.lastBeatNo,
         (unsigned long)ago,
         d.receiver.pending.valid ? 1 : 0,
-        (unsigned)d.score.currentEventIndex,
-        d.score.noteIsSounding ? 1 : 0);
+        (unsigned)d.score.currentEventIndex);
 }
 #endif  // SERIAL_DEBUG
 
