@@ -189,11 +189,14 @@ void applyPattern(SystemData& data) {
 
     // 2-3. 拍検出 (ゲート式ステートマシン)
     //   Idle:  dynNorm > BEAT_DYN_THRESHOLD_G で Armed に遷移し積分を開始
-    //   Armed: 振り終わり (dynNorm < BEAT_RELEASE_G) のリリースエッジで判定
-    //          - sPathLen >= BEAT_PATH_THRESHOLD_M (= 振った距離が十分)
-    //          - now - sLastBeatMs >= BEAT_REFRACTORY_MS (= 不応期を経過)
-    //          を満たせば拍確定。いずれにせよ Idle に戻して次の振りに備える。
-    //   保険:  Armed が BEAT_ARMED_TIMEOUT_MS 以上続いたら強制 Idle。
+    //   Armed: 以下のいずれかでリリース判定に入る
+    //          (a) dynNorm < BEAT_RELEASE_G        (絶対値: 完全停止)
+    //          (b) dynNorm < peak * BEAT_RELEASE_RATIO (相対値: ピークアウト後減衰)
+    //          (c) Armed 開始から BEAT_ARMED_TIMEOUT_MS 経過 (保険)
+    //          リリース時点で sPathLen >= 閾値 かつ refractory 経過なら拍確定。
+    //          (a)(b)(c) いずれの経路でも採用条件は同じ (取りこぼし防止)。
+    //   突入直後 BEAT_ARMED_MIN_HOLD_MS は (a)(b) を抑制し、突入直後の単発
+    //   ノイズで即リリースしてしまうのを防ぐ。
     if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
         switch (sGate) {
             case BeatGate::Idle:
@@ -208,12 +211,18 @@ void applyPattern(SystemData& data) {
                 break;
 
             case BeatGate::Armed: {
-                const bool released   = data.imu.dynNorm < BEAT_RELEASE_G;
-                const bool timeout    = (now - sArmedAtMs) >= BEAT_ARMED_TIMEOUT_MS;
+                const uint32_t armedFor    = now - sArmedAtMs;
+                const bool minHoldOk       = armedFor >= BEAT_ARMED_MIN_HOLD_MS;
+                const bool releaseAbs      = data.imu.dynNorm < BEAT_RELEASE_G;
+                const bool releaseRatio    = (sArmedPeakDyn > 0.0f) &&
+                                             (data.imu.dynNorm <
+                                              sArmedPeakDyn * BEAT_RELEASE_RATIO);
+                const bool released        = minHoldOk && (releaseAbs || releaseRatio);
+                const bool timeout         = armedFor >= BEAT_ARMED_TIMEOUT_MS;
                 if (released || timeout) {
-                    const bool pathOk      = sPathLen >= BEAT_PATH_THRESHOLD_M;
+                    const bool pathOk       = sPathLen >= BEAT_PATH_THRESHOLD_M;
                     const bool refractoryOk = (now - sLastBeatMs) >= BEAT_REFRACTORY_MS;
-                    if (released && pathOk && refractoryOk) {
+                    if (pathOk && refractoryOk) {
                         data.beat.event = true;
                         data.beat.beatNo += 1;
                         data.beat.lastBeatMs = now;
@@ -249,6 +258,10 @@ void applyPattern(SystemData& data) {
         // Conducting 以外ではゲートを必ず Idle に戻しておく
         if (sGate != BeatGate::Idle) resetGate();
     }
+
+    // デバッグ可視化用にゲート状態を SystemData にミラー
+    data.beat.gateState    = (sGate == BeatGate::Armed) ? 1 : 0;
+    data.beat.armedPeakDyn = sArmedPeakDyn;
 
     // LED 状態
     updateLed(data);
