@@ -77,8 +77,11 @@ namespace logic_params {
     // する。本振りなら Armed 突入から ~150 ms 程度で到達するため、振りと
     // 音がほぼ同時に感じられる。
     // 0.10 では軽い振れ (peak 1.3 g 程度) でも 100 ms で蓄積して誤発火した
-    // ため 0.20 に引き上げ。発火後は即 Idle に戻すので Armed セッション中の
-    // 二重発火はない (1 振り = 1 拍が保証される)。
+    // ため 0.20 に引き上げ。
+    // 1 Armed セッションに 1 回しか発火しない & 発火後も Armed を維持して
+    // リリース/timeout を待つため、同じ振り中に二重発火しない。連続スイング
+    // で「発火→即 Idle→再 Arm→refractory 境界で再発火」という連続発火
+    // ループも構造的に発生しない。
     constexpr float    BEAT_FIRE_PATH_M        = 0.20f;
     // g -> m/s^2 変換係数 (ISO 標準重力)
     constexpr float    GRAVITY_MS2             = 9.80665f;
