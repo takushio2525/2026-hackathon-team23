@@ -58,12 +58,17 @@ namespace logic_params {
     // 拍検出の本体閾値 (Armed 突入トリガ)。振り下ろし加速のピーク値を狙う。
     constexpr float    BEAT_DYN_THRESHOLD_G    = 1.20f;
     constexpr uint32_t BEAT_REFRACTORY_MS      = 250;
-    // 振り終わり (リリース) 判定。Armed 中に動加速度がこの値を下回ったら、
-    // そのタイミング (= 振り下ろし切って減速し終わる瞬間) で拍を確定する。
-    // BEAT_DYN_THRESHOLD_G より十分小さく取る (ヒステリシス)。
+    // 振り終わり (リリース) 判定: 以下の OR でリリースと見なす。
+    //   (a) 動加速度が BEAT_RELEASE_G 未満 (= 完全停止)
+    //   (b) 動加速度が Armed 中ピークの BEAT_RELEASE_RATIO 未満
+    //       (= ピークアウト後、相対的に十分減衰)
+    // 連続スイングだと dynNorm が 0 まで落ちきらないので、(b) で拾う。
     constexpr float    BEAT_RELEASE_G          = 0.20f;
-    // Armed が長引いて何かおかしいときの保険。これを超えたら強制的に Idle に
-    // 戻して暴走を止める。普通の振り下ろしは 200〜400 ms なので 800 ms で十分。
+    constexpr float    BEAT_RELEASE_RATIO      = 0.40f;
+    // Armed 突入直後の単発ノイズで誤リリースしないための最低保持時間。
+    constexpr uint32_t BEAT_ARMED_MIN_HOLD_MS  = 50;
+    // Armed が長引いたら強制終了。普通の振り下ろしは 200〜500 ms 程度。
+    // タイムアウトでも path/refractory を満たせば拍として採用する (取りこぼし防止)。
     constexpr uint32_t BEAT_ARMED_TIMEOUT_MS   = 800;
     // 拍検出の追加ゲート: Armed に入ってから振り終わるまでに動かした
     // 「経路長」 (= 速度ノルムの時間積分) がこの距離以上であること。

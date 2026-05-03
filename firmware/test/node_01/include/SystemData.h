@@ -28,6 +28,9 @@ struct BeatLogicData {
     // 前回拍からの経路長 (= |v| の時間積分, m 単位)。拍検出の AND ゲート用。
     // 拍確定 / 状態遷移などでゼロリセットされる。
     float    pathLenM = 0.0f;
+    // デバッグ可視化用: 拍検出ゲートの状態と Armed 中の dynNorm 最大値。
+    uint8_t  gateState = 0;        // 0 = Idle, 1 = Armed
+    float    armedPeakDyn = 0.0f;
 };
 
 struct TempoLogicData {
