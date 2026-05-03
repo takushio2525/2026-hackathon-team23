@@ -72,9 +72,12 @@ namespace logic_params {
     constexpr uint32_t BEAT_ARMED_TIMEOUT_MS   = 800;
     // 拍検出の追加ゲート: Armed に入ってから振り終わるまでに動かした
     // 「経路長」 (= 速度ノルムの時間積分) がこの距離以上であること。
-    // 瞬間ピークだけが立つ細かい揺れを除外する AND 条件。10 cm = 0.10 m。
+    // 瞬間ピークだけが立つ細かい揺れを除外する AND 条件。
     // ※積分は Armed の間だけ走るので、起動からのノイズ蓄積は混じらない。
-    constexpr float    BEAT_PATH_THRESHOLD_M   = 0.10f;
+    // 実機ログ (Armed 50〜100 ms) で path がほとんど積まれなかったため、
+    // 10 cm では到達せず常に NO 採用。Armed 100 ms × 2 g 想定の半分の
+    // 5 cm から始める。実機の ARM_END ログを見て再調整する。
+    constexpr float    BEAT_PATH_THRESHOLD_M   = 0.05f;
     // g -> m/s^2 変換係数 (ISO 標準重力)
     constexpr float    GRAVITY_MS2             = 9.80665f;
     constexpr float    BPM_EMA_ALPHA           = 0.30f;
