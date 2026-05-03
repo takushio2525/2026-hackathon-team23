@@ -41,6 +41,7 @@ inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
 inline const StatusLedConfig STATUS_LED_CONFIG = {
     /*pin=*/             LED_BUILTIN,
     /*blinkIntervalMs=*/ 500,
+    /*activeLow=*/       false,    // UNO R4 WiFi の LED_BUILTIN は HIGH で点灯
 };
 
 namespace logic_params {
