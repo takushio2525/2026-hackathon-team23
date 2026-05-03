@@ -14,6 +14,7 @@
 
 #include "SystemData.h"
 #include "ProjectConfig.h"
+#include "SerialDebug.h"
 
 namespace {
 
@@ -36,8 +37,14 @@ float    sPathLen      = 0.0f;        // |sVel| の時間積分 (m)   — Armed 
 float    sArmedPeakDyn = 0.0f;        // Armed 中の dynNorm 最大値 (デバッグ用)
 uint32_t sArmedAtMs    = 0;           // Armed に入った時刻
 uint32_t sLastImuMs    = 0;           // 直前に積分した IMU サンプル時刻
+// 直前に終了した Armed セッションの最終結果。dump で「振りごとに何が起きたか」
+// を可視化するため、新しい Armed が始まるまで保持する。
+float    sLastArmedPath  = 0.0f;
+float    sLastArmedPeak  = 0.0f;
+uint16_t sLastArmedDurMs = 0;
+bool     sLastArmedAdopt = false;
 
-void resetGate() {
+void gateToIdle() {
     sGate         = BeatGate::Idle;
     sVel[0] = sVel[1] = sVel[2] = 0.0f;
     sPathLen      = 0.0f;
@@ -222,7 +229,8 @@ void applyPattern(SystemData& data) {
                 if (released || timeout) {
                     const bool pathOk       = sPathLen >= BEAT_PATH_THRESHOLD_M;
                     const bool refractoryOk = (now - sLastBeatMs) >= BEAT_REFRACTORY_MS;
-                    if (pathOk && refractoryOk) {
+                    const bool adopted      = pathOk && refractoryOk;
+                    if (adopted) {
                         data.beat.event = true;
                         data.beat.beatNo += 1;
                         data.beat.lastBeatMs = now;
@@ -247,8 +255,22 @@ void applyPattern(SystemData& data) {
                         }
                         sLastBeatMs = now;
                     }
-                    // 採用/不採用にかかわらず Idle に戻す
-                    resetGate();
+                    // 振りごとのサマリを 1 行で出力 (拍検出のチューニング用)
+                    const char* reason = timeout ? "timeout"
+                                       : releaseAbs ? "abs"
+                                       : "ratio";
+                    DBG_PRINTF("[N1 ARM_END dur=%lu peak=%4.2f path=%5.3f reason=%s adopt=%s]\n",
+                               (unsigned long)armedFor,
+                               sArmedPeakDyn,
+                               sPathLen,
+                               reason,
+                               adopted ? "YES" : "NO");
+                    // 直前セッションを保存してから Idle へ
+                    sLastArmedPath  = sPathLen;
+                    sLastArmedPeak  = sArmedPeakDyn;
+                    sLastArmedDurMs = (armedFor > 65535u) ? 65535u : (uint16_t)armedFor;
+                    sLastArmedAdopt = adopted;
+                    gateToIdle();
                     data.beat.pathLenM = 0.0f;
                 }
                 break;
@@ -256,7 +278,7 @@ void applyPattern(SystemData& data) {
         }
     } else {
         // Conducting 以外ではゲートを必ず Idle に戻しておく
-        if (sGate != BeatGate::Idle) resetGate();
+        if (sGate != BeatGate::Idle) gateToIdle();
     }
 
     // デバッグ可視化用にゲート状態を SystemData にミラー
