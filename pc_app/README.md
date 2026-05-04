@@ -1,45 +1,21 @@
-# pc_app — PC 側サブシステムの置き場（例）
+# pc_app — PC 側サブシステム
 
-このディレクトリは「**PC 側で動くサブシステムをリポジトリに同梱したいとき**」の例。
-サンプルとして [Processing](https://processing.org/) のスケッチを置いているが、
-中身は自分たちの技術スタックに合わせて自由に差し替えてよい。
-
-ディレクトリ名も用途に合わせてリネーム可能
-（例: `viewer/`, `desktop_app/`, `web/`, `frontend/` など）。
-
-## こんなときに使う
-
-- マイコンから PC へシリアルでデータを送って可視化したい
-- PC 側で音・映像を生成したい
-- 操作用の GUI を作りたい
-- Web フロントエンドやデスクトップアプリを同梱したい
-
-## 構成
-
-| ディレクトリ | 内容 |
+| サブディレクトリ | 目的 |
 |---|---|
-| `example_sketch/` | 最小の Processing スケッチ（書き方のサンプル） |
+| [`production/`](production/) | 本番想定の素のテンプレート (Processing スケッチ雛形) |
+| [`test/`](test/) | 仕様書準拠のテスト用音再生 (Processing) |
 
-## サンプルの実行方法（Processing の場合）
+## test 版 (推奨)
 
-1. [Processing IDE](https://processing.org/download) をインストールする
-2. `example_sketch/example_sketch.pde` を Processing IDE で開く
-3. 「Run」ボタンを押す
-
-> Processing 以外（Python / Unity / Electron 等）を使う場合は、
-> `example_sketch/` を削除して自分たちのプロジェクトを配置する。
-
-## スケッチを追加する（Processing 固有）
-
-Processing のお約束として、スケッチのフォルダ名と `.pde` のファイル名は
-**同じ名前**にする必要がある。
+`firmware/test/` の楽器ノード (UNO R4 WiFi) から USB Serial で送られる
+NOTE パケットを受けて Minim でサイン波合成して鳴らす。
 
 ```
-pc_app/
-└── my_sketch/
-    └── my_sketch.pde   # フォルダと同じ名前
+pc_app/test/orchestra_player/orchestra_player.pde
 ```
 
-## 不要な班は
+詳細は [`test/README.md`](test/README.md) を参照。
 
-`pc_app/` ディレクトリを丸ごと削除してよい。
+## production 版
+
+クリーンな Processing スケッチ雛形。各班が音色合成や可視化を自由に書く前提。
