@@ -69,6 +69,12 @@ namespace logic_params {
     constexpr float    BEAT_RELEASE_RATIO      = 0.40f;
     // Armed 突入直後の単発ノイズで誤リリースしないための最低保持時間。
     constexpr uint32_t BEAT_ARMED_MIN_HOLD_MS  = 50;
+    // リリース判定デバウンス: (releaseAbs || releaseRatio) が連続して
+    // この時間以上成立したら真のリリースと見なす。振り途中の一瞬の dynNorm
+    // dip で Armed を抜けて再 Armed→再発火するのを防ぐ。
+    // 5ms 周期 IMU で 8 サンプル分。短すぎると効かず、長すぎるとリリースが
+    // 遅れて連続スイングのテンポが乱れる。
+    constexpr uint32_t BEAT_RELEASE_HOLD_MS    = 40;
     // Armed が長引いたら強制終了。普通の振り下ろしは 200〜500 ms 程度。
     // タイムアウトでも path/refractory を満たせば拍として採用する (取りこぼし防止)。
     constexpr uint32_t BEAT_ARMED_TIMEOUT_MS   = 800;
