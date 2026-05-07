@@ -68,12 +68,15 @@ pio run
 |---|---|---|---|---|
 | node_01 | 指揮者 (SoftAP + IMU) | XIAO ESP32-S3 Sense + GY-521 | — | — |
 | node_02 | 楽器 1 (金管 1) | Arduino UNO R4 WiFi | 0x02 | 0 |
-| node_03 | 楽器 2 (金管 2) | (未実装) | 0x03 | 4 |
-| node_04 | 楽器 3 (金管 3) | (未実装) | 0x04 | 8 |
+| node_03 | 楽器 2 (金管 2) | Arduino UNO R4 WiFi | 0x03 | 0 |
+| node_04 | 楽器 3 (木管 1) | Arduino UNO R4 WiFi | 0x04 | 0 |
 | node_05 | ドラム | (未実装) | 0x05 | 0 |
 
+テスト実装では同期検証用に `startBeatNo` を全 0 で揃え、3 度・5 度の和音を積んで
+C major 圏内のハモリで拍ズレを聞き取りやすくしている。本番の輪唱（4／8 拍ずらし）は
+`ProjectConfig.h` の `startBeatNo` を差し替えるだけで切り替わる設計。
 node_03〜05 は node_02 をコピーして `ProjectConfig.h` の `partId` /
-`startBeatNo` と `score_data.cpp` の楽譜だけ差し替えれば動く設計
+`startBeatNo` と `score_data.cpp` の楽譜だけ差し替えれば動く
 (仕様書 §2.4.3.6)。
 
 ## 仕様の核
@@ -88,5 +91,5 @@ node_03〜05 は node_02 をコピーして `ProjectConfig.h` の `partId` /
 | パケット長 | 20 B 固定 |
 | BPM 範囲 | 40–240 |
 | マスタクロック | 指揮者ノードの `millis()`、楽器側は EMA で offset 推定 |
-| MOP-1 同期誤差 | ≤ 30 ms |
+| MOP-1 同期誤差 | ≤ 20 ms (ADR-0006 に準拠) |
 | MOP-2 通信遅延 | ≤ 10 ms |
