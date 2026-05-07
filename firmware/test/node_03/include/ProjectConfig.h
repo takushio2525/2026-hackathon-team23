@@ -29,7 +29,6 @@ inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
     /*startBeatNo=*/         0,       // 輪唱の入り拍 (このパートは先頭から)
     /*clockSyncEmaAlpha=*/   0.10f,
     /*clockSyncMinSamples=*/ 5,
-    /*expiredGraceMs=*/      100,
     /*loopIntervalMs=*/      5,
 };
 

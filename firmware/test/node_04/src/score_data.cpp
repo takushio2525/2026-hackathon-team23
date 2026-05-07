@@ -12,15 +12,16 @@
 // 末尾まで来ると先頭に戻ってループ再生する。
 #include "score_data.h"
 
+// {beatAt, noteNumber, velocity, durationQ8, flags, subNote, subVelocity,
+//  subOffsetQ8, subDurationQ8} — sub なしは 0 を明示
 const ScoreEvent kScore[] = {
-    // beatAt, noteNumber, velocity, durationQ8 (256=1拍), flags (bit0=NoteOn)
-    { 1, 67, 100, 240, 0x01 },  // ソ G4
-    { 2, 69, 100, 240, 0x01 },  // ラ A4
-    { 3, 71, 100, 240, 0x01 },  // シ B4
-    { 4, 72, 100, 240, 0x01 },  // ド C5
-    { 5, 71, 100, 240, 0x01 },  // シ B4
-    { 6, 69, 100, 240, 0x01 },  // ラ A4
-    { 7, 67, 100, 480, 0x01 },  // ソ G4 (約 2 拍)
+    { 1, 67, 100, 240, 0x01, 0, 0, 0, 0 },  // ソ G4
+    { 2, 69, 100, 240, 0x01, 0, 0, 0, 0 },  // ラ A4
+    { 3, 71, 100, 240, 0x01, 0, 0, 0, 0 },  // シ B4
+    { 4, 72, 100, 240, 0x01, 0, 0, 0, 0 },  // ド C5
+    { 5, 71, 100, 240, 0x01, 0, 0, 0, 0 },  // シ B4
+    { 6, 69, 100, 240, 0x01, 0, 0, 0, 0 },  // ラ A4
+    { 7, 67, 100, 480, 0x01, 0, 0, 0, 0 },  // ソ G4 (約 2 拍)
 };
 
 const size_t kScoreLength = sizeof(kScore) / sizeof(kScore[0]);

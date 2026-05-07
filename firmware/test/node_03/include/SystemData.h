@@ -38,7 +38,6 @@ struct PerformerStateData {
 
 struct ScoreProgressData {
     uint16_t currentEventIndex = 0;
-    uint16_t lastFiredEffectiveBeat = 0xFFFF;  // 同 BEAT で再発火しないため
     // 消音は Processing 側が NotePacket.durationMs から自動で行うため、node_03 では
     // 鳴りっぱなしの追跡をしない (旧 noteIsSounding / noteOffAtMs は削除)。
     // ── 細分音符 (8 分音符など) の予約発火スロット ──
