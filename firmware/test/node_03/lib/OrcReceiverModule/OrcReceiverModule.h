@@ -14,8 +14,7 @@ struct OrcReceiverConfig {
     uint8_t  partId;              // 0x03 (金管 2)
     uint16_t startBeatNo;         // 0 (このパートの入り拍)
     float    clockSyncEmaAlpha;   // 0.10
-    uint8_t  clockSyncMinSamples; // 5
-    uint16_t expiredGraceMs;      // 100 ms (過去 BEAT を即発音で許容する範囲)
+    uint8_t  clockSyncMinSamples; // 5 (デバッグ表示用. Playing 遷移条件には使わない)
     uint16_t loopIntervalMs;      // 5 ms (ループ周期)
 };
 
@@ -31,7 +30,6 @@ struct ReceiverLogicData {
     uint16_t    lastBeatNo = 0;
     uint32_t    lastBeatMs = 0;
     PendingBeat pending;
-    bool        firedThisCycle = false;
 };
 
 class OrcReceiverModule : public IModule {

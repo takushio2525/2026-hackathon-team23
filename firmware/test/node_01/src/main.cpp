@@ -27,8 +27,6 @@ OrcNetModule     gNet(ORC_NET_CONFIG);
 OrcSenderModule  gSender(ORC_SENDER_CONFIG);
 StatusLedModule  gLed(STATUS_LED_CONFIG);
 
-// init を一意モジュール集合に対して呼ぶ
-IModule* gAll[]     = { &gNet, &gImu, &gSender, &gLed };
 // 入力フェーズ: WiFi 受信 -> IMU 読取
 IModule* gInputs[]  = { &gNet, &gImu };
 // 出力フェーズ: ロジック結果をパケット化 -> LED 反映 -> UDP 送信

@@ -26,7 +26,6 @@ OrcReceiverModule  gRecv(ORC_RECEIVER_CONFIG);
 NoteSenderModule   gNote(NOTE_SENDER_CONFIG);
 StatusLedModule    gLed(STATUS_LED_CONFIG);
 
-IModule* gAll[]     = { &gNet, &gRecv, &gNote, &gLed };
 IModule* gInputs[]  = { &gNet, &gRecv };
 IModule* gOutputs[] = { &gNote, &gLed, &gNet };
 
