@@ -43,8 +43,10 @@ struct CalibrationData {
     bool     done = false;
     uint32_t startMs = 0;
     uint32_t sampleCount = 0;
-    float    accumAccel[3] = {0, 0, 0};
-    float    gravityOffset[3] = {0, 0, 0};
+    // 停止時の加速度ノルムの累積。軸ごとの重力ベクトルではなくスカラー 1 個だけ持つ。
+    // 平均すると姿勢に依らない「静止ノルム ≒ 重力 1g」になる。
+    float    accumNorm = 0.0f;
+    float    gravityMag = 0.0f;   // 確定値 = accumNorm / sampleCount (≒ 1g)
 };
 
 struct ConductorStateData {
