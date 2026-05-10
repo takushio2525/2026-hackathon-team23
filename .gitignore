@@ -87,5 +87,12 @@ desktop.ini
 *.bak
 *.kicad_prl
 
+# ===== sound_lab =====
+# 解析にかける音源(任意・コミット不要)
+sound_lab/analyzer/samples/*
+!sound_lab/analyzer/samples/.gitkeep
+# 解析結果をその都度差し替えるファイル(サンプルの example_organ.json は残す)
+sound_lab/processing/instrument_player/data/instrument.json
+
 # ===== その他 =====
 *.tmp
