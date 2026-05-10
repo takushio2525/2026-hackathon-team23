@@ -121,23 +121,6 @@
 \begin{document}
 \maketitle
 
-%%%%%%%%%%%%%%%%%%%%%%%%
-% 改訂履歴
-%%%%%%%%%%%%%%%%%%%%%%%%
-\thispagestyle{empty}
-\vspace*{6mm}
-\noindent\textbf{\large 改訂履歴}\\[2pt]
-\noindent\begin{tabularx}{\textwidth}{c c c X}
-\toprule
-\textbf{版} & \textbf{日付} & \textbf{著者} & \textbf{変更内容} \\
-\midrule
-0.1 & 2026-04-29 & 塩澤 & 初版（第3回ミーティング提出版）．たたき台仕様として全体方針・ FBS / MOP / EMA 準拠アーキテクチャ・パケット定義・処理フロー・テスト計画を整備 \\
-0.2 & 2026-05-07 & 塩澤 & テスト実装（\texttt{firmware/test/}）に基づく改訂．主な変更点は (a) MOP-1 を 30\,ms $\to$ 20\,ms に修正（ADR-0006 と整合）, (b) 拍検出アルゴリズムを「動加速度ノルム + 経路長ゲート + デバウンスリリース」のステートマシンに刷新, (c) 楽器側状態遷移を SelfRun 撤廃 + index 駆動の 3 状態に簡素化, (d) NoteOff を Processing 側で \texttt{durationMs} から自動消音する方式に変更, (e) 部品をテスト実機構成（XIAO ESP32-S3 Sense + GY-521 モジュール，UNO R4 WiFi $\times$ 3）に揃え, (f) テスト実装で確定した数値を \S\ref{subsec:tested-values} に集約．§\ref{subsec:tbd}（実機で確定する仮値）から確定済み項目を移動 \\
-0.3 & 2026-05-10 & 塩澤 & テスト実装（\texttt{firmware/test/}・\texttt{pc\_app/test/}）との突き合わせで見つかった記述の不整合を修正．(a) \texttt{NoteOutData} は \texttt{pendingOff} を持たず \texttt{pendingOn} のみ（0.2 の NoteOff 不送出と整合）, (b) 起動時キャリブレーションは重力ベクトル（\texttt{gravityOffset[3]}）ではなくスカラー静止ノルム \texttt{gravityMag} であることを各所に反映し，動加速度ノルム \texttt{dynNorm = max(0, accNorm - gravityMag)} の算出を明記, (c) \texttt{SyncLogicData.converged} は 0.2 では状態遷移条件に使わず診断専用である旨を統一, (d) \texttt{StatusLedModule}・\texttt{SerialDebug} を \texttt{common/lib/} に置く構成へファイル構成図を訂正, (e) 楽器ノードの \texttt{CtrlData}・\texttt{NoteOutData}・\texttt{SystemData} 集約表を追加 \\
-\bottomrule
-\end{tabularx}
-\vspace{8mm}
-
 \setcounter{tocdepth}{2}
 \tableofcontents \thispagestyle{empty}
 
