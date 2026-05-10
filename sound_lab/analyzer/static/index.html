@@ -268,18 +268,20 @@ dlBtn.addEventListener("click", () => {
 /* ── 描画 ── */
 function render(){
   results.classList.remove("hidden");
-  $("#srcline").textContent = `${instrument.source_file} → ${instrument.note_name} / ${instrument.fundamental_hz} Hz / ${instrument.duration_sec.toFixed(2)} s`;
   const i = instrument, f = i.features, e = i.envelope;
+  const trimmed = (f.trimmed_lead_sec||0) + (f.trimmed_trail_sec||0);
+  $("#srcline").textContent = `${i.source_file} → ${i.note_name} / ${i.fundamental_hz} Hz / 解析対象 ${i.duration_sec.toFixed(2)} s`
+    + (trimmed > 0.005 ? `（元 ${(f.source_duration_sec||0).toFixed(2)} s から 先頭 ${(f.trimmed_lead_sec||0).toFixed(2)} s・末尾 ${(f.trimmed_trail_sec||0).toFixed(2)} s の無音を自動カット）` : `（無音トリムなし）`);
   const cells = [
     ["基音", `${i.fundamental_hz}<small> Hz</small>`],
     ["MIDI ノート", `${i.note_name}<small> (${i.midi_note})</small>`],
-    ["長さ", `${i.duration_sec.toFixed(2)}<small> s</small>`],
+    ["長さ（トリム後）", `${i.duration_sec.toFixed(2)}<small> s</small>`],
+    ["無音カット 先頭/末尾", `${(f.trimmed_lead_sec||0).toFixed(2)}<small> / </small>${(f.trimmed_trail_sec||0).toFixed(2)}<small> s</small>`],
     ["タイプ", i.sustaining ? '<span class="pill">持続音</span>' : '<span class="pill">減衰音</span>'],
     ["倍音数", `${f.harmonic_count}`],
     ["非調和性 B", `${i.inharmonicity_b}`],
     ["ノイズ量", `${(i.noise.level*100).toFixed(1)}<small> %</small>`],
     ["スペクトル重心", `${Math.round(f.spectral_centroid_hz)}<small> Hz</small>`],
-    ["ロールオフ85%", `${Math.round(f.spectral_rolloff_hz)}<small> Hz</small>`],
     ["スペクトル平坦度", `${f.spectral_flatness}`],
   ];
   $("#stats").innerHTML = cells.map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
