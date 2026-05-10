@@ -22,8 +22,11 @@ struct ImuData {
     float    gyro[3]  = {0, 0, 0};   // 生角速度 (dps)
     float    accLpf[3] = {0, 0, 0};  // LPF 後の加速度 (g, 重力込み)
     float    accNorm = 0;            // LPF 後ノルム (g, 重力込み)
-    // 動加速度 = LPF 後 - キャリブ済み重力ベクトル。拍検出はこちらで判定する。
-    // Calibrating 完了前は gravityOffset=0 のため accLpf と等しい。
+    // 動加速度ノルム dynNorm = accNorm - キャリブ済み静止ノルム (gravityMag ≒ 1g)。
+    // 姿勢非依存のスカラー量で、拍検出はこの dynNorm で判定する。0 でクランプ済み。
+    // dynAcc は accLpf の向きを保ったまま大きさを dynNorm にスケールしたベクトル
+    // (= 重力を「現在の加速度方向の成分」として差し引いた近似)。経路長の二重積分用。
+    // Calibrating 完了前は gravityMag=0 のため dynNorm=accNorm。
     float    dynAcc[3] = {0, 0, 0};
     float    dynNorm = 0;
     uint32_t sampleAtMs = 0;
