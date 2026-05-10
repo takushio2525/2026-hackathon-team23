@@ -102,11 +102,10 @@ void dumpPeriodic(const SystemData& d) {
 
 void dumpEdges(const SystemData& d) {
     if (d.conductor.state != gPrevState) {
-        DBG_PRINTF("[N1 EVT STATE] %s -> %s (gravity=(%6.3f,%6.3f,%6.3f))\n",
+        DBG_PRINTF("[N1 EVT STATE] %s -> %s (gravityMag=%6.3f done=%d)\n",
                    stateName(gPrevState), stateName(d.conductor.state),
-                   d.calibration.gravityOffset[0],
-                   d.calibration.gravityOffset[1],
-                   d.calibration.gravityOffset[2]);
+                   d.calibration.gravityMag,
+                   d.calibration.done ? 1 : 0);
         gPrevState = d.conductor.state;
     }
     if (d.orcNet.wifiConnected != gPrevWifi) {

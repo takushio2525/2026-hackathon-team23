@@ -78,7 +78,7 @@ void applyPattern(SystemData& data) {
     using namespace logic_params;
     const uint32_t now = millis();
 
-    // 1. IIR LPF + ノルム計算 + 動加速度 (重力補正後) の計算
+    // 1. IIR LPF + ノルム計算 + 動加速度ノルム (静止ノルム補正後) の計算
     if (data.imu.ready) {
         if (!sLpfInit) {
             for (int i = 0; i < 3; ++i) sLpfAcc[i] = data.imu.acc[i];
@@ -93,14 +93,23 @@ void applyPattern(SystemData& data) {
         data.imu.accNorm = sqrtf(sLpfAcc[0] * sLpfAcc[0] +
                                  sLpfAcc[1] * sLpfAcc[1] +
                                  sLpfAcc[2] * sLpfAcc[2]);
-        // 動加速度 = LPF 後 - キャリブ重力。Calibrating 中は gravityOffset=0 なので
-        // dyn=accLpf となり、Conducting 遷移直後はほぼ 0 から始まる。
-        for (int i = 0; i < 3; ++i) {
-            data.imu.dynAcc[i] = sLpfAcc[i] - data.calibration.gravityOffset[i];
+        // 動加速度ノルム = LPF 後の加速度ノルム − キャリブ済み静止ノルム (≒重力 1g)。
+        // 軸ごとではなくスカラーで引くので姿勢に依存しない。水平で校正してから
+        // 90 度傾けて振っても残留重力で誤検出しない (旧方式の不具合)。
+        // Calibrating 中は gravityMag=0 なので dynNorm=accNorm。負側は 0 クランプ。
+        float dynN = data.imu.accNorm - data.calibration.gravityMag;
+        if (dynN < 0.0f) dynN = 0.0f;
+        data.imu.dynNorm = dynN;
+        // dynAcc は accLpf の向きを保ったまま大きさを dynNorm にスケール
+        // (= 重力を「現在の加速度方向の成分」として差し引いた近似ベクトル)。
+        // 経路長の二重積分はこのベクトルを使う。Armed 中は accNorm が十分大きく
+        // 向きは振りに支配されるので近似として十分。
+        if (data.imu.accNorm > 1e-3f) {
+            const float k = dynN / data.imu.accNorm;
+            for (int i = 0; i < 3; ++i) data.imu.dynAcc[i] = sLpfAcc[i] * k;
+        } else {
+            for (int i = 0; i < 3; ++i) data.imu.dynAcc[i] = 0.0f;
         }
-        data.imu.dynNorm = sqrtf(data.imu.dynAcc[0] * data.imu.dynAcc[0] +
-                                 data.imu.dynAcc[1] * data.imu.dynAcc[1] +
-                                 data.imu.dynAcc[2] * data.imu.dynAcc[2]);
 
         // Armed 中のみ dynAcc を二重積分して経路長 sPathLen を更新する。
         // Idle 中は積分しないので、起動からのノイズが蓄積することはない。
@@ -141,31 +150,28 @@ void applyPattern(SystemData& data) {
                 data.conductor.state = ConductorState::Calibrating;
                 data.calibration.startMs = now;
                 data.calibration.sampleCount = 0;
-                data.calibration.accumAccel[0] = 0;
-                data.calibration.accumAccel[1] = 0;
-                data.calibration.accumAccel[2] = 0;
+                data.calibration.accumNorm = 0.0f;
                 data.calibration.done = false;
             }
             break;
 
         case ConductorState::Calibrating: {
             if (data.imu.ready) {
-                for (int i = 0; i < 3; ++i) {
-                    data.calibration.accumAccel[i] += data.imu.acc[i];
-                }
+                // 軸ごとではなく生加速度のノルムを累積する。停止していれば姿勢に
+                // 関係なく ≒1g になり、その平均を「静止ノルム」として保持する。
+                const float n = sqrtf(data.imu.acc[0] * data.imu.acc[0] +
+                                      data.imu.acc[1] * data.imu.acc[1] +
+                                      data.imu.acc[2] * data.imu.acc[2]);
+                data.calibration.accumNorm += n;
                 data.calibration.sampleCount++;
             }
             if (now - data.calibration.startMs >= CALIBRATION_MS) {
                 if (data.calibration.sampleCount > 0) {
-                    for (int i = 0; i < 3; ++i) {
-                        data.calibration.gravityOffset[i] =
-                            data.calibration.accumAccel[i] /
-                            (float)data.calibration.sampleCount;
-                    }
+                    data.calibration.gravityMag =
+                        data.calibration.accumNorm /
+                        (float)data.calibration.sampleCount;
                 } else {
-                    data.calibration.gravityOffset[0] = 0;
-                    data.calibration.gravityOffset[1] = 0;
-                    data.calibration.gravityOffset[2] = 1.0f;
+                    data.calibration.gravityMag = 1.0f;   // フォールバック: 1g
                 }
                 data.calibration.done = true;
                 data.conductor.state = ConductorState::Conducting;
