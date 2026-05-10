@@ -16,24 +16,25 @@
 | パス | 内容 |
 |---|---|
 | [`analyzer/`](analyzer/) | 解析ツール本体。バックエンド = Python（`librosa` で解析）、フロント = HTML（ブラウザでアップロード → 可視化 → JSON ダウンロード） |
-| [`processing/instrument_player/`](processing/instrument_player/) | 生成した JSON を読み込んで加算合成 + ADSR + 整形ノイズで鳴らす Processing スケッチ（Minim 使用、鍵盤 UI 付き） |
+| [`processing/instrument_player/`](processing/instrument_player/) | `data/` に入れた JSON を全部読み込み、一覧から音色を切り替えながら加算合成 + ADSR + 整形ノイズで鳴らす Processing スケッチ（Minim 使用、鍵盤 UI 付き） |
 | [`library_format.md`](library_format.md) | インストゥルメント定義 JSON のフォーマット仕様 |
 
 ## クイックスタート
 
 ```bash
-# 1) 解析ツールを起動（初回のみ依存インストール）
+# 1) 解析ツールを起動（macOS は sound_lab/analyzer/start.command をダブルクリックでも可）
 cd sound_lab/analyzer
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python app.py
-#   → ブラウザで http://127.0.0.1:5005 を開く
+#   → ブラウザが自動で http://127.0.0.1:5005 を開く
 #   → 楽器の単音ファイルをドロップ → 「解析」→ 波形/スペクトル/ADSR を確認 → 「JSON をダウンロード」
 
-# 2) ダウンロードした JSON を Processing に渡す
-cp ~/Downloads/piano_C4.instrument.json sound_lab/processing/instrument_player/data/instrument.json
+# 2) ダウンロードした JSON を Processing の data/ に放り込む（複数 OK・名前は任意）
+cp ~/Downloads/*.instrument.json sound_lab/processing/instrument_player/data/
 #   → Processing IDE で instrument_player/instrument_player.pde を開いて Run
-#   → 画面の鍵盤をクリック or PC キーボードで演奏。'o' キーで別の JSON を選び直せる
+#   → 画面下の一覧をクリック（または [ / ] キー）で音色を切替。鍵盤クリック / PC キーで演奏。
+#      JSON を足したら 'r' で再スキャン
 ```
 
 詳しい手順は各サブディレクトリの README を参照。
