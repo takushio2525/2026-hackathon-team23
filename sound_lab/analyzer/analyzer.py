@@ -39,6 +39,11 @@ ONE_CYCLE_POINTS = 1024          # 単一周期波形の点数
 NOISE_BANDS_HZ = [0, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, SR // 2]
 FMIN = 50.0                      # 基音探索の下限
 FMAX = 2200.0                    # 基音探索の上限
+# 先頭/末尾の無音トリム(ピーク RMS からの相対 dB)。録音のルームトーンや準備音を無音扱いする閾値。
+TRIM_LEAD_DB = 20.0              # 先頭: -20dB 未満は無音とみなしてカット(準備音・息・暗騒音も切る)
+TRIM_TRAIL_DB = 50.0             # 末尾: -50dB 未満をカット(減衰の尾は残すため緩め)
+TRIM_PRE_ROLL_MS = 20.0          # 先頭の立ち上がり手前に残す余白
+TRIM_POST_ROLL_MS = 80.0         # 末尾に残す余白
 _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
@@ -91,6 +96,35 @@ def _autocorr_f0(seg: np.ndarray, sr: int) -> float | None:
     return sr / lag if lag > 0 else None
 
 
+def _trim_silence(y: np.ndarray, sr: int):
+    """先頭と末尾の無音(デジタル無音やルームトーン)をトリムする。
+    librosa.effects.trim より積極的に: 先頭は -TRIM_LEAD_DB、末尾は -TRIM_TRAIL_DB 未満を無音と
+    みなしてカットし、立ち上がり手前と末尾に少しだけ余白を残す。極端に短くなる場合は何もしない。
+    返り値: (トリム後の y, 先頭で削ったサンプル数, 末尾で削ったサンプル数)
+    """
+    n = y.size
+    if n < sr // 50:                      # 20ms 未満は触らない
+        return y, 0, 0
+    hop, frame = 256, 1024
+    rms = librosa.feature.rms(y=y, frame_length=frame, hop_length=hop, center=True)[0]
+    if rms.size == 0:
+        return y, 0, 0
+    peak = float(rms.max())
+    if peak <= 1e-7:
+        return y, 0, 0
+    lead_thr = peak * (10.0 ** (-TRIM_LEAD_DB / 20.0))
+    trail_thr = peak * (10.0 ** (-TRIM_TRAIL_DB / 20.0))
+    lead_idx = np.where(rms >= lead_thr)[0]
+    trail_idx = np.where(rms >= trail_thr)[0]
+    if lead_idx.size == 0 or trail_idx.size == 0:
+        return y, 0, 0
+    start = max(0, int(lead_idx[0]) * hop - int(TRIM_PRE_ROLL_MS / 1000.0 * sr))
+    end = min(n, (int(trail_idx[-1]) + 1) * hop + int(TRIM_POST_ROLL_MS / 1000.0 * sr))
+    if end - start < sr // 20:            # トリム後 50ms 未満になるなら諦めて元のまま
+        return y, 0, 0
+    return y[start:end], start, n - end
+
+
 # ── メイン ───────────────────────────────────────────────────
 def analyze_file(path: str, name: str | None = None) -> dict:
     """音源ファイルを解析して {"instrument": {...}, "preview": {...}} を返す。"""
@@ -102,12 +136,11 @@ def analyze_file(path: str, name: str | None = None) -> dict:
     if y.size == 0 or float(np.max(np.abs(y))) < 1e-5:
         raise AnalysisError("無音、または音量が小さすぎて解析できません。")
 
-    # 前後の無音を控えめにトリム(アタック頭を削りすぎないよう top_db は緩め)
-    y_trim, _ = librosa.effects.trim(y, top_db=45)
-    if y_trim.size >= SR // 20:          # 50 ms 以上残れば採用
-        y = y_trim
+    # 先頭/末尾の無音(デジタル無音・ルームトーン)を自動トリム
+    raw_sec = y.size / SR
+    y, n_lead, n_trail = _trim_silence(y, SR)
     if y.size < SR // 10:                # 0.1 秒未満は短すぎ
-        raise AnalysisError("音が短すぎます(0.1 秒以上の単音を渡してください)。")
+        raise AnalysisError("音が短すぎます(0.1 秒以上の単音を渡してください)。元ファイルがほぼ無音の可能性があります。")
 
     duration_sec = y.size / SR
 
@@ -151,6 +184,9 @@ def analyze_file(path: str, name: str | None = None) -> dict:
     features = _spectral_features(y, steady)
     features["rms_peak"] = _r(rms_peak, 4)
     features["harmonic_count"] = int(sum(1 for h in harmonics if h["amp"] > 0.0))
+    features["source_duration_sec"] = _r(raw_sec, 3)        # トリム前の長さ
+    features["trimmed_lead_sec"] = _r(n_lead / SR, 3)       # 先頭で削った無音
+    features["trimmed_trail_sec"] = _r(n_trail / SR, 3)     # 末尾で削った無音
 
     # ── 全体エンベロープを必要なら間引いて格納 ───────────
     env_out = env
@@ -219,52 +255,63 @@ def _detect_fundamental(y: np.ndarray) -> float:
 
 
 # ── ADSR ─────────────────────────────────────────────────────
+_ATTACK_NEAR_PEAK = 0.85   # 「ピークにほぼ到達」とみなす相対レベル(= アタック終了点)
+_ONSET_LEVEL = 0.10        # 立ち上がり開始とみなす相対レベル
+_END_LEVEL = 0.05          # これ未満が続いたら「音は終わった」とみなす(末尾の無音切り)
+
+
 def _fit_adsr(env: np.ndarray, rate_hz: int) -> dict:
-    """0..1 正規化済みエンベロープから ADSR とループ点(秒)を当てはめる。"""
+    """0..1 正規化済みエンベロープ(ピーク=1)から ADSR とループ点(秒)を当てはめる。
+
+    アタックは「ピーク到達まで」ではなく「ピークの 85% に最初に達するまで」で測る。
+    こうすると、本体に強弱の揺らぎがある(= 最大瞬間が中盤に来る)音でも、立ち上がりだけを拾える。
+    ディケイ以降は「アタック終了点」を起点に評価する。
+    """
     n = len(env)
     if n < 3:
         return dict(attack_sec=0.005, decay_sec=0.05, sustain_level=0.5,
                     release_sec=0.05, loop_start_sec=0.0, loop_end_sec=max(0.0, (n - 1) / rate_hz))
 
-    peak_idx = int(np.argmax(env))
-    # アタック: 振幅 10% 到達点 → ピーク
-    above10 = np.where(env >= 0.10)[0]
-    start_idx = int(above10[0]) if above10.size else 0
-    attack_sec = max(peak_idx - start_idx, 1) / rate_hz
+    # 立ち上がり開始 onset → アタック終了(ピークの 85% に最初に到達)body_start
+    above_onset = np.where(env >= _ONSET_LEVEL)[0]
+    onset_idx = int(above_onset[0]) if above_onset.size else 0
+    near_peak = np.where(env[onset_idx:] >= _ATTACK_NEAR_PEAK)[0]
+    body_start = onset_idx + int(near_peak[0]) if near_peak.size else int(np.argmax(env))
+    attack_sec = max(body_start - onset_idx, 1) / rate_hz
 
-    # ピーク後の有効区間 [peak_idx, end_idx](末尾の無音を除く)
-    above5 = np.where(env >= 0.05)[0]
-    end_idx = int(above5[-1]) if above5.size else n - 1
-    if end_idx <= peak_idx:
+    # アタック以降の有効区間 [body_start, end_idx](末尾の無音は除く)
+    above_end = np.where(env >= _END_LEVEL)[0]
+    end_idx = int(above_end[-1]) if above_end.size else n - 1
+    if end_idx <= body_start:
         end_idx = n - 1
-    tail = end_idx - peak_idx
+    tail = end_idx - body_start
 
-    if tail < 4:        # 打撃音などピーク即終了
+    if tail < 4:        # 打撃音などアタック即終了
         return dict(attack_sec=attack_sec, decay_sec=max(tail, 1) / rate_hz,
                     sustain_level=float(env[end_idx]),
                     release_sec=max(tail, 1) / rate_hz,
-                    loop_start_sec=peak_idx / rate_hz, loop_end_sec=end_idx / rate_hz)
+                    loop_start_sec=body_start / rate_hz, loop_end_sec=end_idx / rate_hz)
 
-    # ピーク後を 0.35〜0.70 の窓で見て「中盤レベル」をサステインとみなす
-    m0 = peak_idx + int(0.35 * tail)
-    m1 = peak_idx + int(0.70 * tail)
+    # 中盤 0.30〜0.70 の窓を「サステイン」とみなす
+    m0 = body_start + int(0.30 * tail)
+    m1 = body_start + int(0.70 * tail)
     sustain_level = float(np.clip(np.median(env[m0:m1 + 1]), 0.0, 1.0))
 
-    # ディケイ: ピークから sustain_level に下がるまで(無ければ 1/e まで)
+    # ディケイ: body_start から sustain_level(無ければ 1/e)まで下がるのにかかる時間
     target = max(sustain_level, math.e ** -1) if sustain_level < 0.05 else sustain_level
-    decay_end = peak_idx
-    for i in range(peak_idx, end_idx + 1):
+    decay_end = body_start
+    for i in range(body_start, end_idx + 1):
         if env[i] <= target:
             decay_end = i
             break
     else:
         decay_end = m0
-    decay_sec = max(decay_end - peak_idx, 1) / rate_hz
+    decay_sec = max(decay_end - body_start, 1) / rate_hz
 
     # リリース: 中盤の窓の終わり(m1)から end_idx までの尻尾
     release_sec = max(end_idx - m1, 1) / rate_hz
 
-    # ループ区間(持続音を伸ばすときに使う): 中盤の窓そのもの
+    # ループ区間(持続音を要求長まで伸ばすときに使う): 中盤の窓そのもの
     loop_start_sec = m0 / rate_hz
     loop_end_sec = m1 / rate_hz
     if loop_end_sec <= loop_start_sec:

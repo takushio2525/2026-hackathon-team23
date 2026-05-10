@@ -110,6 +110,10 @@
 
 ## `features` — 表示用特徴量（合成非依存）
 
+`source_duration_sec` / `trimmed_lead_sec` / `trimmed_trail_sec` は、解析の先頭で行う**無音トリム**の結果。
+解析器は元ファイルの先頭・末尾の無音（デジタル無音や、ピーク RMS から `-20dB`／`-50dB` 未満の暗騒音・準備音）を
+自動でカットしてから解析する。`fundamental_hz` 以降の値や `envelope.values[]` は **トリム後の音**に対するもの。
+
 ```jsonc
 "features": {
   "spectral_centroid_hz": 1820.4,
@@ -118,7 +122,10 @@
   "zero_crossing_rate": 0.043,
   "spectral_flatness": 0.0021,
   "rms_peak": 0.31,
-  "harmonic_count": 24
+  "harmonic_count": 24,
+  "source_duration_sec": 8.0,    // トリム前の元ファイルの長さ
+  "trimmed_lead_sec": 2.13,      // 先頭で削った無音の長さ
+  "trimmed_trail_sec": 0.0       // 末尾で削った無音の長さ
 }
 ```
 
