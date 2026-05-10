@@ -1,7 +1,8 @@
 # instrument_player — 音色定義 JSON を読んで演奏する Processing スケッチ
 
-`data/instrument.json`（無ければ `data/example_organ.json`）を読み込み、鍵盤や PC キーボードで
-音程と発音長を与えると、加算合成 + 非調和性 + 整形ノイズ + 時間ワープした振幅エンベロープで鳴らす。
+`data/` フォルダにある `*.json` をすべて読み込み、画面下の一覧（クリック or `[` / `]` キー）で
+音色を切り替えながら、鍵盤や PC キーボードで音程・発音長を与えると、加算合成 + 非調和性 +
+整形ノイズ + 時間ワープした振幅エンベロープで鳴らす。
 
 操作・合成方式の詳細は親ディレクトリの [`../README.md`](../README.md) を参照。
 
@@ -9,22 +10,24 @@
 
 | パス | 内容 |
 |---|---|
-| `instrument_player.pde` | スケッチ本体（`InstrModel` = JSON → 配列、`ResynthVoice extends UGen` = 1 音ぶんのボイス） |
-| `data/instrument.json` | 読み込む音色定義（`analyzer` でダウンロードしたものをこの名前で置く） |
+| `instrument_player.pde` | スケッチ本体（`InstrModel` = JSON → 配列、`ResynthVoice extends UGen` = 1 音ぶんのボイス、`data/*.json` 一覧 UI） |
+| `data/` | 音色定義 JSON 置き場。ここに入れた `*.json` を起動時に全部スキャンする |
 | `data/example_organ.json` | 起動確認用サンプル（手書き。解析結果ではない。消してよい） |
 | `sketch.properties` | Processing のモード設定（Java） |
 
 ## 実行
 
-1. Processing IDE で Minim ライブラリを入れる
-2. `instrument_player.pde` を開いて Run
-3. 何も置いていなくても `example_organ.json` で音が出る。`sound_lab/analyzer` で作った JSON を
-   `data/instrument.json` に置き直し（または実行中に `o` キーで選択）、`r` キーで再読込
+1. Processing IDE で Minim ライブラリを入れる（`スケッチ → ライブラリをインポート → ライブラリを追加`）
+2. `sound_lab/analyzer` で作った `*.instrument.json` を `data/` フォルダに放り込む（複数 OK・名前は任意）
+3. `instrument_player.pde` を開いて Run
+4. 画面下の一覧をクリック（または `[` / `]`）で音色を切替。何も置かなくても `example_organ.json` で音は出る。
+   解析し直して上書きしたら `r` で再スキャン＋再読込。`data/` 以外の場所にある JSON は `o` で選択
 
 ## トラブルシュート
 
 - 音が出ない → Minim が入っているか、`スケッチ → ライブラリをインポート` に Minim があるか確認
-- `data/ に … がありません` と出る → `o` キーで JSON を選ぶか、`data/instrument.json` を置く
+- 一覧に出ない → 拡張子が `.json` か確認 → `r` キーで再スキャン（ファイル追加直後に押す）
+- `data/ に .json がありません` と出る → `data/` に JSON を置いて `r`、または `o` キーで選ぶ
 - 音が割れる → 画面下の発音長スライダーを短くする / 同時押し数を減らす（ボイスごとに振幅は
   `1/Σ倍音振幅` で正規化しているが、多重和音では合算で歪むことがある）
 - 音が「のっぺり」する → `a` キーで実エンベロープ側になっているか確認（ADSR 4 値モードだと簡略化される）

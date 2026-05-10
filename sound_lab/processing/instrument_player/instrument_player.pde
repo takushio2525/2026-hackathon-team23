@@ -8,11 +8,17 @@
 
    必要ライブラリ: Minim (スケッチ → ライブラリをインポート → ライブラリを追加 → "Minim")
 
+   音色の差し替え:
+     data/ フォルダに置いた *.json をすべて自動で見つけ、起動後に画面の一覧をクリック
+     (または '[' / ']' キー)で切り替えられる。'r' で data/ を再スキャン＋現在の音色を再読込。
+     'o' で data/ 以外の場所にある JSON も選べる。
+     何も置いていない場合は同梱の example_organ.json で起動する。
+
    操作:
      - 画面の鍵盤をクリック / PC キーボード(zsxdcvg… と q2w3e… の 2 列)で演奏
      - 上下矢印: オクターブ移動 / 左右矢印: 発音長 ±0.1s / スライダーをドラッグでも変更
-     - 'o': 別のインストゥルメント JSON を選び直す  /  'r': 現在の JSON を再読込
-       (デフォルトは data/instrument.json。無ければ data/example_organ.json)
+     - '[' / ']': 音色を前 / 次へ切替   /   'o': data/ 外の JSON を選択   /   'r': data/ 再スキャン＋再読込
+     - 'a': 振幅包絡の方式切替(実エンベロープ ↔ ADSR 4 値)   /   Space: 全音停止
 
    フォーマット仕様: sound_lab/library_format.md
    ========================================================================== */
@@ -21,6 +27,7 @@ import ddf.minim.*;
 import ddf.minim.ugens.*;
 import ddf.minim.analysis.*;
 import java.util.Iterator;
+import java.io.File;
 
 Minim minim;
 AudioOutput out;
@@ -28,6 +35,11 @@ AudioOutput out;
 InstrModel model;                 // 読み込んだ音色定義
 String loadedName = "(未読込)";
 ArrayList<ResynthVoice> voices = new ArrayList<ResynthVoice>();
+
+// data/ 配下の *.json 一覧と、いま選んでいるインデックス
+ArrayList<File> instrumentFiles = new ArrayList<File>();
+int currentIdx = -1;
+int listScroll = 0;               // 一覧が長いときの表示開始行
 
 int   baseOctaveMidi = 48;        // 鍵盤左端の MIDI ノート(C3)
 int   keyboardOctaves = 3;        // 表示するオクターブ数
@@ -44,7 +56,7 @@ void initKeymap(){
   for (int i=0;i<hi.length();i++)  KEYMAP.put(hi.charAt(i),  12+i);
 }
 
-void settings(){ size(940, 560); }
+void settings(){ size(960, 620); }
 
 void setup(){
   surface.setTitle("instrument_player — sound_lab");
@@ -52,24 +64,70 @@ void setup(){
   initKeymap();
   minim = new Minim(this);
   out = minim.getLineOut(Minim.STEREO, 1024, 44100);
-  loadDefault();
+  rescanAndLoad(true);
 }
 
-void loadDefault(){
-  if (dataFile("instrument.json").exists())      loadInstrument(dataPath("instrument.json"));
-  else if (dataFile("example_organ.json").exists()) loadInstrument(dataPath("example_organ.json"));
-  else println("[警告] data/ に instrument.json も example_organ.json もありません。'o' で JSON を選んでください。");
+// data/ を再スキャンして、可能なら今と同じファイルを(無ければ既定を)読み直す
+void rescanAndLoad(boolean preferDefault){
+  String keep = (currentIdx>=0 && currentIdx<instrumentFiles.size()) ? instrumentFiles.get(currentIdx).getName() : null;
+  scanInstruments();
+  if (instrumentFiles.isEmpty()){
+    model = null; loadedName = "(data/ に .json がありません)";
+    println("[警告] data/ に *.json がありません。解析ツールで作った JSON をここに置くか、'o' で選んでください。");
+    currentIdx = -1; return;
+  }
+  int target = -1;
+  if (!preferDefault && keep != null) target = indexOfName(keep);
+  if (target < 0) target = indexOfName("instrument.json");
+  if (target < 0) target = indexOfName("example_organ.json");
+  if (target < 0) target = 0;
+  loadByIndex(target);
+}
+
+// data/ 直下の *.json をファイル名順に集める
+void scanInstruments(){
+  instrumentFiles.clear();
+  File dir = new File(dataPath(""));
+  File[] fs = dir.exists() ? dir.listFiles() : null;
+  if (fs != null){
+    for (File f : fs){
+      if (f.isFile() && f.getName().toLowerCase().endsWith(".json")) instrumentFiles.add(f);
+    }
+    java.util.Collections.sort(instrumentFiles, new java.util.Comparator<File>(){
+      public int compare(File a, File b){ return a.getName().compareToIgnoreCase(b.getName()); }
+    });
+  }
+}
+int indexOfName(String name){
+  for (int i=0;i<instrumentFiles.size();i++) if (instrumentFiles.get(i).getName().equalsIgnoreCase(name)) return i;
+  return -1;
+}
+
+// 一覧のインデックスで読み込む
+void loadByIndex(int idx){
+  if (idx<0 || idx>=instrumentFiles.size()) return;
+  currentIdx = idx;
+  ensureListVisible();
+  loadInstrument(instrumentFiles.get(idx).getAbsolutePath());
+}
+void cycleInstrument(int delta){
+  int n = instrumentFiles.size();
+  if (n<=1) return;
+  int base = currentIdx<0 ? 0 : currentIdx;
+  loadByIndex(((base + delta) % n + n) % n);
 }
 
 void loadInstrument(String path){
   try {
     JSONObject root = loadJSONObject(path);
     model = new InstrModel(root, out.sampleRate());
-    loadedName = root.getString("name", "instrument") + "  (" + model.noteName + " / " +
+    String fname = new File(path).getName();
+    loadedName = fname + "  —  " + root.getString("name", "instrument") + " (" + model.noteName + " / " +
                  nf(model.fundamentalHz,0,1) + " Hz / " + model.harmonicCount + " 倍音, " +
                  (model.sustaining ? "持続音" : "減衰音") + ")";
     println("loaded: " + path + " → " + loadedName);
   } catch (Exception e){
+    loadedName = "[読込失敗] " + new File(path).getName() + " : " + e;
     println("[エラー] JSON を読めませんでした: " + e);
   }
 }
@@ -97,6 +155,7 @@ void draw(){
   drawHeader();
   drawVisualization();
   drawSlider();
+  drawInstrumentList();
   drawKeyboard();
 }
 
@@ -121,8 +180,8 @@ void drawHeader(){
   textSize(12); fill(99,102,241);
   text(loadedName, 34, 62);
   textAlign(RIGHT);
-  text("発音長 " + nf(noteDurSec,0,2) + " s   |   包絡 " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ") +
-       "   |   'o'=JSON選択  'r'=再読込  'a'=包絡切替  矢印=音域/長さ", width-34, 52);
+  text("発音長 " + nf(noteDurSec,0,2) + "s | 包絡 " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ") +
+       " | [ ]=音色切替  o=外部選択  r=再スキャン  a=包絡  矢印=音域/長さ  Space=停止", width-34, 52);
   textAlign(LEFT);
 }
 
@@ -175,6 +234,63 @@ void drawSlider(){
   strokeWeight(1);
 }
 
+// ── インストゥルメント一覧 (data/*.json) ───────────────────
+float listX, listY, listW, listH;            // 直近の描画範囲(クリック判定で使う)
+void listGeom(){
+  listX = 20; listY = 92+120+8+30+8;          // スライダーパネルの下
+  listW = width-40; listH = (height-180) - listY - 8;   // 鍵盤の上まで
+}
+int visibleRows(){ listGeom(); return max(1, (int)((listH - 36) / 22f)); }
+void ensureListVisible(){
+  int vis = visibleRows();
+  if (currentIdx < listScroll) listScroll = currentIdx;
+  if (currentIdx >= listScroll + vis) listScroll = currentIdx - vis + 1;
+  listScroll = max(0, min(listScroll, max(0, instrumentFiles.size()-vis)));
+}
+void drawInstrumentList(){
+  listGeom();
+  glassPanel(listX, listY, listW, listH);
+  fill(30,27,75); textSize(11); textAlign(LEFT);
+  text("インストゥルメント (data/*.json) — クリック または [ / ] で切替", listX+14, listY+18);
+  if (instrumentFiles.isEmpty()){
+    fill(120,120,150);
+    text("data/ に .json がありません。解析ツールでダウンロードした JSON をこのフォルダに置いて 'r' を押してください。", listX+14, listY+40);
+    textAlign(LEFT); return;
+  }
+  int vis = visibleRows();
+  float rowY0 = listY+28, rowH=22;
+  for (int r=0; r<vis; r++){
+    int i = listScroll + r;
+    if (i >= instrumentFiles.size()) break;
+    float ry = rowY0 + r*rowH;
+    boolean cur = (i==currentIdx);
+    boolean hover = (mouseX>listX+10 && mouseX<listX+listW-10 && mouseY>=ry && mouseY<ry+rowH-2);
+    noStroke();
+    fill(cur ? color(129,140,248) : (hover ? color(255,255,255,215) : color(255,255,255,120)));
+    rect(listX+10, ry, listW-20, rowH-2, 7);
+    fill(cur ? 255 : color(40,37,90)); textSize(11); textAlign(LEFT);
+    text(nf(i+1,2) + ".  " + instrumentFiles.get(i).getName() + (cur ? "    ◀ 再生中" : ""), listX+22, ry+15);
+  }
+  fill(99,102,241); textSize(10); textAlign(RIGHT);
+  text((listScroll>0 ? "▲ " : "") + (currentIdx+1) + " / " + instrumentFiles.size() +
+       (listScroll+vis<instrumentFiles.size() ? " ▼" : ""), listX+listW-16, listY+18);
+  textAlign(LEFT); noStroke();
+}
+int instrumentRowAt(float mx, float my){
+  if (instrumentFiles.isEmpty()) return -1;
+  listGeom();
+  if (mx<listX+10 || mx>listX+listW-10) return -1;
+  int vis = visibleRows();
+  float rowY0 = listY+28, rowH=22;
+  for (int r=0; r<vis; r++){
+    int i = listScroll + r;
+    if (i >= instrumentFiles.size()) break;
+    float ry = rowY0 + r*rowH;
+    if (my>=ry && my<ry+rowH-2) return i;
+  }
+  return -1;
+}
+
 // 鍵盤
 float kbX, kbY, kbW, kbH, whiteW;
 int   whiteCount;
@@ -220,6 +336,9 @@ void mousePressed(){
   if (mouseY > sliderY-14 && mouseY < sliderY+14 && mouseX > sliderX-12 && mouseX < sliderX+sliderW+12){
     draggingSlider = true; updateSlider(); return;
   }
+  // インストゥルメント一覧
+  int li = instrumentRowAt(mouseX, mouseY);
+  if (li >= 0){ loadByIndex(li); return; }
   // 鍵盤(黒鍵を先に判定)
   int m = keyAt(mouseX, mouseY);
   if (m >= 0) playNote(m);
@@ -256,14 +375,25 @@ void keyPressed(){
     return;
   }
   char c = Character.toLowerCase(key);
-  if (c=='o'){ selectInput("インストゥルメント JSON を選択", "onJsonSelected"); return; }
-  if (c=='r'){ loadDefault(); return; }
+  if (c=='['){ cycleInstrument(-1); return; }
+  if (c==']'){ cycleInstrument(1);  return; }
+  if (c=='o'){ selectInput("data/ 以外の JSON を選択", "onJsonSelected"); return; }
+  if (c=='r'){ rescanAndLoad(false); return; }     // data/ を再スキャンし、いまのファイルを読み直す
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; return; }
   if (c==' '){ stopAll(); return; }
   Integer off = KEYMAP.get(c);
   if (off != null) playNote(baseOctaveMidi + off);
 }
-void onJsonSelected(File f){ if (f != null) loadInstrument(f.getAbsolutePath()); }
+void onJsonSelected(File f){
+  if (f == null) return;
+  loadInstrument(f.getAbsolutePath());
+  scanInstruments();                                // data/ 内のファイルを選んだ場合は一覧に反映
+  int i = -1;
+  for (int k=0;k<instrumentFiles.size();k++)
+    if (instrumentFiles.get(k).getAbsolutePath().equals(f.getAbsolutePath())){ i=k; break; }
+  currentIdx = i;                                   // 外部ファイルなら -1(どの行も再生中表示にしない)
+  if (i>=0) ensureListVisible();
+}
 
 // ── 音名 ────────────────────────────────────────────────────
 final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
