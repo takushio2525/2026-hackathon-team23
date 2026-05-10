@@ -126,6 +126,18 @@
     <div class="src" id="srcline"></div>
   </header>
 
+  <!-- file:// で開かれた / サーバに繋がらないときの案内 -->
+  <div class="card" id="needserver" style="display:none;border-color:rgba(244,114,182,.5);background:rgba(255,255,255,.7)">
+    <h2><span class="dot"></span>解析サーバが必要です</h2>
+    <p style="font-size:.9rem;line-height:1.7">
+      このページは <b>解析用 Python サーバ経由</b>で開く必要があります。HTML ファイルを直接ダブルクリックしても動きません。<br>
+      <b>① かんたん</b>: <span class="fldval">sound_lab/analyzer/start.command</span> をダブルクリック（初回は依存インストールで数分）。自動でブラウザが開きます。<br>
+      <b>② ターミナル</b>:
+      <code style="font-family:var(--mono);font-size:.82rem">cd sound_lab/analyzer &amp;&amp; python3 -m venv .venv &amp;&amp; source .venv/bin/activate &amp;&amp; pip install -r requirements.txt &amp;&amp; python app.py</code><br>
+      起動できたら <a href="http://127.0.0.1:5005">http://127.0.0.1:5005</a> を開いてください（今このページが <span class="fldval" id="curproto"></span> ならそれが原因です）。
+    </p>
+  </div>
+
   <!-- アップロード -->
   <div class="card">
     <div id="drop" tabindex="0" role="button" aria-label="音源ファイルを選択">
@@ -197,6 +209,13 @@ const drop = $("#drop"), fileInput = $("#file"), analyzeBtn = $("#analyzeBtn"),
       dlBtn = $("#dlBtn"), statusEl = $("#status"), results = $("#results");
 let pickedFile = null, instrument = null, preview = null;
 
+/* file:// で直接開かれている場合は最初から案内を出す（fetch は必ず失敗するため） */
+function showNeedServer(){
+  $("#curproto").textContent = location.protocol + (location.host ? "//" + location.host : "");
+  $("#needserver").style.display = "";
+}
+if (location.protocol === "file:") showNeedServer();
+
 /* ── ファイル選択 / ドラッグ&ドロップ ── */
 drop.addEventListener("click", () => fileInput.click());
 drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
@@ -228,7 +247,11 @@ async function analyze(){
     dlBtn.disabled = false;
     setStatus("解析完了 ✓  JSON をダウンロードできます");
     render();
-  }catch(err){ setStatus("通信エラー: " + err, true); }
+  }catch(err){
+    // TypeError: Failed to fetch ＝ サーバに繋がっていない / file:// で開いている
+    showNeedServer();
+    setStatus("解析サーバに接続できません。上の案内のとおり start.command か python app.py を起動してください。", true);
+  }
   setBusy(false);
 }
 

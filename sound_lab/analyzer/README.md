@@ -10,16 +10,30 @@
 
 ## セットアップ & 起動
 
+### いちばん簡単（macOS）
+
+`sound_lab/analyzer/start.command` を **Finder でダブルクリック**。初回だけ仮想環境の作成と依存
+インストール（librosa を含むため数分）が走り、起動後はブラウザが自動で `http://127.0.0.1:5005`
+を開く。止めるときはそのターミナルウィンドウで `Ctrl+C`。
+
+> 「開発元を確認できません」と出たら、ファイルを右クリック →「開く」→「開く」で一度許可すればよい。
+
+### 手動（macOS / Linux / Windows 共通）
+
 ```bash
 cd sound_lab/analyzer
 python3 -m venv .venv
 source .venv/bin/activate           # Windows: .venv\Scripts\activate
 pip install -r requirements.txt     # librosa を含むため初回は数分かかる
-python app.py
-# → http://127.0.0.1:5005 をブラウザで開く
+python app.py                       # 起動するとブラウザが自動で開く
+# 開かなければ http://127.0.0.1:5005 を手で開く
 ```
 
-`mp3` を読むには ffmpeg 等が必要になることがある（`wav` / `flac` なら追加不要）。
+`mp3` / `m4a` を読むには ffmpeg が必要（`brew install ffmpeg`）。`wav` / `flac` なら追加不要。
+
+> **「通信エラー: Failed to fetch」と出るとき** … サーバ（`python app.py` または `start.command`）が
+> 起動していない、もしくは HTML ファイルを直接ダブルクリックして `file://` で開いている。必ず
+> `http://127.0.0.1:5005` から開くこと。HTML 側にも同じ案内が出る。
 
 ## 使い方
 
@@ -57,7 +71,8 @@ python app.py
 
 | パス | 内容 |
 |---|---|
-| `app.py` | Flask サーバ（`/`, `/analyze`, `/samples/<f>`） |
+| `start.command` | macOS 用ワンクリック起動（venv 自動作成 → サーバ起動 → ブラウザを開く） |
+| `app.py` | Flask サーバ（`/`, `/analyze`, `/samples/<f>`。起動時にブラウザを自動で開く） |
 | `analyzer.py` | 解析ロジック本体（サーバ非依存） |
 | `static/index.html` | フロント（単一 HTML、外部依存なし） |
 | `samples/` | 動作確認用の音源置き場（中身は任意。`/samples/<ファイル名>` で配信） |
