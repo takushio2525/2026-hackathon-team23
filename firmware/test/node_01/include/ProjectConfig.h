@@ -50,12 +50,15 @@ inline const StatusLedConfig STATUS_LED_CONFIG = {
 // applyPattern() のロジック係数
 namespace logic_params {
     constexpr float    LPF_ALPHA               = 0.10f;
-    // 拍検出閾値: 動加速度 (= LPF 後 - キャリブ重力) のノルムがこれを超えたら拍。
-    // 重力 1g は引かれているので、純粋な振り下ろし加速度の大きさで判定する。
-    // 経緯: 仕様書の 1.8g は重力込み前提で、そのままだと届かなかった。0.8g に
-    // 下げたら小さい揺れで誤検出する (= 勝手に進む) ため、中間の 1.2g に調整。
-    // 重力込み 1.8g は姿勢により動加速度 0.9〜1.5g 相当、その中央付近を狙う。
-    // 拍検出の本体閾値 (Armed 突入トリガ)。振り下ろし加速のピーク値を狙う。
+    // 拍検出閾値 (Armed 突入トリガ): 動加速度ノルム dynNorm (= LPF 後の加速度
+    // ノルム − キャリブ済み静止ノルム ≒1g) がこれを超えたら拍候補とみなす。
+    // 姿勢非依存のスカラー量で、重力相当は引かれているので純粋な振りの加速度
+    // 強度で判定する。振り下ろし加速のピーク値を狙う。
+    // 経緯: 仕様書の 1.8g は重力込み前提で届かず、0.8g では小さい揺れで誤検出
+    // (= 勝手に進む) したため中間の 1.2g に調整。
+    // 注意: ノルム差なので重力に直交する向きの振りは過小評価される
+    // (|g + a| − |g| = sqrt(1 + a²) − 1 < a)。実機で取りこぼし/誤検出が出たら
+    // 1.0〜1.4 の範囲で再調整する。
     constexpr float    BEAT_DYN_THRESHOLD_G    = 1.20f;
     // 不応期: 1 振りの中で「振り下ろし -> 振り戻し」の両方を 2 拍として
     // 拾わないために必要。350 ms = 約 170 BPM 上限。普通の指揮なら十分。
@@ -69,6 +72,12 @@ namespace logic_params {
     constexpr float    BEAT_RELEASE_RATIO      = 0.40f;
     // Armed 突入直後の単発ノイズで誤リリースしないための最低保持時間。
     constexpr uint32_t BEAT_ARMED_MIN_HOLD_MS  = 50;
+    // リリース判定デバウンス: (releaseAbs || releaseRatio) が連続して
+    // この時間以上成立したら真のリリースと見なす。振り途中の一瞬の dynNorm
+    // dip で Armed を抜けて再 Armed→再発火するのを防ぐ。
+    // 5ms 周期 IMU で 8 サンプル分。短すぎると効かず、長すぎるとリリースが
+    // 遅れて連続スイングのテンポが乱れる。
+    constexpr uint32_t BEAT_RELEASE_HOLD_MS    = 40;
     // Armed が長引いたら強制終了。普通の振り下ろしは 200〜500 ms 程度。
     // タイムアウトでも path/refractory を満たせば拍として採用する (取りこぼし防止)。
     constexpr uint32_t BEAT_ARMED_TIMEOUT_MS   = 800;
