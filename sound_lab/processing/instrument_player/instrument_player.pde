@@ -1,10 +1,12 @@
 /* ==========================================================================
    instrument_player — sound_lab で解析した音色定義(JSON)を読み込み、
-   音程と長さを外から与えると「限りなく元に近い音」を鳴らす Processing スケッチ。
+   音程を与えると「限りなく元に近い音」を鳴らす Processing スケッチ。
+
+   発音モデル: キー(または鍵盤クリック)を押している間ずっと鳴り続け、離すとリリース。
+               持続音は押している間サステイン区間をループ、減衰音は自然に鳴り切る。
 
    合成方式: 倍音ごとに振幅・周波数比・時間エンベロープを持つ加算合成
              + 非調和性(f_n = n·f0·√(1+B·n²)) + スペクトル整形ノイズ + 全体振幅エンベロープ。
-             全体エンベロープは要求発音長に合わせて「ループ区間を伸縮」して時間ワープする。
 
    必要ライブラリ: Minim (スケッチ → ライブラリをインポート → ライブラリを追加 → "Minim")
 
@@ -15,8 +17,9 @@
      何も置いていない場合は同梱の example_organ.json で起動する。
 
    操作:
-     - 画面の鍵盤をクリック / PC キーボード(zsxdcvg… と q2w3e… の 2 列)で演奏
-     - 上下矢印: オクターブ移動 / 左右矢印: 発音長 ±0.1s / スライダーをドラッグでも変更
+     - 鍵盤をクリック / PC キーボード(zsxdcvg… と q2w3e… の 2 列)を「押している間」鳴る。離すとリリース
+     - 上下矢印: オクターブ移動(押している鍵はいったん離される)
+     - 'p' または画面のボタン: きらきら星(ドドソソララソ)を再生
      - '[' / ']': 音色を前 / 次へ切替   /   'o': data/ 外の JSON を選択   /   'r': data/ 再スキャン＋再読込
      - 'a': 振幅包絡の方式切替(実エンベロープ ↔ ADSR 4 値)   /   Space: 全音停止
 
@@ -34,7 +37,11 @@ AudioOutput out;
 
 InstrModel model;                 // 読み込んだ音色定義
 String loadedName = "(未読込)";
-ArrayList<ResynthVoice> voices = new ArrayList<ResynthVoice>();
+
+ArrayList<ResynthVoice> voices = new ArrayList<ResynthVoice>();          // 鳴っている全ボイス
+HashMap<Integer,ResynthVoice> heldByNote = new HashMap<Integer,ResynthVoice>();  // 押されている音(MIDI→voice)
+int mousePressedNote = -1;        // マウスで押している鍵盤(離したとき用)
+boolean useSimpleADSR = false;    // true なら値配列でなく A/D/S/R 4 値だけで包絡を作る
 
 // data/ 配下の *.json 一覧と、いま選んでいるインデックス
 ArrayList<File> instrumentFiles = new ArrayList<File>();
@@ -43,9 +50,17 @@ int listScroll = 0;               // 一覧が長いときの表示開始行
 
 int   baseOctaveMidi = 48;        // 鍵盤左端の MIDI ノート(C3)
 int   keyboardOctaves = 3;        // 表示するオクターブ数
-float noteDurSec = 1.0;           // 発音長(スライダーで変更)
-boolean useSimpleADSR = false;    // true なら値配列でなく A/D/S/R 4 値だけで包絡を作る
-boolean draggingSlider = false;
+
+// ── きらきら星シーケンサ ──────────────────────────────────
+final int[] SONG_NOTES = {60, 60, 67, 67, 69, 69, 67};   // ド ド ソ ソ ラ ラ ソ (C4 C4 G4 G4 A4 A4 G4)
+final int[] SONG_BEATS = {1, 1, 1, 1, 1, 1, 2};          // 最後のソは 2 拍
+int     songBeatMs = 480;          // 1 拍の長さ(ms)
+boolean songPlaying = false;
+int     songIdx = 0;
+int     songNoteOnMs = 0;          // 次のノートを鳴らす時刻(millis)
+int     songNoteOffMs = Integer.MAX_VALUE;   // 今のノートを離す時刻
+ResynthVoice songVoice = null;
+int     songCurrentNote = -1;      // 鍵盤ハイライト用
 
 // PC キーボード → MIDI ノート(0 = baseOctaveMidi 起点のオフセット)
 final HashMap<Character,Integer> KEYMAP = new HashMap<Character,Integer>();
@@ -132,29 +147,78 @@ void loadInstrument(String path){
   }
 }
 
-// ── 演奏 ────────────────────────────────────────────────────
-void playNote(int midiNote){
+// ── 演奏 (押す / 離す) ──────────────────────────────────────
+void pressNote(int midi){
   if (model == null) return;
-  ResynthVoice v = new ResynthVoice(model, midiNote, 1.0, noteDurSec, useSimpleADSR);
+  if (heldByNote.containsKey(midi)) return;            // 既に押している(キーリピート対策)
+  ResynthVoice v = new ResynthVoice(model, midi, 0.95f, useSimpleADSR);
   v.patch(out);
   voices.add(v);
+  heldByNote.put(midi, v);
+}
+void releaseNote(int midi){
+  ResynthVoice v = heldByNote.remove(midi);
+  if (v != null) v.noteOff();
+}
+void releaseAllHeld(){
+  for (Integer n : new ArrayList<Integer>(heldByNote.keySet())) releaseNote(n);
+  mousePressedNote = -1;
 }
 void stopAll(){
   for (ResynthVoice v : voices) v.unpatch(out);
-  voices.clear();
+  voices.clear(); heldByNote.clear();
+  mousePressedNote = -1;
+  songPlaying = false; songVoice = null; songCurrentNote = -1; songNoteOffMs = Integer.MAX_VALUE;
+}
+void shiftOctave(int dirSemis){
+  releaseAllHeld();                                    // 押しっぱなしの鍵が迷子にならないよう離す
+  baseOctaveMidi = constrain(baseOctaveMidi + dirSemis, 12, 96);
+}
+
+// ── きらきら星 ──────────────────────────────────────────────
+void startSong(){
+  stopAll();
+  if (model == null) return;
+  songPlaying = true; songIdx = 0;
+  songNoteOnMs = millis();          // すぐ最初のノート
+  songNoteOffMs = Integer.MAX_VALUE;
+}
+void updateSong(){
+  if (!songPlaying) return;
+  int now = millis();
+  if (songVoice != null && now >= songNoteOffMs){     // 今のノートを離す
+    songVoice.noteOff(); songVoice = null; songCurrentNote = -1; songNoteOffMs = Integer.MAX_VALUE;
+  }
+  if (now >= songNoteOnMs){                            // 次のノートを鳴らす
+    if (songIdx >= SONG_NOTES.length){ songPlaying = false; return; }
+    int durMs = SONG_BEATS[songIdx] * songBeatMs;
+    if (model != null){
+      ResynthVoice v = new ResynthVoice(model, SONG_NOTES[songIdx], 0.95f, useSimpleADSR);
+      v.patch(out); voices.add(v);
+      songVoice = v; songCurrentNote = SONG_NOTES[songIdx];
+    }
+    songNoteOffMs = now + (int)(durMs * 0.82f);       // 拍の 82% 鳴らして残りは隙間
+    songNoteOnMs  = now + durMs;
+    songIdx++;
+  }
 }
 
 // ── 描画ループ ──────────────────────────────────────────────
 void draw(){
+  updateSong();
   // 終了したボイスを掃除
   for (Iterator<ResynthVoice> it = voices.iterator(); it.hasNext();){
     ResynthVoice v = it.next();
-    if (v.done){ v.unpatch(out); it.remove(); }
+    if (v.done){
+      v.unpatch(out); it.remove();
+      if (heldByNote.get(v.midiNote) == v) heldByNote.remove(v.midiNote);
+      if (songVoice == v){ songVoice = null; songCurrentNote = -1; }
+    }
   }
   drawBackground();
   drawHeader();
   drawVisualization();
-  drawSlider();
+  drawControls();
   drawInstrumentList();
   drawKeyboard();
 }
@@ -172,6 +236,9 @@ void glassPanel(float x, float y, float w, float h){
   noStroke(); fill(255,255,255,150); rect(x,y,w,h,18);
   stroke(255,255,255,200); noFill(); rect(x,y,w,h,18); noStroke();
 }
+boolean mouseOver(float x, float y, float w, float h){
+  return mouseX>=x && mouseX<=x+w && mouseY>=y && mouseY<=y+h;
+}
 
 void drawHeader(){
   glassPanel(20, 16, width-40, 64);
@@ -180,8 +247,9 @@ void drawHeader(){
   textSize(12); fill(99,102,241);
   text(loadedName, 34, 62);
   textAlign(RIGHT);
-  text("発音長 " + nf(noteDurSec,0,2) + "s | 包絡 " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ") +
-       " | [ ]=音色切替  o=外部選択  r=再スキャン  a=包絡  矢印=音域/長さ  Space=停止", width-34, 52);
+  text("包絡 " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ") +
+       "  |  鍵盤=押している間 鳴る / 離すとリリース   [ ]=音色  o=外部  r=再スキャン  a=包絡  ↑↓=オクターブ  p=きらきら星  Space=停止",
+       width-34, 52);
   textAlign(LEFT);
 }
 
@@ -193,10 +261,8 @@ void drawVisualization(){
   float pad=14;
   // 左半分: エンベロープ
   float ex=x+pad, ey=y+pad, ew=w*0.5f-pad*1.5f, eh=h-pad*2-12;
-  fill(99,102,241); textSize(10); text("振幅エンベロープ", ex, ey-2);
-  noFill(); stroke(129,140,248);
+  fill(99,102,241); textSize(10); text("振幅エンベロープ（緑＝押している間のループ区間 / 赤＝リリース尾）", ex, ey-2);
   float[] env = model.envValues; int n=env.length;
-  // ループ区間ハイライト
   float origDur=(n-1)/model.envRate;
   float lx0=ex+ew*constrain(model.loopStartSec/origDur,0,1), lx1=ex+ew*constrain(model.loopEndSec/origDur,0,1);
   noStroke(); fill(34,197,94,40); rect(lx0,ey+6,lx1-lx0,eh);
@@ -220,24 +286,41 @@ void drawVisualization(){
   noStroke();
 }
 
-// 発音長スライダー
-float sliderX, sliderW, sliderY;
-void drawSlider(){
-  sliderX=20+14; sliderW=width-40-28; sliderY=92+120+22;
-  glassPanel(20, 92+120+8, width-40, 30);
-  stroke(99,102,241,120); strokeWeight(3); line(sliderX, sliderY, sliderX+sliderW, sliderY);
-  float t=(noteDurSec-0.1f)/(4.0f-0.1f);
-  float hx=sliderX + sliderW*t;
-  noStroke(); fill(129,140,248); ellipse(hx, sliderY, 16,16);
-  fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("発音長 (drag) : " + nf(noteDurSec,0,2) + " s", sliderX, sliderY-8);
-  strokeWeight(1);
+// ── コントロールバー(きらきら星 / 停止) ───────────────────
+float ctlY, ctlH, btnSongX, btnSongW, btnStopX, btnStopW;
+void drawControls(){
+  float x=20, y=92+120+8, w=width-40, h=30;
+  ctlY=y; ctlH=h;
+  glassPanel(x,y,w,h);
+  float by=y+5, bh=h-10;
+  // きらきら星ボタン
+  btnSongX=x+12; btnSongW=232;
+  fill(songPlaying ? color(192,132,252) : (mouseOver(btnSongX,by,btnSongW,bh)?color(150,160,250):color(129,140,248)));
+  noStroke(); rect(btnSongX,by,btnSongW,bh,8);
+  fill(255); textAlign(CENTER); textSize(11);
+  text(songPlaying ? "♪ 再生中…  (クリックで頭から)" : "▶  きらきら星 ♪ ドドソソララソ", btnSongX+btnSongW/2, by+bh*0.5f+4);
+  // 全部止めるボタン
+  btnStopX=btnSongX+btnSongW+10; btnStopW=110;
+  fill(mouseOver(btnStopX,by,btnStopW,bh)?color(255,255,255,235):color(255,255,255,150));
+  rect(btnStopX,by,btnStopW,bh,8);
+  fill(40,37,90); text("■  全部止める", btnStopX+btnStopW/2, by+bh*0.5f+4);
+  // ヒント
+  fill(99,102,241); textAlign(LEFT); textSize(10);
+  text("鍵盤は「押している間」鳴り、離すとリリース。'p' でも きらきら星。", btnStopX+btnStopW+18, by+bh*0.5f+4);
+  textAlign(LEFT);
+}
+int controlButtonAt(float mx, float my){
+  float by=ctlY+5, bh=ctlH-10;
+  if (my<by || my>by+bh) return 0;
+  if (mx>=btnSongX && mx<=btnSongX+btnSongW) return 1;
+  if (mx>=btnStopX && mx<=btnStopX+btnStopW) return 2;
+  return 0;
 }
 
 // ── インストゥルメント一覧 (data/*.json) ───────────────────
 float listX, listY, listW, listH;            // 直近の描画範囲(クリック判定で使う)
 void listGeom(){
-  listX = 20; listY = 92+120+8+30+8;          // スライダーパネルの下
+  listX = 20; listY = 92+120+8+30+8;          // コントロールバーの下
   listW = width-40; listH = (height-180) - listY - 8;   // 鍵盤の上まで
 }
 int visibleRows(){ listGeom(); return max(1, (int)((listH - 36) / 22f)); }
@@ -325,42 +408,31 @@ int whiteMidi(int whiteIndex){
   int oct = whiteIndex/7, idx=whiteIndex%7;
   return baseOctaveMidi + oct*12 + WHITE_PC[idx];
 }
-boolean isNoteOn(int midi){
-  for (ResynthVoice v : voices){ if (v.midiNote==midi && !v.done && v.tSec < 0.18f) return true; }
-  return false;
-}
+boolean isNoteOn(int midi){ return heldByNote.containsKey(midi) || midi == songCurrentNote; }
 
 // ── マウス操作 ──────────────────────────────────────────────
 void mousePressed(){
-  // スライダー
-  if (mouseY > sliderY-14 && mouseY < sliderY+14 && mouseX > sliderX-12 && mouseX < sliderX+sliderW+12){
-    draggingSlider = true; updateSlider(); return;
-  }
-  // インストゥルメント一覧
-  int li = instrumentRowAt(mouseX, mouseY);
+  int cb = controlButtonAt(mouseX, mouseY);   // コントロールバー
+  if (cb == 1){ startSong(); return; }
+  if (cb == 2){ stopAll();  return; }
+  int li = instrumentRowAt(mouseX, mouseY);   // 音色一覧
   if (li >= 0){ loadByIndex(li); return; }
-  // 鍵盤(黒鍵を先に判定)
-  int m = keyAt(mouseX, mouseY);
-  if (m >= 0) playNote(m);
+  int m = keyAt(mouseX, mouseY);              // 鍵盤(押し始め)
+  if (m >= 0){ pressNote(m); mousePressedNote = m; }
 }
-void mouseDragged(){ if (draggingSlider) updateSlider(); }
-void mouseReleased(){ draggingSlider = false; }
-void updateSlider(){
-  float t = constrain((mouseX - sliderX)/sliderW, 0, 1);
-  noteDurSec = 0.1f + t*(4.0f-0.1f);
+void mouseReleased(){
+  if (mousePressedNote >= 0){ releaseNote(mousePressedNote); mousePressedNote = -1; }
 }
 int keyAt(float mx, float my){
   if (my < kbY || my > kbY+kbH) return -1;
-  // 黒鍵
-  for (int i=0;i<whiteCount-1;i++){
+  for (int i=0;i<whiteCount-1;i++){           // 黒鍵を先に判定
     int pc = WHITE_PC[i%7];
     boolean hasSharp = (pc==0||pc==2||pc==5||pc==7||pc==9);
     if (!hasSharp) continue;
     float bx = kbX+(i+1)*whiteW - whiteW*0.30f, bw=whiteW*0.6f, bh=kbH*0.62f;
     if (mx>=bx && mx<=bx+bw && my<=kbY+bh) return whiteMidi(i)+1;
   }
-  // 白鍵
-  int i = (int)((mx-kbX)/whiteW);
+  int i = (int)((mx-kbX)/whiteW);             // 白鍵
   if (i<0 || i>=whiteCount) return -1;
   return whiteMidi(i);
 }
@@ -368,10 +440,8 @@ int keyAt(float mx, float my){
 // ── キーボード操作 ──────────────────────────────────────────
 void keyPressed(){
   if (key==CODED){
-    if (keyCode==UP)   baseOctaveMidi = min(96, baseOctaveMidi+12);
-    if (keyCode==DOWN) baseOctaveMidi = max(12, baseOctaveMidi-12);
-    if (keyCode==LEFT)  noteDurSec = max(0.1f, noteDurSec-0.1f);
-    if (keyCode==RIGHT) noteDurSec = min(4.0f, noteDurSec+0.1f);
+    if (keyCode==UP)   shiftOctave(+12);
+    if (keyCode==DOWN) shiftOctave(-12);
     return;
   }
   char c = Character.toLowerCase(key);
@@ -380,9 +450,15 @@ void keyPressed(){
   if (c=='o'){ selectInput("data/ 以外の JSON を選択", "onJsonSelected"); return; }
   if (c=='r'){ rescanAndLoad(false); return; }     // data/ を再スキャンし、いまのファイルを読み直す
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; return; }
+  if (c=='p'){ startSong(); return; }              // きらきら星
   if (c==' '){ stopAll(); return; }
   Integer off = KEYMAP.get(c);
-  if (off != null) playNote(baseOctaveMidi + off);
+  if (off != null) pressNote(baseOctaveMidi + off);
+}
+void keyReleased(){
+  if (key==CODED) return;
+  Integer off = KEYMAP.get(Character.toLowerCase(key));
+  if (off != null) releaseNote(baseOctaveMidi + off);
 }
 void onJsonSelected(File f){
   if (f == null) return;
@@ -447,6 +523,7 @@ class InstrModel {
     loopStartSec = e.getFloat("loop_start_sec", (envValues.length-1)/envRate*0.4f);
     loopEndSec   = e.getFloat("loop_end_sec",   (envValues.length-1)/envRate*0.7f);
     if (envValues.length < 2){ envValues = new float[]{0,1,1,0}; envRate=10; }
+    if (loopEndSec <= loopStartSec) loopEndSec = loopStartSec + max(0.05f, 1.0f/envRate);
 
     JSONArray ha = root.getJSONArray("harmonics");
     N = ha.size();
@@ -515,95 +592,91 @@ float[] toFloatArray(JSONArray a){
 
 /* ==========================================================================
    ResynthVoice — 1 音ぶんの加算合成ボイス。Minim の UGen として out に patch する。
+   ゲートモデル: 生成時は「押されている」状態で鳴り続け、noteOff() でリリースに入る。
    ========================================================================== */
 class ResynthVoice extends UGen {
   InstrModel m;
   int   midiNote;
   float targetF0;
   float gain;            // velocity 由来
-  float durSec;          // 要求された発音長(リリース除く本体)
   boolean simpleADSR;
 
   float[] phase;         // 倍音ごとの位相
   double  noisePos;
   float   tSec = 0;      // 経過秒
-  float   totalSec;      // これを超えたら done
   boolean done = false;
 
-  // 時間ワープ用に展開した値
-  float origDur, headT, bodyLen, loopLen, tailStart, tailLen;
+  // ゲート状態(audio スレッドが読むので volatile で公開)
+  volatile boolean releasing = false;
+  float releaseStartT = 0;       // リリース開始の経過秒
+  float releaseStartLevel = 0;   // リリース開始時の振幅(0..1) — ジャンプ防止
+  float releaseHoldWarpT = 0;    // リリース中に倍音/ノイズ包絡を固定する原音時間
 
-  ResynthVoice(InstrModel model, int midiNote, float velocity, float durationSec, boolean simple){
-    this.m = model; this.midiNote = midiNote;
-    this.targetF0 = 440f * pow(2, (midiNote-69)/12.0f);
+  // ワープ用に展開した値
+  float origDur, headT, loopLen;
+
+  ResynthVoice(InstrModel model, int midi, float velocity, boolean simple){
+    this.m = model; this.midiNote = midi;
+    this.targetF0 = 440f * pow(2, (midi-69)/12.0f);
     this.gain = constrain(velocity, 0, 1);
-    this.durSec = max(0.05f, durationSec);
     this.simpleADSR = simple;
     phase = new float[m.N];
     for (int i=0;i<m.N;i++) phase[i] = m.harmPhase[i];
+    origDur = m.origDurSec();
+    headT   = m.loopStartSec;
+    loopLen = max(m.loopEndSec - m.loopStartSec, 1e-3f);
+  }
 
-    origDur   = m.origDurSec();
-    loopLen   = max(m.loopEndSec - m.loopStartSec, 1e-3f);
-    tailStart = max(origDur - m.releaseSec, m.loopEndSec);
-    tailLen   = max(origDur - tailStart, 0);
-    headT     = m.loopStartSec;
-    if (m.sustaining && durSec > origDur){
-      bodyLen  = max(durSec - headT - tailLen, 0);
-      totalSec = headT + bodyLen + tailLen + 0.01f;
-    } else if (!m.sustaining && durSec >= origDur){
-      totalSec = origDur + 0.01f;          // 鳴らし切り
-    } else {
-      totalSec = durSec + 0.01f;           // 原音より短く切る(末尾は releaseFade で減衰)
+  float relSec(){ return max(m.releaseSec, 0.02f); }
+
+  // キーを離した(または曲のノートオフ)
+  void noteOff(){
+    if (releasing) return;
+    releaseStartLevel = sustainBodyLevel(tSec);   // 直前の本体振幅
+    releaseHoldWarpT  = warpBody(tSec);
+    releaseStartT     = tSec;
+    releasing = true;                             // ← 最後に立てる(他フィールドの可視性を確保)
+  }
+
+  // 押している間の本体振幅(0..1) — リリース処理は含まない
+  float sustainBodyLevel(float t){
+    if (simpleADSR){
+      float a=m.attackSec, d=m.decaySec, s=m.sustainLevel;
+      if (t < a) return t/max(a,1e-4f);
+      if (!m.sustaining){                         // 減衰音: A→D で ≒0 へ落として保持
+        if (t < a+d){ float u=(t-a)/max(d,1e-4f); return lerp(1, 0.02f, u); }
+        return 0.02f;
+      }
+      if (t < a+d){ float u=(t-a)/max(d,1e-4f); return lerp(1, s, u); }
+      return s;                                   // 押している間サステインを保持
     }
-    if (simpleADSR) totalSec = max(totalSec, m.attackSec + m.decaySec + m.releaseSec + 0.01f);
+    return sampleCurve(m.envValues, m.envRate, warpBody(t));
   }
-  // この音は「自然な終端より前で切られる」か(= 末尾にリリースフェードを足す必要があるか)
-  boolean isCutShort(){
-    return (m.sustaining && durSec <= origDur) || (!m.sustaining && durSec < origDur);
+  // 押している間の原音時間(持続音はループ、減衰音は鳴らし切り)
+  float warpBody(float t){
+    if (!m.sustaining) return min(t, origDur);
+    if (t < headT) return t;
+    float u = (t - headT) % loopLen;
+    return m.loopStartSec + u;
   }
-
-  // ── 全体振幅エンベロープ(0..1) ── 要求発音長に時間ワープ
-  float ampEnvAt(float t){
-    if (simpleADSR) return adsrAt(t);
-    float st = warpedTime(t);
-    return sampleCurve(m.envValues, m.envRate, st) * releaseFade(t);
+  // 実際の振幅(0..1) — リリース込み
+  float ampAt(float t){
+    if (!releasing) return sustainBodyLevel(t);
+    float u = (t - releaseStartT) / relSec();
+    if (u >= 1) return 0;
+    float k = 1 - u;
+    return releaseStartLevel * k * k;             // (1-u)^2 ≒ やわらかい減衰
   }
   // 倍音 k の時間エンベロープ(0..1)
   float harmEnvAt(int k, float t){
     float[] he = m.harmEnv[k];
     float rate = (he.length-1)/max(origDur, 1e-3f);
-    float st = warpedTime(t);
-    return sampleCurve(he, rate, st);
+    float warpT = releasing ? releaseHoldWarpT : warpBody(t);
+    return sampleCurve(he, rate, warpT);
   }
   float noiseEnvAt(float t){
-    // ノイズ包絡も同じ時間ワープ(レートは JSON のまま)
-    float st = warpedTime(t);
-    return sampleCurve(m.noiseEnv, m.noiseEnvRate, st) * releaseFade(t);
-  }
-  // 経過秒 t → 原音時間 st(ループ伸縮込み)
-  float warpedTime(float t){
-    if (m.sustaining && durSec > origDur){
-      if (t < headT) return t;
-      if (t < headT + bodyLen){ float u = (t - headT) % loopLen; return m.loopStartSec + u; }
-      return min(tailStart + (t - headT - bodyLen), origDur);
-    }
-    return min(t, origDur);   // 鳴らし切り / 短く切る場合は原音をそのまま辿る
-  }
-  // 自然終端より前で切る音は、末尾 releaseSec で 0 へ落としてクリックを防ぐ
-  float releaseFade(float t){
-    if (!isCutShort()) return 1;
-    float r = max(m.releaseSec, 0.01f), fadeStart = durSec - r;
-    return t <= fadeStart ? 1 : max(0, (durSec - t)/r);
-  }
-  // ADSR 4 値だけで包絡(useSimpleADSR 時)
-  float adsrAt(float t){
-    float a=m.attackSec, d=m.decaySec, s=m.sustainLevel, r=m.releaseSec;
-    float sustainEnd = m.sustaining ? max(durSec, a+d) : a+d;  // 減衰音は実質 D で 0 へ
-    if (t < a) return t/max(a,1e-4f);
-    if (t < a+d){ float u=(t-a)/max(d,1e-4f); return lerp(1, s, u); }
-    if (t < sustainEnd) return s;
-    float u = (t - sustainEnd)/max(r,1e-4f);
-    return max(0, lerp(s, 0, u));
+    float warpT = releasing ? releaseHoldWarpT : warpBody(t);
+    return sampleCurve(m.noiseEnv, m.noiseEnvRate, warpT);
   }
   // 線形補間でカーブを評価(時刻 sec、レート rate)
   float sampleCurve(float[] c, float rate, float sec){
@@ -618,7 +691,7 @@ class ResynthVoice extends UGen {
   protected void uGenerate(float[] channels){
     float sr = sampleRate();
     if (done){ for (int i=0;i<channels.length;i++) channels[i]=0; return; }
-    float a = ampEnvAt(tSec);
+    float a = ampAt(tSec);
     float s = 0;
     for (int k=0;k<m.N;k++){
       float amp = m.harmAmp[k]; if (amp<=0) continue;
@@ -631,13 +704,15 @@ class ResynthVoice extends UGen {
     }
     s *= m.harmNorm;
     if (m.noiseLevel > 0 && m.noiseTable.length > 1){
-      float ne = noiseEnvAt(tSec) * m.noiseLevel;
+      float relMul = releasing ? max(0, 1-(tSec-releaseStartT)/relSec()) : 1;
+      float ne = noiseEnvAt(tSec) * m.noiseLevel * relMul;
       s += m.noiseTable[(int)noisePos] * ne;
       noisePos += 1; if (noisePos >= m.noiseTable.length) noisePos -= m.noiseTable.length;
     }
     s *= a * gain * 0.9f;
     for (int i=0;i<channels.length;i++) channels[i] = s;
     tSec += 1.0f/sr;
-    if (tSec >= totalSec || (a <= 0 && tSec > 0.05f)) done = true;
+    if (releasing && (tSec - releaseStartT) >= relSec()) done = true;       // リリース完了
+    else if (!done && a <= 1e-4f && tSec > 0.15f) done = true;              // 減衰音が自然に死んだ
   }
 }

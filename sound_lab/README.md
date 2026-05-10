@@ -16,7 +16,7 @@
 | パス | 内容 |
 |---|---|
 | [`analyzer/`](analyzer/) | 解析ツール本体。バックエンド = Python（`librosa` で解析）、フロント = HTML（ブラウザでアップロード → 可視化 → JSON ダウンロード） |
-| [`processing/instrument_player/`](processing/instrument_player/) | `data/` に入れた JSON を全部読み込み、一覧から音色を切り替えながら加算合成 + ADSR + 整形ノイズで鳴らす Processing スケッチ（Minim 使用、鍵盤 UI 付き） |
+| [`processing/instrument_player/`](processing/instrument_player/) | `data/` に入れた JSON を全部読み込み、一覧から音色を切り替えながら加算合成 + 整形ノイズ + ADSR で鳴らす Processing スケッチ（Minim 使用。鍵盤は押している間 鳴る／きらきら星 再生ボタン付き） |
 | [`library_format.md`](library_format.md) | インストゥルメント定義 JSON のフォーマット仕様 |
 
 ## クイックスタート
@@ -33,7 +33,8 @@ python app.py
 # 2) ダウンロードした JSON を Processing の data/ に放り込む（複数 OK・名前は任意）
 cp ~/Downloads/*.instrument.json sound_lab/processing/instrument_player/data/
 #   → Processing IDE で instrument_player/instrument_player.pde を開いて Run
-#   → 画面下の一覧をクリック（または [ / ] キー）で音色を切替。鍵盤クリック / PC キーで演奏。
+#   → 画面下の一覧をクリック（または [ / ] キー）で音色を切替。鍵盤は押している間 鳴る（離すとリリース）。
+#      ▶ きらきら星 ボタンや 'p' キーでデモ演奏。
 #      JSON を足したら 'r' で再スキャン
 ```
 
