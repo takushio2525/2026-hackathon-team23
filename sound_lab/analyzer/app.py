@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import traceback
+import webbrowser
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -22,6 +24,9 @@ from analyzer import AnalysisError, analyze_file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 SAMPLES_DIR = os.path.join(BASE_DIR, "samples")
+HOST, PORT = "127.0.0.1", 5005
+URL = f"http://{HOST}:{PORT}"
+DEBUG = True                       # コード変更を即反映したくない場合は False に
 MAX_UPLOAD_MB = 32
 ALLOWED_EXT = {".wav", ".flac", ".ogg", ".mp3", ".aiff", ".aif", ".m4a"}
 
@@ -77,7 +82,14 @@ def too_large(_e):
     return jsonify(error=f"ファイルが大きすぎます(上限 {MAX_UPLOAD_MB} MB)。"), 413
 
 
+def _open_browser_later():
+    threading.Timer(1.2, lambda: webbrowser.open(URL)).start()
+
+
 if __name__ == "__main__":
     os.makedirs(SAMPLES_DIR, exist_ok=True)
-    print("sound_lab analyzer  ->  http://127.0.0.1:5005")
-    app.run(host="127.0.0.1", port=5005, debug=True)
+    # debug=True だとリローダで子プロセスが立つ。ブラウザは実際に配信する側だけで一度だけ開く
+    if not DEBUG or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        _open_browser_later()
+    print(f"sound_lab analyzer  ->  {URL}   (止めるには Ctrl+C)")
+    app.run(host=HOST, port=PORT, debug=DEBUG)
