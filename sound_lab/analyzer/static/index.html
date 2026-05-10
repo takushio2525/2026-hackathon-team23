@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sound_lab — 楽器音アナライザ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent-from:#818CF8; --accent-to:#C084FC;
+    --ink:#1E1B4B; --ink-muted:#6366F1;
+    --glass-bg:rgba(255,255,255,.55); --glass-bg-hi:rgba(255,255,255,.72);
+    --glass-bg-lo:rgba(255,255,255,.40); --glass-border:rgba(255,255,255,.70);
+    --radius-card:1.5rem; --radius-button:1rem;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'DM Sans','Noto Sans JP',system-ui,-apple-system,sans-serif;
+    color:var(--ink); min-height:100vh; padding:32px 20px 64px;
+    background:linear-gradient(135deg,#E0E7FF 0%,#FCE7F3 50%,#DBEAFE 100%);
+    position:relative; overflow-x:hidden;
+  }
+  body::before,body::after,.blob3{
+    content:""; position:fixed; border-radius:50%; filter:blur(80px);
+    z-index:-1; pointer-events:none;
+  }
+  body::before{width:520px;height:520px;background:#F0ABFC;opacity:.5;top:-160px;left:-120px}
+  body::after{width:480px;height:480px;background:#A5B4FC;opacity:.5;top:32%;right:-160px}
+  .blob3{width:440px;height:440px;background:#FBCFE8;opacity:.4;bottom:-180px;left:38%}
+  @media(prefers-reduced-motion:no-preference){
+    body::before{animation:f1 18s ease-in-out infinite alternate}
+    body::after{animation:f2 22s ease-in-out infinite alternate}
+  }
+  @keyframes f1{to{transform:translate(40px,30px)}}
+  @keyframes f2{to{transform:translate(-30px,40px)}}
+
+  .wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+  header h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:600;letter-spacing:-.01em}
+  header p{color:var(--ink-muted);font-size:.95rem;margin-top:4px}
+  header .src{font-family:var(--mono);font-size:.75rem;color:var(--ink-muted);margin-top:6px}
+
+  .card{
+    background:var(--glass-bg); backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--glass-border); border-radius:var(--radius-card);
+    box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 14px 40px -18px rgba(129,140,248,.5);
+    padding:22px 24px;
+  }
+  @supports not (backdrop-filter: blur(1px)){ .card{background:rgba(255,255,255,.86)} }
+  .card h2{font-size:1.05rem;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--accent-from),var(--accent-to))}
+
+  /* ── ドロップゾーン ── */
+  #drop{
+    border:2px dashed rgba(129,140,248,.45); border-radius:var(--radius-card);
+    padding:38px 24px; text-align:center; transition:.18s; cursor:pointer;
+    background:var(--glass-bg-lo);
+  }
+  #drop.hot{border-color:var(--accent-to);background:var(--glass-bg-hi)}
+  #drop .big{font-size:1.05rem;font-weight:600}
+  #drop .sub{color:var(--ink-muted);font-size:.85rem;margin-top:6px}
+  #drop .sub b{font-family:var(--mono);font-weight:500}
+  input[type=file]{display:none}
+
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  button,.btn{
+    font-family:inherit;font-size:.9rem;font-weight:600;border:none;cursor:pointer;
+    border-radius:var(--radius-button);padding:11px 20px;transition:.16s;
+  }
+  .btn-primary{background:linear-gradient(135deg,var(--accent-from),var(--accent-to));color:#fff;
+    box-shadow:0 8px 24px -8px rgba(129,140,248,.6)}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .btn-primary:disabled{opacity:.5;cursor:default;filter:none}
+  .btn-ghost{background:var(--glass-bg-hi);color:var(--ink);border:1px solid var(--glass-border)}
+  .btn-ghost:hover{background:#fff}
+  .btn-ghost:disabled{opacity:.45;cursor:default}
+  button:focus-visible,.btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(129,140,248,.6),0 0 0 6px rgba(255,255,255,.6)}
+
+  #status{font-size:.88rem;color:var(--ink-muted);min-height:1.2em}
+  #status.err{color:#BE123C;font-weight:500}
+  .spinner{width:16px;height:16px;border:2px solid rgba(129,140,248,.3);border-top-color:var(--accent-from);
+    border-radius:50%;display:inline-block;vertical-align:-3px;margin-right:7px;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── 統計グリッド ── */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+  .stat{background:var(--glass-bg-hi);border:1px solid var(--glass-border);border-radius:var(--radius-button);
+    padding:12px 14px}
+  .stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);font-weight:600}
+  .stat .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:3px}
+  .stat .v small{font-size:.7rem;font-weight:500;color:var(--ink-muted)}
+  .pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.72rem;font-weight:600;
+    background:rgba(129,140,248,.16);color:var(--accent-from)}
+
+  canvas{width:100%;display:block;border-radius:12px;background:rgba(255,255,255,.45)}
+  .canvlabel{font-size:11px;color:var(--ink-muted);font-weight:600;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+  .canvlabel:first-child{margin-top:0}
+  .adsr-line{font-family:var(--mono);font-size:.8rem;color:var(--ink-muted);margin-top:10px;line-height:1.7}
+  .adsr-line b{color:var(--ink)}
+
+  /* ── 試聴 ── */
+  .play-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:640px){.play-grid{grid-template-columns:1fr}.play-grid{grid-template-columns:1fr}}
+  label.fld{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-muted);font-weight:600;margin-bottom:6px}
+  input[type=range]{width:100%;accent-color:var(--accent-from)}
+  .fldval{font-family:var(--mono);font-size:.85rem;color:var(--ink);font-weight:500}
+  .keys{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+  .key{flex:1;min-width:22px;height:54px;border-radius:0 0 7px 7px;border:1px solid rgba(129,140,248,.3);
+    background:var(--glass-bg-hi);cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--ink-muted);
+    display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;transition:.1s}
+  .key:hover{background:#fff}
+  .key.black{background:linear-gradient(180deg,#3730A3,#4338CA);color:rgba(255,255,255,.7);height:36px;flex:.7;min-width:16px}
+  .key.on{background:linear-gradient(135deg,var(--accent-from),var(--accent-to));color:#fff}
+  footer{text-align:center;font-size:.75rem;color:var(--ink-muted);margin-top:8px}
+  a{color:var(--accent-from)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="blob3"></div>
+<div class="wrap">
+  <header>
+    <h1>sound_lab — 楽器音アナライザ</h1>
+    <p>楽器の<strong>単音</strong>を渡すと、ADSR・倍音・残差ノイズ・非調和性まで解析し、Processing で再合成できる JSON を作ります。</p>
+    <div class="src" id="srcline"></div>
+  </header>
+
+  <!-- アップロード -->
+  <div class="card">
+    <div id="drop" tabindex="0" role="button" aria-label="音源ファイルを選択">
+      <div class="big">🎵 音源ファイルをドロップ / クリックして選択</div>
+      <div class="sub"><b>.wav</b> 推奨 ・ .flac / .ogg / .mp3 / .aiff / .m4a 可 ・ 〜32&nbsp;MB ・ <b>1音だけ</b>を渡してください</div>
+    </div>
+    <input type="file" id="file" accept=".wav,.flac,.ogg,.mp3,.aiff,.aif,.m4a,audio/*" />
+    <div class="row" style="margin-top:16px">
+      <button class="btn-primary" id="analyzeBtn" disabled>解析する</button>
+      <button class="btn-ghost" id="dlBtn" disabled>インストゥルメント JSON をダウンロード</button>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <!-- 結果 -->
+  <div id="results" class="hidden" style="display:flex;flex-direction:column;gap:20px">
+
+    <div class="card">
+      <h2><span class="dot"></span>解析結果</h2>
+      <div class="stats" id="stats"></div>
+      <div class="adsr-line" id="adsrline"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>波形・スペクトル・エンベロープ</h2>
+      <div class="canvlabel">波形（トリム後）</div>
+      <canvas id="cWave" height="150"></canvas>
+      <div class="canvlabel">スペクトル（対数周波数 / dB ・縦線＝倍音）</div>
+      <canvas id="cSpec" height="180"></canvas>
+      <div class="canvlabel">振幅エンベロープ（橙：アタック/ディケイ ・緑：ループ区間 ・赤：リリース）</div>
+      <canvas id="cEnv" height="120"></canvas>
+      <div class="canvlabel">倍音の振幅（dB）</div>
+      <canvas id="cHarm" height="150"></canvas>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>ブラウザで試聴（加算合成プレビュー）</h2>
+      <div class="play-grid">
+        <div>
+          <label class="fld">音程 — <span class="fldval" id="noteVal">C4 (60)</span></label>
+          <input type="range" id="noteSlider" min="36" max="84" value="60" />
+          <div class="keys" id="keys"></div>
+        </div>
+        <div>
+          <label class="fld">発音長 — <span class="fldval" id="durVal">1.0 s</span></label>
+          <input type="range" id="durSlider" min="0.1" max="4" step="0.05" value="1.0" />
+          <label class="fld" style="margin-top:14px">音量 — <span class="fldval" id="volVal">70%</span></label>
+          <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.7" />
+          <div class="row" style="margin-top:14px">
+            <button class="btn-primary" id="playBtn">▶ 鳴らす</button>
+            <button class="btn-ghost" id="stopBtn">■ 停止</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    解析: <span class="fldval">Python + librosa</span> ／ 再合成の本番は
+    <span class="fldval">sound_lab/processing/instrument_player</span>（Processing + Minim）。
+    フォーマット仕様 → <span class="fldval">sound_lab/library_format.md</span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const drop = $("#drop"), fileInput = $("#file"), analyzeBtn = $("#analyzeBtn"),
+      dlBtn = $("#dlBtn"), statusEl = $("#status"), results = $("#results");
+let pickedFile = null, instrument = null, preview = null;
+
+/* ── ファイル選択 / ドラッグ&ドロップ ── */
+drop.addEventListener("click", () => fileInput.click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) setFile(f); });
+
+function setFile(f){
+  pickedFile = f;
+  drop.querySelector(".big").textContent = "🎵 " + f.name;
+  analyzeBtn.disabled = false;
+  setStatus(`${(f.size/1048576).toFixed(2)} MB — 「解析する」を押してください`);
+  analyze();   // 自動で解析開始
+}
+function setStatus(msg, isErr){ statusEl.textContent = msg || ""; statusEl.className = isErr ? "err" : ""; }
+function setBusy(b){ statusEl.innerHTML = b ? '<span class="spinner"></span>解析中… (librosa の処理に数秒かかります)' : statusEl.textContent; analyzeBtn.disabled = b || !pickedFile; }
+
+analyzeBtn.addEventListener("click", analyze);
+async function analyze(){
+  if (!pickedFile) return;
+  setBusy(true); statusEl.className = "";
+  const fd = new FormData(); fd.append("file", pickedFile);
+  try{
+    const res = await fetch("/analyze", { method:"POST", body:fd });
+    const data = await res.json();
+    if (!res.ok){ setStatus(data.error || `エラー (${res.status})`, true); setBusy(false); return; }
+    instrument = data.instrument; preview = data.preview;
+    dlBtn.disabled = false;
+    setStatus("解析完了 ✓  JSON をダウンロードできます");
+    render();
+  }catch(err){ setStatus("通信エラー: " + err, true); }
+  setBusy(false);
+}
+
+/* ── ダウンロード ── */
+dlBtn.addEventListener("click", () => {
+  if (!instrument) return;
+  const blob = new Blob([JSON.stringify(instrument, null, 1)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (instrument.name || "instrument") + ".instrument.json";
+  a.click(); URL.revokeObjectURL(a.href);
+});
+
+/* ── 描画 ── */
+function render(){
+  results.classList.remove("hidden");
+  $("#srcline").textContent = `${instrument.source_file} → ${instrument.note_name} / ${instrument.fundamental_hz} Hz / ${instrument.duration_sec.toFixed(2)} s`;
+  const i = instrument, f = i.features, e = i.envelope;
+  const cells = [
+    ["基音", `${i.fundamental_hz}<small> Hz</small>`],
+    ["MIDI ノート", `${i.note_name}<small> (${i.midi_note})</small>`],
+    ["長さ", `${i.duration_sec.toFixed(2)}<small> s</small>`],
+    ["タイプ", i.sustaining ? '<span class="pill">持続音</span>' : '<span class="pill">減衰音</span>'],
+    ["倍音数", `${f.harmonic_count}`],
+    ["非調和性 B", `${i.inharmonicity_b}`],
+    ["ノイズ量", `${(i.noise.level*100).toFixed(1)}<small> %</small>`],
+    ["スペクトル重心", `${Math.round(f.spectral_centroid_hz)}<small> Hz</small>`],
+    ["ロールオフ85%", `${Math.round(f.spectral_rolloff_hz)}<small> Hz</small>`],
+    ["スペクトル平坦度", `${f.spectral_flatness}`],
+  ];
+  $("#stats").innerHTML = cells.map(([k,v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  $("#adsrline").innerHTML =
+    `ADSR近似 — A <b>${(e.attack_sec*1000).toFixed(0)} ms</b> ／ D <b>${(e.decay_sec*1000).toFixed(0)} ms</b> ／ ` +
+    `S <b>${(e.sustain_level*100).toFixed(0)} %</b> ／ R <b>${(e.release_sec*1000).toFixed(0)} ms</b>　|　` +
+    `ループ区間 <b>${e.loop_start_sec.toFixed(2)}–${e.loop_end_sec.toFixed(2)} s</b>　|　` +
+    `ノイズ色（低→高）${i.noise.band_levels.map(x=>x.toFixed(2)).join(" ")}`;
+
+  drawWave(); drawSpec(); drawEnv(); drawHarm();
+  buildKeys();
+}
+
+function ctxOf(id){
+  const c = $(id), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.height;
+  c.width = w * dpr; c.height = h * dpr;
+  const x = c.getContext("2d"); x.scale(dpr, dpr);
+  return { x, w, h };
+}
+const ACC1 = "#818CF8", ACC2 = "#C084FC", GRID = "rgba(99,102,241,.18)", INKMUT = "#6366F1";
+
+function drawWave(){
+  const { x, w, h } = ctxOf("#cWave"); const d = preview.waveform; const mid = h/2;
+  x.clearRect(0,0,w,h);
+  x.strokeStyle = GRID; x.beginPath(); x.moveTo(0,mid); x.lineTo(w,mid); x.stroke();
+  const grad = x.createLinearGradient(0,0,w,0); grad.addColorStop(0,ACC1); grad.addColorStop(1,ACC2);
+  x.strokeStyle = grad; x.lineWidth = 1; x.beginPath();
+  for (let k=0;k<d.length;k++){ const px = k/(d.length-1)*w;
+    x.moveTo(px, mid - d[k][1]*mid*0.95); x.lineTo(px, mid - d[k][0]*mid*0.95); }
+  x.stroke();
+}
+
+function freqToX(fz, fmin, fmax, w){ return (Math.log(fz)-Math.log(fmin))/(Math.log(fmax)-Math.log(fmin))*w; }
+function drawSpec(){
+  const { x, w, h } = ctxOf("#cSpec");
+  const fr = preview.spectrum_freq, db = preview.spectrum_db;
+  const fmin = fr[0], fmax = fr[fr.length-1];
+  x.clearRect(0,0,w,h);
+  // dB グリッド (0,-20,-40,-60)
+  x.fillStyle = INKMUT; x.font = "9px 'JetBrains Mono', monospace";
+  for (const lvl of [0,-20,-40,-60]){ const y = (-lvl/72)*h; x.strokeStyle = GRID; x.beginPath(); x.moveTo(0,y); x.lineTo(w,y); x.stroke(); x.fillText(lvl+" dB", 3, y+10); }
+  // 倍音マーカー
+  if (instrument){
+    for (const hm of instrument.harmonics){ if (hm.amp<=0) continue;
+      const fz = hm.ratio * instrument.fundamental_hz; if (fz<fmin||fz>fmax) continue;
+      const px = freqToX(fz,fmin,fmax,w);
+      x.strokeStyle = hm.n===1 ? "rgba(192,132,252,.7)" : "rgba(129,140,248,.28)";
+      x.beginPath(); x.moveTo(px,0); x.lineTo(px,h); x.stroke();
+    }
+  }
+  // 周波数目盛
+  for (const fz of [100,200,500,1000,2000,5000,10000]){ if (fz<fmin||fz>fmax) continue;
+    const px = freqToX(fz,fmin,fmax,w); x.fillStyle = INKMUT;
+    x.fillText(fz>=1000?(fz/1000)+"k":fz+"", px+2, h-3); }
+  // スペクトル曲線
+  const grad = x.createLinearGradient(0,0,w,0); grad.addColorStop(0,ACC1); grad.addColorStop(1,ACC2);
+  x.strokeStyle = grad; x.lineWidth = 1.6; x.beginPath();
+  for (let k=0;k<fr.length;k++){ const px = freqToX(fr[k],fmin,fmax,w); const y = Math.min(h, (-db[k]/72)*h);
+    k===0?x.moveTo(px,y):x.lineTo(px,y); }
+  x.stroke();
+}
+
+function drawEnv(){
+  const { x, w, h } = ctxOf("#cEnv");
+  const e = instrument.envelope, v = e.values, n = v.length, rate = e.rate_hz, dur = (n-1)/rate;
+  x.clearRect(0,0,w,h);
+  x.strokeStyle = GRID; for (const ly of [0.25,0.5,0.75,1]){ const y=h-ly*h*0.95; x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke(); }
+  const ls = e.loop_start_sec/dur*w, le = e.loop_end_sec/dur*w;
+  x.fillStyle = "rgba(74,222,128,.16)"; x.fillRect(ls,0,le-ls,h);
+  x.fillStyle = "rgba(244,114,182,.16)"; x.fillRect(le,0,w-le,h);
+  // 区間ごとに色分けして折れ線
+  const segColor = px => px < e.loop_start_sec/dur*w ? "#F59E0B" : (px < le ? "#22C55E" : "#EF4444");
+  for (let k=1;k<n;k++){ const x0=(k-1)/(n-1)*w, x1=k/(n-1)*w;
+    x.strokeStyle = segColor(x0); x.lineWidth=2; x.beginPath();
+    x.moveTo(x0, h - v[k-1]*h*0.95); x.lineTo(x1, h - v[k]*h*0.95); x.stroke(); }
+  // sustain レベル線
+  x.strokeStyle = "rgba(99,102,241,.5)"; x.setLineDash([4,3]); x.beginPath();
+  const sy = h - e.sustain_level*h*0.95; x.moveTo(0,sy); x.lineTo(w,sy); x.stroke(); x.setLineDash([]);
+}
+
+function drawHarm(){
+  const { x, w, h } = ctxOf("#cHarm");
+  const hs = instrument.harmonics; x.clearRect(0,0,w,h);
+  const floor = -60; // dB
+  x.strokeStyle = GRID; x.fillStyle = INKMUT; x.font="9px 'JetBrains Mono',monospace";
+  for (const lvl of [0,-20,-40]){ const y = (-lvl/-floor)*h; x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke(); x.fillText(lvl+"",3,y+10); }
+  const n = hs.length, bw = w/n;
+  for (let k=0;k<n;k++){ const hm = hs[k]; if (hm.amp<=0) continue;
+    const db = Math.max(floor, hm.amp_db); const bh = (1 - db/floor) * h;
+    const g = x.createLinearGradient(0,h-bh,0,h); g.addColorStop(0,ACC2); g.addColorStop(1,ACC1);
+    x.fillStyle = g; x.fillRect(k*bw+1, h-bh, bw-2, bh);
+    if (n<=24){ x.fillStyle=INKMUT; x.fillText((k+1)+"", k*bw + bw/2 - 3, h-4); }
+  }
+}
+
+/* ── 鍵盤 ── */
+const NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function midiName(m){ return NOTE_NAMES[m%12]+(Math.floor(m/12)-1); }
+function buildKeys(){
+  const box=$("#keys"); box.innerHTML="";
+  for (let m=48;m<=72;m++){ const k=document.createElement("div");
+    const isBlack = NOTE_NAMES[m%12].includes("#");
+    k.className = "key"+(isBlack?" black":""); k.dataset.m=m;
+    if (!isBlack) k.textContent = midiName(m);
+    k.addEventListener("mousedown", ()=>{ setNote(m); playPreview(); });
+    box.appendChild(k);
+  }
+}
+function hlKey(m){ document.querySelectorAll(".key").forEach(k=>k.classList.toggle("on", +k.dataset.m===m)); }
+
+/* ── スライダー ── */
+const noteSlider=$("#noteSlider"), durSlider=$("#durSlider"), volSlider=$("#volSlider");
+function setNote(m){ noteSlider.value=m; $("#noteVal").textContent=`${midiName(m)} (${m})`; hlKey(m); }
+noteSlider.addEventListener("input",()=>setNote(+noteSlider.value));
+durSlider.addEventListener("input",()=>$("#durVal").textContent=(+durSlider.value).toFixed(2)+" s");
+volSlider.addEventListener("input",()=>$("#volVal").textContent=Math.round(+volSlider.value*100)+"%");
+$("#playBtn").addEventListener("click",playPreview);
+$("#stopBtn").addEventListener("click",stopPreview);
+
+/* ── Web Audio による加算合成プレビュー ── */
+let actx=null, activeNodes=[];
+function stopPreview(){ activeNodes.forEach(n=>{try{n.stop?n.stop():n.disconnect();}catch(_){}}); activeNodes=[]; }
+function midiToHz(m){ return 440*Math.pow(2,(m-69)/12); }
+
+// envelope.values[] を、要求発音長 D に時間ワープした Float32Array にする
+function warpEnvelope(values, rate, e, durSec, points){
+  const n=values.length, origDur=(n-1)/rate;
+  const lsT=e.loop_start_sec, leT=e.loop_end_sec, relT=e.release_sec;
+  const sampleOrig = t => { // 0..origDur の t を線形補間
+    const idx = Math.max(0, Math.min(n-1, t*rate)); const i0=Math.floor(idx), i1=Math.min(n-1,i0+1);
+    return values[i0]+(values[i1]-values[i0])*(idx-i0);
+  };
+  const out=new Float32Array(points);
+  if (!instrument.sustaining || durSec<=origDur){
+    for (let k=0;k<points;k++){ const t=k/(points-1)*durSec;
+      out[k] = t<=origDur ? sampleOrig(t) : 0;
+      // 短く切る場合は最後 release を急減
+      if (durSec<origDur && t > durSec-relT) out[k]*= Math.max(0,(durSec-t)/Math.max(relT,1e-3));
+    }
+    return out;
+  }
+  // 持続音で伸ばす: [0,lsT] → ループ[lsT,leT]を繰り返し → 末尾[origDur-relT, origDur]
+  const headT=lsT, loopLen=Math.max(leT-lsT,1e-3), tailStart=Math.max(origDur-relT, leT);
+  const tailLen=origDur-tailStart, bodyLen=Math.max(durSec - headT - tailLen, 0);
+  for (let k=0;k<points;k++){
+    const t=k/(points-1)*durSec; let st;
+    if (t<headT) st=t;
+    else if (t < headT+bodyLen){ let u=(t-headT)%loopLen; st=lsT+u; }
+    else { st = tailStart + (t-headT-bodyLen); }
+    out[k]=sampleOrig(Math.min(st,origDur));
+  }
+  return out;
+}
+// 倍音 k の env(0..1, 32点) を同じ時間ワープで durSec の points 点に
+function warpHarmEnv(hEnv, e, durSec, points){
+  // hEnv は時間軸 0..origDur(全体) に対応。envelope.values と同じ扱いができるよう rate を合わせる
+  const n=hEnv.length; // 32点が 0..origDur に均等配置
+  const origDur=(instrument.envelope.values.length-1)/instrument.envelope.rate_hz;
+  const rate=(n-1)/Math.max(origDur,1e-3);
+  return warpEnvelope(hEnv, rate, e, durSec, points);
+}
+
+function makeNoiseBuffer(ctx, seconds){
+  const len=Math.floor(ctx.sampleRate*seconds), b=ctx.createBuffer(1,len,ctx.sampleRate), d=b.getChannelData(0);
+  for (let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  return b;
+}
+
+async function playPreview(){
+  if (!instrument) return;
+  if (!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+  if (actx.state==="suspended") await actx.resume();
+  stopPreview();
+  const m=+noteSlider.value, durSec=+durSlider.value, vol=+volSlider.value;
+  const f0=midiToHz(m), B=instrument.inharmonicity_b||0, e=instrument.envelope;
+  const t0=actx.currentTime+0.02, P=Math.max(64, Math.round(durSec*200));
+  const masterEnv=warpEnvelope(e.values, e.rate_hz, e, durSec, P);
+
+  // 出力段
+  const master=actx.createGain(); master.gain.value=vol*0.9; master.connect(actx.destination);
+  const env=actx.createGain(); env.gain.value=0;       // t0 まで無音に保つ
+  env.gain.setValueCurveAtTime(masterEnv, t0, durSec); env.connect(master);
+
+  // 倍音(加算合成)
+  const sumAmp=instrument.harmonics.reduce((s,h)=>s+(h.amp>0?h.amp:0),0)||1;
+  const norm=1/Math.max(sumAmp,1);
+  const harmBus=actx.createGain(); harmBus.gain.value=norm; harmBus.connect(env);
+  const nyq=actx.sampleRate/2;
+  for (const h of instrument.harmonics){
+    if (h.amp<=0) continue;
+    const fz=f0*h.ratio*Math.sqrt(1+B*h.n*h.n); if (fz>=nyq) continue;
+    const osc=actx.createOscillator(); osc.type="sine"; osc.frequency.value=fz;
+    const g=actx.createGain(); g.gain.value=0;
+    const he=warpHarmEnv(h.env, e, durSec, P); for (let k=0;k<P;k++) he[k]*=h.amp;
+    g.gain.setValueCurveAtTime(he, t0, durSec);
+    osc.connect(g); g.connect(harmBus); osc.start(t0); osc.stop(t0+durSec+0.05);
+    activeNodes.push(osc);
+  }
+
+  // 残差ノイズ(白色 → ローパスで色付け → ノイズ包絡)
+  if (instrument.noise.level>0.002){
+    const nb=makeNoiseBuffer(actx, Math.min(2.5, durSec+0.3));
+    const src=actx.createBufferSource(); src.buffer=nb; src.loop=true;
+    // band_levels の重心からカットオフをざっくり決める
+    const bl=instrument.noise.band_levels, bh=instrument.noise.bands_hz;
+    let num=0,den=0; for (let i=0;i<bl.length;i++){ const fc=(bh[i]+bh[i+1])/2; num+=fc*bl[i]; den+=bl[i]; }
+    const cutoff=Math.max(300, Math.min(nyq*0.9, den>0?num/den*2:4000));
+    const lp=actx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=cutoff; lp.Q.value=0.5;
+    const ng=actx.createGain(); ng.gain.value=0;
+    const ne=warpEnvelope(instrument.noise.envelope, instrument.noise.rate_hz, e, durSec, P);
+    for (let k=0;k<P;k++) ne[k]*=instrument.noise.level;
+    ng.gain.setValueCurveAtTime(ne, t0, durSec);
+    src.connect(lp); lp.connect(ng); ng.connect(env); src.start(t0); src.stop(t0+durSec+0.05);
+    activeNodes.push(src);
+  }
+  setNote(m);
+  setTimeout(()=>{ try{master.disconnect();}catch(_){} }, (durSec+0.2)*1000);
+}
+
+// PC キーボードでも演奏(zsxdcvgbhnjm... 風)
+const KEYMAP={"z":48,"s":49,"x":50,"d":51,"c":52,"v":53,"g":54,"b":55,"h":56,"n":57,"j":58,"m":59,
+  "q":60,"2":61,"w":62,"3":63,"e":64,"r":65,"5":66,"t":67,"6":68,"y":69,"7":70,"u":71,"i":72};
+window.addEventListener("keydown", ev=>{
+  if (ev.repeat || !instrument) return;
+  const m=KEYMAP[ev.key.toLowerCase()]; if (m===undefined) return;
+  if (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  setNote(m); playPreview();
+});
+</script>
+</body>
+</html>
