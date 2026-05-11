@@ -1,0 +1,595 @@
+% !TEX program = lualatex
+\documentclass[lualatex,book,openany,paper=a4paper,jafontsize=11.5pt,jafontscale=1.05]{jlreq}
+
+\usepackage{luatexja-fontspec}
+\usepackage{hack-fonts}
+\usepackage{hack-cover}
+\usepackage[hidelinks]{hyperref}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{array}
+\setlength{\arrayrulewidth}{0.6pt}
+\renewcommand{\arraystretch}{1.18}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{amsmath}
+
+\setlength{\emergencystretch}{3em}
+\lstdefinestyle{textdiagram}{
+  basicstyle=\ttfamily\small,
+  numbers=none,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  showstringspaces=false
+}
+
+\lstdefinestyle{pseudo}{
+  basicstyle=\ttfamily\small,
+  numbers=left,
+  numberstyle=\tiny,
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  showstringspaces=false
+}
+
+\setlist[itemize]{leftmargin=2em}
+\setlist[enumerate]{leftmargin=2em}
+
+\title{ハッカソン}
+\subtitle{Processing 音源サブシステム\\基本設計・詳細設計}
+\team{チーム23}
+\author{
+  25G1021 : 梅澤 颯太
+}
+\date{2026年5月8日}
+\version{1.0}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\maketitle
+
+\setcounter{tocdepth}{2}
+\tableofcontents \thispagestyle{empty}
+
+\clearpage
+\hypersetup{pageanchor=true}
+\chapter{システムの基本設計}\setcounter{page}{1}
+
+\section{機能一覧}
+Processing 音源サブシステムの機能一覧を表\ref{tab:fbs}に示す．本書では Processing 側の
+機能を F6 として定義し，塩澤設計の F4「発音情報配信」の受け口以降を担当範囲とする．
+
+\begin{longtable}{p{0.28\linewidth}p{0.62\linewidth}}
+\caption{Processing 音源サブシステムの機能一覧}\label{tab:fbs}\\
+\hline
+機能 & 役割 \\
+\hline
+\endfirsthead
+\hline
+機能 & 役割 \\
+\hline
+\endhead
+Serial 接続管理 &
+Processing 起動時に USB Serial ポートを開く．切断時は音を止め，ユーザ操作または自動再試行で
+再接続できる状態へ戻す． \\
+\hline
+NOTE フレーム同期・復号 &
+Serial から届くバイト列をバッファへ蓄積し，\texttt{magic=0x4F52} を探して20バイト単位に切り出す．
+\texttt{version/type/seq/partId} を検査する． \\
+\hline
+パート設定管理 &
+\texttt{partId=0x02--0x05} と音色・発音枠を対応付ける．本番は各 Mac が1パートを担当し，検証時は1台で
+4パートを受けられる統合モードも持つ． \\
+\hline
+ボイス管理 &
+NoteOn，NoteOff，\texttt{durationMs} 経過による自動停止，同時発音数上限，古いボイスの解放を管理する． \\
+\hline
+音色生成 &
+金管パートは倍音加算合成と ADSR で音色を作る．リズム伴奏パートは短い減衰を持つ打音系として扱い，
+塩澤・齋藤の node\_05 仕様と矛盾しないようにする． \\
+\hline
+画面表示・操作 IF &
+接続状態，期待 partId，受信 seq，発音中ボイス数，警告，ミュート，テスト発音を表示・操作する． \\
+\hline
+ログ・検証支援 &
+受信時刻，復号結果，破棄理由，発音開始時刻を CSV に残し，結合試験で遅延と欠落を評価できるようにする． \\
+\hline
+\end{longtable}
+
+\section{システム構成図}
+図\ref{lst:overview}に，Processing 音源サブシステムを含む全体構成を示す．塩澤設計との整合を優先し，
+各楽器ノードは専用 Mac と USB Serial で 1 対 1 接続する．ただし，Processing の内部設計は
+4パートを扱える形にしておき，結合前の検証では1台の Mac で全パートを再生できるようにする．
+
+\begin{lstlisting}[style=textdiagram, caption={Processing 音源サブシステムを含む全体構成}, label={lst:overview}]
+User conducts
+    |
+    v
+node_01: conductor, CTRL/BEAT sender
+    |
+    | UDP multicast CTRL/BEAT
+    v
+node_02 -- USB Serial NOTE --> Mac 1 Processing --> Brass 1
+node_03 -- USB Serial NOTE --> Mac 2 Processing --> Brass 2
+node_04 -- USB Serial NOTE --> Mac 3 Processing --> Brass 3
+node_05 -- USB Serial NOTE --> Mac 4 Processing --> rhythm/drum
+\end{lstlisting}
+
+\subsection{パート対応}
+Processing は表\ref{tab:part-map}の対応で \texttt{partId} を解釈する．齋藤設計の楽譜上の役割と，
+塩澤設計のノード ID をつなぐ境界であるため，本表は実装時にも設定値として残す．
+
+\begin{longtable}{p{0.16\linewidth}p{0.14\linewidth}p{0.26\linewidth}p{0.34\linewidth}}
+\caption{partId と音色・役割の対応}\label{tab:part-map}\\
+\hline
+ノード & partId & 楽譜上の役割 & Processing 側音色 \\
+\hline
+\endfirsthead
+\hline
+ノード & partId & 楽譜上の役割 & Processing 側音色 \\
+\hline
+\endhead
+node\_02 & 0x02 & 主旋律 & 金管1．基準となる BrassVoice． \\
+\hline
+node\_03 & 0x03 & 輪唱パート1 & 金管2．BrassVoice の倍音比率は同じで，音量と定位を変えられる設計にする． \\
+\hline
+node\_04 & 0x04 & 輪唱パート2 & 金管3．BrassVoice の設定を共有し，必要なら少し明るい音色に調整する． \\
+\hline
+node\_05 & 0x05 & ベース・リズム伴奏 & 短い減衰を持つ Drum/RhythmVoice．金管音色で無理に鳴らさない． \\
+\hline
+\end{longtable}
+
+\section{操作インターフェース設計}
+Processing のユーザは演奏者ではなく，デモ準備者または結合試験担当者である．観客や指揮者は
+Processing を直接操作しない．そのため，画面とキー操作は演奏中の障害発見と安全停止に絞る．
+
+\begin{longtable}{p{0.19\linewidth}p{0.30\linewidth}p{0.39\linewidth}}
+\caption{Processing 側操作インターフェース}\label{tab:ui}\\
+\hline
+操作・表示 & 対象 & システム挙動 \\
+\hline
+\endfirsthead
+\hline
+操作・表示 & 対象 & システム挙動 \\
+\hline
+\endhead
+起動 & Mac 担当者 & Serial ポート一覧を取得し，設定済みポートがあれば接続を試みる． \\
+\hline
+\texttt{1}--\texttt{4} キー & Mac 担当者 & 期待 partId を 0x02--0x05 に切り替える．本番では Mac ごとに固定する． \\
+\hline
+\texttt{a} キー & 検証担当者 & 統合モードに入り，0x02--0x05 の全パートを受け付ける． \\
+\hline
+\texttt{r} キー & Mac 担当者 & Serial を閉じ，ポート選択待ちへ戻る．USB 抜けや誤接続の復旧に使う． \\
+\hline
+\texttt{m} キー & Mac 担当者 & ミュートを切り替える．ミュート中も NOTE 復号とログ記録は続ける． \\
+\hline
+\texttt{t} キー & Mac 担当者 & 選択中 partId のテスト音を鳴らし，音量とスピーカ接続を確認する． \\
+\hline
+画面上部 & 全員 & 接続状態，ポート名，期待 partId，直近 seq，欠落数，破棄数を表示する． \\
+\hline
+画面下部 & 全員 & 発音中ボイス数，ミュート状態，波形モニタ，直近エラーを表示する． \\
+\hline
+\end{longtable}
+
+\section{状態遷移図}
+Processing 側の状態遷移を図\ref{lst:state}に示す．状態は UI 表示，Serial 接続，発音管理の
+3つを一貫して制御するために使う．Serial 例外時に発音が残り続けないことを重視する．
+
+\begin{lstlisting}[style=textdiagram, caption={Processing 音源サブシステムの状態遷移}, label={lst:state}]
+Boot
+  -> PortSelect  : setup completed
+PortSelect
+  -> Ready       : serial port opened
+  -> Error       : port open failed
+Ready
+  -> Playing     : first valid NOTE received
+  -> PortSelect  : user presses r
+Playing
+  -> Muted       : user presses m
+  -> Ready       : no NOTE for 1000 ms, serial still alive
+  -> Error       : serial exception or timeout > 3000 ms
+Muted
+  -> Playing     : user presses m
+  -> Error       : serial exception
+Error
+  -> PortSelect  : user presses r or retry interval elapsed
+\end{lstlisting}
+
+\begin{longtable}{p{0.18\linewidth}p{0.32\linewidth}p{0.38\linewidth}}
+\caption{状態定義}\label{tab:states}\\
+\hline
+状態 & 意味 & 主な処理 \\
+\hline
+\endfirsthead
+\hline
+状態 & 意味 & 主な処理 \\
+\hline
+\endhead
+Boot & 起動直後 & 画面，音声出力，設定値，ログ，内部配列を初期化する． \\
+\hline
+PortSelect & Serial ポート選択待ち & 利用可能ポートを表示し，ユーザ選択または保存設定で接続する． \\
+\hline
+Ready & 接続済み・NOTE 待ち & Serial バッファを空にし，フレーム同期を開始する． \\
+\hline
+Playing & 正常受信・発音中 & NOTE 復号，partId 検査，Voice 生成，画面更新，ログ出力を行う． \\
+\hline
+Muted & 受信継続・発音停止 & NOTE は処理してログに残すが，新規 Voice を作らない．既存 Voice は Release へ移す． \\
+\hline
+Error & 接続異常・復号不能 & Serial を閉じ，全 Voice を停止し，エラー理由を表示する． \\
+\hline
+\end{longtable}
+
+\chapter{システムの詳細設計}
+
+\section{部品一覧}
+Processing 側に関係する構成要素を表\ref{tab:parts}に示す．本書の主対象はソフトウェアであるが，
+ルーブリック上のハードウェア設計項目に対応するため，接続関係と動作も明確にする．
+
+\begin{longtable}{p{0.16\linewidth}p{0.25\linewidth}p{0.10\linewidth}p{0.39\linewidth}}
+\caption{Processing 側関連部品}\label{tab:parts}\\
+\hline
+ID & 要素 & 数量 & 役割 \\
+\hline
+\endfirsthead
+\hline
+ID & 要素 & 数量 & 役割 \\
+\hline
+\endhead
+P1 & Arduino UNO R4 WiFi & 4 & node\_02--05．楽譜進行後，NOTE パケットを USB Serial で送信する． \\
+\hline
+P2 & Mac または PC & 4 & Processing 実行機．本番は1台につき1つの Serial ポートを開く． \\
+\hline
+P3 & USB Type-C ケーブル & 4 & Arduino と Mac の給電および Serial 通信を兼ねる． \\
+\hline
+P4 & スピーカまたは内蔵スピーカ & 4 & Processing の音声出力を再生する．音量は結合時に手動調整する． \\
+\hline
+P5 & Processing 4 + Sound/Minim 系ライブラリ & 4環境 & NOTE を受けて音を合成する実行環境．授業演習で扱った Processing 音生成を発展させる． \\
+\hline
+\end{longtable}
+
+\section{ハードウェア設計}
+接続は表\ref{tab:hw-design}の通りとする．Processing 側では回路を追加しないが，Serial 接続と
+音声出力の対応を固定し，誤接続時に発音しない設計にする．
+
+\begin{longtable}{p{0.23\linewidth}p{0.65\linewidth}}
+\caption{Processing 側ハードウェア接続設計}\label{tab:hw-design}\\
+\hline
+項目 & 設計 \\
+\hline
+\endfirsthead
+\hline
+項目 & 設計 \\
+\hline
+\endhead
+接続方式 & node\_02--05 と Mac 1--4 を USB Type-C で 1 対 1 接続する． \\
+\hline
+通信方式 & USB CDC Serial．Arduino 側は \texttt{Serial.write()} で NOTE を送る． \\
+\hline
+ボーレート & 115200 bps．USB CDC では実効速度に余裕があるが，Arduino 側設定と統一する． \\
+\hline
+フレーミング & 全 NOTE は先頭2バイトの \texttt{magic=0x4F52} を同期マークとする．Serial 上ではリトルエンディアンで \texttt{0x52 0x4F} の順に現れる． \\
+\hline
+音声出力 & 各 Mac の既定オーディオ出力へ送る．本番は OS 音量をそろえ，クリップがない範囲で調整する． \\
+\hline
+誤接続対策 & Mac ごとに期待 \texttt{partId} を設定し，異なる \texttt{partId} を受信した場合は発音せず警告とログを残す． \\
+\hline
+切断時動作 & USB 切断または Serial 例外を検出したら Error へ遷移し，全 Voice を停止する． \\
+\hline
+\end{longtable}
+
+\section{ソフトウェア設計}
+
+\subsection{ファイル構成}
+実装時の配置案を図\ref{lst:filetree}に示す．本書は設計書でありファイルを実装しないが，
+クラス責務を明確にするため，Processing スケッチの分割単位を定義する．
+
+\begin{lstlisting}[style=textdiagram, caption={Processing 実装予定ファイル構成}, label={lst:filetree}]
+pc_app/
+`-- orchestra_processing/
+    |-- orchestra_processing.pde   // setup(), draw(), keyPressed()
+    |-- Config.pde                  // expected partId, serial, audio params
+    |-- OrcProtocol.pde             // NotePacket and little-endian decoder
+    |-- SerialFrameReader.pde       // byte buffer and magic sync
+    |-- PartManager.pde             // part filter and voice allocation
+    |-- Voice.pde                   // BrassVoice, RhythmVoice, ADSR
+    |-- ToneFactory.pde             // harmonic tables and waveform creation
+    |-- UiView.pde                  // status screen and waveform monitor
+    `-- Logger.pde                  // CSV logging
+\end{lstlisting}
+
+\subsection{NOTE パケット設計}
+Processing は表\ref{tab:note}の20バイトを固定長 NOTE として読む．この表は塩澤設計の受信側解釈であり，
+Processing 側で独自に別形式を定義しない．
+
+\begin{longtable}{p{0.10\linewidth}p{0.18\linewidth}p{0.16\linewidth}p{0.44\linewidth}}
+\caption{NOTE パケットの受信側解釈}\label{tab:note}\\
+\hline
+offset & field & type & Processing 側の扱い \\
+\hline
+\endfirsthead
+\hline
+offset & field & type & Processing 側の扱い \\
+\hline
+\endhead
+0 & magic & uint16 & 0x4F52 以外なら同期探索を続ける． \\
+\hline
+2 & version & uint8 & 0x01 以外なら破棄し，version error としてログする． \\
+\hline
+3 & type & uint8 & 3 のときだけ NOTE として処理する．CTRL/BEAT は Processing で発音しない． \\
+\hline
+4 & seq & uint32 & 前回値との差から重複・欠落を検出する． \\
+\hline
+8 & timestampMs & uint32 & Arduino 側の送信時刻．遅延評価用にログする． \\
+\hline
+12 & partId & uint8 & 0x02--0x05．期待 partId または ALL と一致する場合だけ発音する． \\
+\hline
+13 & noteNumber & uint8 & MIDI ノート番号として周波数へ変換する．0 は休符または停止相当として扱う． \\
+\hline
+14 & velocity & uint8 & 0--127 を振幅へ変換する．総振幅が過大にならないよう正規化する． \\
+\hline
+15 & gate & uint8 & 1=NoteOn，0=NoteOff．その他は破棄する． \\
+\hline
+16 & durationMs & uint16 & NoteOn 時の自動停止予定時刻を決める．0 の場合は最小長を使う． \\
+\hline
+18 & reserved & uint8[2] & 0以外でも発音は継続するが警告としてログする． \\
+\hline
+\end{longtable}
+
+\subsection{オブジェクト設計}
+表\ref{tab:classes}に主要クラスを示す．クラス名は実装時の案であり，重要なのは責務分離である．
+Serial 復号，パート管理，音色生成，UI を分けることで，結合試験で問題箇所を切り分けやすくする．
+
+\begin{longtable}{p{0.22\linewidth}p{0.30\linewidth}p{0.36\linewidth}}
+\caption{Processing 側オブジェクト設計}\label{tab:classes}\\
+\hline
+クラス・構造体 & 主なフィールド・メソッド & 役割 \\
+\hline
+\endfirsthead
+\hline
+クラス・構造体 & 主なフィールド・メソッド & 役割 \\
+\hline
+\endhead
+\texttt{NotePacket} &
+\texttt{partId, noteNumber, velocity, gate, durationMs, seq, timestampMs} &
+20バイトフレームから復号した発音指令を表す． \\
+\hline
+\texttt{SerialFrameReader} &
+\texttt{pushByte()}, \texttt{tryReadPacket()}, \texttt{dropUntilMagic()} &
+Serial 入力を蓄積し，magic 同期と20バイト切り出しを行う．破損時は1バイトずつ捨てて再同期する． \\
+\hline
+\texttt{PartConfig} &
+\texttt{expectedPartId}, \texttt{instrumentType}, \texttt{maxVoices} &
+Mac ごとの担当パートと音色を定義する． \\
+\hline
+\texttt{PartManager} &
+\texttt{handleNote()}, \texttt{noteOn()}, \texttt{noteOff()}, \texttt{update()} &
+partId 検査，同時発音上限，durationMs による自動停止を管理する． \\
+\hline
+\texttt{Voice} &
+\texttt{start()}, \texttt{release()}, \texttt{isFinished()} &
+1つの発音単位を表す基底クラス．周波数，振幅，開始時刻，終了予定時刻を持つ． \\
+\hline
+\texttt{BrassVoice} &
+\texttt{harmonics}, \texttt{attackMs}, \texttt{decayMs}, \texttt{sustain}, \texttt{releaseMs} &
+金管1--3の音色を生成する．倍音比率と ADSR を設定値として持つ． \\
+\hline
+\texttt{RhythmVoice} &
+\texttt{noiseAmount}, \texttt{decayMs}, \texttt{pitchDrop} &
+node\_05 のベース・リズム伴奏を短い減衰音として生成する． \\
+\hline
+\texttt{UiView} &
+\texttt{drawStatus()}, \texttt{drawWaveform()}, \texttt{drawWarning()} &
+接続状態，受信状況，発音中ボイス数，警告を描画する． \\
+\hline
+\texttt{Logger} &
+\texttt{logPacket()}, \texttt{logError()}, \texttt{flush()} &
+結合試験用 CSV を保存する． \\
+\hline
+\end{longtable}
+
+\subsection{音色設計}
+\subsubsection{金管音色}
+金管音色は，基音に対して複数の倍音を加える加算合成で作る．初期値は表\ref{tab:harmonics}とし，
+授業資料で扱った波形・スペクトル確認や FFT 解析により，実機試験後に調整できるようにする．
+
+\begin{table}[htbp]
+\centering
+\caption{金管音色の初期倍音比率}\label{tab:harmonics}
+\begin{tabular}{cccccccc}
+\hline
+倍音 & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\
+\hline
+振幅比 & 1.00 & 0.70 & 0.50 & 0.30 & 0.20 & 0.10 & 0.05 \\
+\hline
+\end{tabular}
+\end{table}
+
+ADSR は表\ref{tab:adsr}の初期値とする．前版のように音符全体を単純な直線減衰にすると，
+持続音が弱くなり金管らしさが落ちるため，本設計では Attack，Decay，Sustain，Release を分ける．
+
+\begin{longtable}{p{0.15\linewidth}p{0.15\linewidth}p{0.31\linewidth}p{0.29\linewidth}}
+\caption{金管 ADSR 初期値}\label{tab:adsr}\\
+\hline
+項目 & 初期値 & 意味 & 調整方針 \\
+\hline
+\endfirsthead
+\hline
+項目 & 初期値 & 意味 & 調整方針 \\
+\hline
+\endhead
+Attack & 20 ms & 息の入りの立ち上がり & 遅く感じる場合は10 msへ短縮する． \\
+\hline
+Decay & 40 ms & 最大音量から持続音量へ移る時間 & 音が硬い場合は延長する． \\
+\hline
+Sustain & 最大音量の0.75倍 & 音符中の持続音量 & velocity に応じてスケールする． \\
+\hline
+Release & 60 ms & 息を止めた後の余韻 & 音の切れが悪い場合は40 msへ短縮する． \\
+\hline
+\end{longtable}
+
+\subsubsection{リズム伴奏音色}
+node\_05 は齋藤資料でベース・リズム伴奏，塩澤資料でドラムとして扱われる．したがって，
+Processing 側では金管音色に固定せず，リズムを支える短い減衰音として設計する．
+
+\begin{longtable}{p{0.16\linewidth}p{0.24\linewidth}p{0.48\linewidth}}
+\caption{リズム伴奏音色の設計}\label{tab:rhythm}\\
+\hline
+noteNumber & 音色カテゴリ & 合成方針 \\
+\hline
+\endfirsthead
+\hline
+noteNumber & 音色カテゴリ & 合成方針 \\
+\hline
+\endhead
+36付近 & Kick/Bass & 低いサイン波を短く鳴らし，100--150 ms 程度で減衰させる． \\
+\hline
+38付近 & Snare & ノイズ成分と中域の短い共鳴を混ぜ，90 ms 程度で減衰させる． \\
+\hline
+42付近 & Hi-hat & 高域ノイズを40 ms 程度で短く減衰させる． \\
+\hline
+その他 & Click & 未定義の noteNumber でも無音にならないよう，短いクリック音で代替する． \\
+\hline
+\end{longtable}
+
+\section{処理フローの設計}
+
+\subsection{起動フロー}
+\begin{enumerate}
+  \item \texttt{setup()} で画面，音声出力，設定値，Logger，PartManager を初期化する．
+  \item 期待 \texttt{partId} を設定する．本番では Mac 1--4 が 0x02--0x05 に固定される．
+  \item \texttt{Serial.list()} でポート一覧を取得し，保存済みポートがあれば接続を試みる．
+  \item 接続成功なら Ready，失敗なら PortSelect または Error に遷移する．
+  \item テスト発音でスピーカと音量を確認できるようにする．
+\end{enumerate}
+
+\subsection{NOTE 受信フロー}
+NOTE 受信から発音までの処理を図\ref{lst:receive-flow}に示す．ここで重要なのは，
+Arduino 側が送るバイト列を Processing 側で勝手に文字列化せず，20バイト固定長のバイナリとして扱う点である．
+
+\begin{lstlisting}[style=pseudo, caption={NOTE 受信から発音までの処理フロー}, label={lst:receive-flow}]
+serialEvent()
+  while serial has bytes:
+    reader.pushByte(serial.read())
+    while reader.tryReadPacket(packet):
+      if packet.version != 1:
+        log("version error"); continue
+      if packet.type != 3:
+        log("non NOTE packet"); continue
+      if packet.gate is not 0 and not 1:
+        log("gate error"); continue
+      if expectedPartId != ALL and packet.partId != expectedPartId:
+        log("wrong part"); showWarning(); continue
+      if packet.seq is duplicate:
+        log("duplicate seq"); continue
+      PartManager.handleNote(packet)
+\end{lstlisting}
+
+\subsection{ボイス管理フロー}
+\begin{enumerate}
+  \item \texttt{gate=1} かつ \texttt{noteNumber>0} の場合，NoteOn として扱う．
+  \item \texttt{partId} から音色種別を決める．0x02--0x04 は \texttt{BrassVoice}，0x05 は \texttt{RhythmVoice} とする．
+  \item \texttt{velocity} を 0.0--1.0 に正規化し，合計振幅が 0.8 を超えないようスケールする．
+  \item 同一 partId の発音数が上限を超える場合，最も古い Voice を Release へ移す．
+  \item \texttt{durationMs} から自動 NoteOff 時刻を計算する．0 の場合は最小長を使う．
+  \item \texttt{gate=0} または自動 NoteOff 時刻到達時に，同一 partId・同一 noteNumber の Voice を Release へ移す．
+  \item Release が完了した Voice は配列から削除し，音声出力との接続を解除する．
+\end{enumerate}
+
+\subsection{例外処理}
+\begin{longtable}{p{0.24\linewidth}p{0.36\linewidth}p{0.28\linewidth}}
+\caption{Processing 側例外処理}\label{tab:exceptions}\\
+\hline
+条件 & 処理 & 目的 \\
+\hline
+\endfirsthead
+\hline
+条件 & 処理 & 目的 \\
+\hline
+\endhead
+magic 不一致 & 1バイトずつ破棄して次の \texttt{0x52 0x4F} を探す． & バイトずれから復帰する． \\
+\hline
+version 不一致 & パケット全体を破棄する． & 旧仕様・別仕様との混在を防ぐ． \\
+\hline
+type 不一致 & パケット全体を破棄する． & CTRL/BEAT を誤って発音しない． \\
+\hline
+seq 重複 & 発音せずログのみ残す． & 二重発音を防ぐ． \\
+\hline
+seq 欠落 & 発音は継続し，欠落数をログする． & 聴感破綻を避けつつ検証可能にする． \\
+\hline
+partId 不一致 & 発音せず画面警告を出す． & Mac と Arduino の接続ミスを即発見する． \\
+\hline
+Serial 切断 & 全 Voice を Release し Error へ遷移する． & 無限発音を防ぐ． \\
+\hline
+音量過大 & 全 Voice の振幅をスケールダウンする． & クリップと耳に痛い音を防ぐ． \\
+\hline
+\end{longtable}
+
+\section{テストの設計}
+テストは，Processing 単体，Arduino との結合，音色評価の順に行う．表\ref{tab:tests}に試験項目を示す．
+ルーブリックで要求される「処理フローの条件分岐や例外処理」も確認対象に含める．
+
+\begin{longtable}{p{0.10\linewidth}p{0.24\linewidth}p{0.38\linewidth}p{0.18\linewidth}}
+\caption{Processing 側テスト設計}\label{tab:tests}\\
+\hline
+ID & 試験項目 & 手順 & 合否基準 \\
+\hline
+\endfirsthead
+\hline
+ID & 試験項目 & 手順 & 合否基準 \\
+\hline
+\endhead
+PT-1 & NOTE 復号単体 & 正常な20バイト配列を与え，\texttt{NotePacket} に復号する． & 全フィールドが一致する． \\
+\hline
+PT-2 & フレーム同期復帰 & 破損バイトを前に混ぜた後，正常フレームを与える． & 次の magic から復帰する． \\
+\hline
+PT-3 & partId 誤接続 & Mac 1 設定で partId 0x03 を入力する． & 発音せず警告表示する． \\
+\hline
+PT-4 & NoteOn/Off & gate=1 後に gate=0 または durationMs 経過を入力する． & 無限発音しない． \\
+\hline
+PT-5 & 同時発音上限 & 金管で上限を超える NoteOn を連続入力する． & 古い Voice を Release し，上限を維持する． \\
+\hline
+PT-6 & リズム伴奏音色 & partId 0x05 で複数の noteNumber を入力する． & 短いリズム音として鳴る． \\
+\hline
+PT-7 & 受信遅延 & NOTE 受信時刻から Voice 生成までを100回記録する． & 最大5 ms以下を目標にする． \\
+\hline
+PT-8 & 結合演奏 & node\_02--05 と Mac 4台を接続し，4パートを演奏する． & 欠落なく鳴り，誤接続警告が出ない． \\
+\hline
+\end{longtable}
+
+\section{ルーブリック対応}
+表\ref{tab:rubric}に，本書がシステム設計書ルーブリックの評価項目に対応している箇所を示す．
+
+\begin{longtable}{p{0.34\linewidth}p{0.52\linewidth}}
+\caption{システム設計書ルーブリックとの対応}\label{tab:rubric}\\
+\hline
+評価項目 & 本書での対応 \\
+\hline
+\endfirsthead
+\hline
+評価項目 & 本書での対応 \\
+\hline
+\endhead
+基本設計: 機能一覧とシステム構成図 & 第1章の機能一覧，構成図，partId 対応表で主要機能と構成要素の関係を示した． \\
+\hline
+基本設計: 操作インターフェースと状態遷移 & キー操作，画面表示，Boot から Error までの状態遷移を示した． \\
+\hline
+詳細設計: ハードウェア設計 & Arduino，Mac，USB，スピーカの接続関係と切断時動作を示した． \\
+\hline
+詳細設計: ソフトウェア設計 & ファイル構成，NOTE パケット，クラス設計，音色パラメータを示した． \\
+\hline
+詳細設計: 処理フローの設計 & 起動，受信，復号，発音，例外処理，テストの流れを示した． \\
+\hline
+\end{longtable}
+
+\chapter{生成AIの利用について}
+本設計書の作成にあたり，生成AIを利用した．利用範囲は，既存資料の読み取り補助，
+章立ての整理，ルーブリック項目との対応確認，および文章案の作成である．
+
+ただし，採用する前提条件，NOTE パケット仕様，Mac 4台構成，partId 対応，
+齋藤担当範囲との境界，試験項目については，リポジトリ内資料およびチーム内レビューを確認したうえで
+著者が判断する．生成AIの出力はそのまま採用せず，塩澤・齋藤の仕様と矛盾しないよう修正した．
+
+\end{document}
