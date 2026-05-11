@@ -1,45 +1,40 @@
-# pc_app — PC 側サブシステムの置き場（例）
+# pc_app — PC 側サブシステム
 
-このディレクトリは「**PC 側で動くサブシステムをリポジトリに同梱したいとき**」の例。
-サンプルとして [Processing](https://processing.org/) のスケッチを置いているが、
-中身は自分たちの技術スタックに合わせて自由に差し替えてよい。
-
-ディレクトリ名も用途に合わせてリネーム可能
-（例: `viewer/`, `desktop_app/`, `web/`, `frontend/` など）。
-
-## こんなときに使う
-
-- マイコンから PC へシリアルでデータを送って可視化したい
-- PC 側で音・映像を生成したい
-- 操作用の GUI を作りたい
-- Web フロントエンドやデスクトップアプリを同梱したい
-
-## 構成
-
-| ディレクトリ | 内容 |
+| サブディレクトリ | 目的 |
 |---|---|
-| `example_sketch/` | 最小の Processing スケッチ（書き方のサンプル） |
+| [`production/`](production/) | 本番想定の素のテンプレート（Processing スケッチ雛形）|
+| [`test_v1/`](test_v1/) | `firmware/test_v1/` の楽器ノードからの NOTE を Minim でサイン波合成して鳴らす（旧 `pc_app/test`）。1 楽器 = 1 Mac = 1 Processing |
+| [`test_v2/`](test_v2/) | `firmware/test_v2/`（きらきら星 輪唱）の NOTE を、sound_lab の楽器定義（`data/*.json`）で加算合成して鳴らす。**PC アプリ 1 個で複数シリアルポートを同時に開ける** |
 
-## サンプルの実行方法（Processing の場合）
+**新しく動かすなら `test_v2/` を使う。**
 
-1. [Processing IDE](https://processing.org/download) をインストールする
-2. `example_sketch/example_sketch.pde` を Processing IDE で開く
-3. 「Run」ボタンを押す
-
-> Processing 以外（Python / Unity / Electron 等）を使う場合は、
-> `example_sketch/` を削除して自分たちのプロジェクトを配置する。
-
-## スケッチを追加する（Processing 固有）
-
-Processing のお約束として、スケッチのフォルダ名と `.pde` のファイル名は
-**同じ名前**にする必要がある。
+## test_v2（推奨）
 
 ```
-pc_app/
-└── my_sketch/
-    └── my_sketch.pde   # フォルダと同じ名前
+pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde
 ```
 
-## 不要な班は
+`firmware/test_v2/` の楽器ノード（UNO R4 WiFi）から USB Serial で送られる NOTE パケット
+（**楽器番号 / 高さ / 長さ / 声部 / velocity**）を受け、`data/*.json`（sound_lab の楽器定義）を
+番号で選んでポリフォニックに加算合成する（倍音加算 + 非調和性 + スペクトル整形ノイズ + 全体
+エンベロープ + ビブラート/トレモロ — `instrument_player` と同じ合成方式）。画面下のポート一覧を
+クリックして複数ポートを同時に開けるので、テスト時は 1 Mac に複数ノードを挿してもよい。
 
-`pc_app/` ディレクトリを丸ごと削除してよい。
+詳細は [`test_v2/README.md`](test_v2/README.md) を参照。
+
+## test_v1
+
+`firmware/test_v1/` の楽器ノードからの NOTE を Minim のサイン波で鳴らす最小実装。
+複数ノードを鳴らすときは Mac と Processing インスタンスをノードごとに用意する（1 楽器 = 1 Mac）。
+詳細は [`test_v1/README.md`](test_v1/README.md) を参照。
+
+## production 版
+
+クリーンな Processing スケッチ雛形。各班が音色合成や可視化を自由に書く前提。
+
+## 音色の作り込み（関連）
+
+楽器の単音から音色定義（JSON）を作るツールは [`../sound_lab/`](../sound_lab/) を参照。
+`test_v2/orchestra_resynth` の `data/*.json` も sound_lab の出力フォーマット
+（[`../sound_lab/library_format.md`](../sound_lab/library_format.md)）。`InstrModel` / `ResynthVoice` は
+`sound_lab/processing/instrument_player` から移植している。
