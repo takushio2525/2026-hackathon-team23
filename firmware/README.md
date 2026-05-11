@@ -1,94 +1,101 @@
-# firmware — マイコン用ファームウェア（例）
+# firmware — マイコン用ファームウェア
 
-このディレクトリは「**複数のマイコンを分担して開発するときのプロジェクト構成の例**」。
+このディレクトリは「**本番用** (`production/`)」と「**テスト用** (`test_v1/` / `test_v2/`)」に
+分かれている。
 
-「ハッカソンで Arduino を何台か使い、それぞれ別の役割（センサ担当・表示担当・
-通信担当など）をチームで分担したい」というケースを想定した雛形。ハードウェアを
-使わない班は [`firmware/` ごと削除してよい](#使わない班は)。
+| サブディレクトリ | 目的 | 中身 |
+|---|---|---|
+| [`production/`](production/) | 本番想定の素のテンプレート | クリーンな PlatformIO プロジェクト雛形 (node_01〜05) |
+| [`test_v1/`](test_v1/) | 仕様書（Arduino オーケストラ計画書）準拠の最初の検証実装 | 指揮者 + 楽器 3。各拍で C major 圏内の和音を鳴らして拍ズレを聞き取る用（旧 `firmware/test`） |
+| [`test_v2/`](test_v2/) | きらきら星の輪唱 + 楽器番号付き NOTE | 指揮者 + 楽器 3。楽譜「きらきら星」全曲を内蔵し、3 声部を 8 拍ずつずらして輪唱。NOTE に `instrumentId`（楽器番号）を載せ、PC 側で sound_lab の音色定義を選んで合成する |
 
-## コーディング方針（本チームの決定事項）
+どちらも仕様書 `meetings/0429_3回/事前課題共有/arduino_塩澤.pdf` の §2.3〜§2.4 に沿った
+実機検証用実装。指揮者ノードのハードウェアは `MPU6050` を `GY-521` モジュールで代替している。
+**新しく動かすなら `test_v2/` を使う**（`test_v1/` は最初の同期検証版として残してある）。
 
-本チームのファームウェアは、以下のリファレンス実装に**必ず**従って書く。
+`test_v2` での主な変更点（詳細は [`test_v2/README.md`](test_v2/README.md)）:
 
-> **Embedded-Module-Architecture**
-> <https://github.com/takushio2525/Embedded-Module-Architecture>
+- 楽譜「きらきら星」全曲を内蔵（`node_02/03/04/src/score_data.cpp`、3 台とも同一）
+- 3 声部の輪唱（カノン）：`headRestBeats`（ProjectConfig.h）で頭の休符ぶんずらして入る
+  （node_02→0 / node_03→8 / node_04→16 拍）
+- NOTE パケットに `instrumentId`（楽器番号）を追加（旧 `reserved[0]`）。各ノードが固定で送る
+  （node_02→0 / node_03→1 / node_04→2）。PC 側 `pc_app/test_v2/orchestra_resynth` がこの番号で
+  `data/*.json` を選んで加算合成する
+- 楽器ノードは指揮者の **拍番号** から自分の楽譜位置を計算 → PC 側 Processing を曲の途中で起動しても
+  「いまの拍」から鳴り始める
+- 初期テンポ 100 BPM（最初の 1 音）→ 2 拍目で簡易テンポ確定 → 以降 EMA で随時補正
+- node_02/03/04 の `platformio.ini` は既定で `SERIAL_DEBUG=0`（バイナリ NOTE を Serial に流す）
 
-- **3 フェーズループ**（入力 → ロジック → 出力）で `loop()` を構成する
-- 各機能は `IModule` インターフェース（`setup()` / `update()`）を実装した
-  モジュールとして書く
-- ノード内の共有状態は `SystemData` 構造体に集約する
-- ピン・定数・閾値などノード固有設定は `ProjectConfig` に集約する
-- 周期実行は `ModuleTimer` を使い、`delay()` でブロックしない
-- 新規モジュール追加時はリファレンスの `ARCHITECTURE.md` のチェックリストに従う
-
-共通コード（UDP 層・時間管理・共有プロトコル定義など）は [`common/lib/`](common/lib/) に置き、
-各ノードの `platformio.ini` から `lib_extra_dirs = ../common/lib` で参照する。
-
-詳細と判断の背景は [ADR-0005](../docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
-
-Arduino をベタ書きした経験しかないメンバーは、先にリファレンスの
-`ARCHITECTURE.md` と `example/` 系コードを読んでから実装を始めること。
-
-## 構成
-
-```
-firmware/
-├── common/            # 全ノード共通のコード（例: 共有ライブラリ）
-│   └── lib/
-│       └── ExampleLibrary/   # 共通ライブラリの書き方サンプル
-└── node_01〜05/       # 各マイコン 1台ごとの PlatformIO プロジェクト
-    ├── platformio.ini     # ビルド設定
-    ├── src/main.cpp       # エントリーポイント
-    ├── include/           # ヘッダファイル置き場
-    ├── lib/               # このノード固有のライブラリ
-    └── test/              # ユニットテスト置き場
-```
-
-各ノードは **PlatformIO の新規プロジェクトを作った直後と同じクリーンな状態**
-で用意してある。中身は自分たちのプロジェクトに合わせて書き換えていく。
-
-## ノード数の調整
-
-| 使う台数 | どうする |
-|---|---|
-| 5台 | そのまま |
-| 3台 | `node_04/` `node_05/` を削除 |
-| 1台 | `node_02/` 〜 `node_05/` を削除。`node_01/` を好きな名前にリネームしてもよい |
-| 6台以上 | `node_05/` をコピーして `node_06/` などを作る |
-
-## 役割分担表（記入する）
-
-担当と役割が決まり次第、下の表を更新する。
-
-| ノード | 役割 | ハードウェア | 担当者 | 備考 |
-|---|---|---|---|---|
-| node_01 | 未定 | 未定 | 未定 | |
-| node_02 | 未定 | 未定 | 未定 | |
-| node_03 | 未定 | 未定 | 未定 | |
-| node_04 | 未定 | 未定 | 未定 | |
-| node_05 | 未定 | 未定 | 未定 | |
-
-## ビルド方法
-
-PlatformIO は VSCode 拡張として入れるのが簡単。
+## ビルド
 
 ```bash
-# 例: node_01 をビルドする
-cd firmware/node_01
-pio run                 # ビルドのみ
-pio run -t upload       # 書き込み
-pio device monitor      # シリアルモニタ
+# === test_v2 (きらきら星 輪唱・推奨) ===
+pio run -d firmware/test_v2/node_01 -t upload   # 指揮者 (XIAO ESP32-S3 Sense + GY-521)
+pio run -d firmware/test_v2/node_02 -t upload   # 輪唱 声部 1
+pio run -d firmware/test_v2/node_03 -t upload   # 輪唱 声部 2
+pio run -d firmware/test_v2/node_04 -t upload   # 輪唱 声部 3
+
+# === test_v1 (最初の同期検証版) ===
+pio run -d firmware/test_v1/node_01 -t upload
+pio run -d firmware/test_v1/node_02 -t upload   # ...node_03 / node_04 も同様
+
+# === production (まだ素のテンプレ) ===
+pio run -d firmware/production/node_01
 ```
 
-各ノードの詳細は `firmware/node_XX/README.md` を参照。
+`pio device monitor -d firmware/test_v2/node_01` でシリアルモニタ。
 
-## 共通ライブラリ
+## コーディング方針
 
-複数ノードで同じコードを共有したいときに [`common/lib/`](common/lib/) を使う。
-詳細は [`common/README.md`](common/README.md)。
+`test_v1/` `test_v2/` のコードは [Embedded-Module-Architecture (EMA)](https://github.com/takushio2525/Embedded-Module-Architecture)
+に全面準拠する。
 
-## 使わない班は
+- 3 フェーズループ（入力 → ロジック → 出力）で `loop()` を構成
+- 各機能は `IModule`（`init()` / `updateInput()` / `updateOutput()` / `deinit()`）を実装
+- ノード内の共有状態は `SystemData` 構造体に集約
+- ピン・定数・閾値は `ProjectConfig.h` に集約（モジュール本体にハードコードしない）
+- モジュール間の直接呼び出しは禁止。通信は `SystemData` のフィールド経由のみ
 
-ハードウェアを使わない班・Arduino 以外を使う班は、**`firmware/` ディレクトリを
-丸ごと削除してよい**。削除後に必要なら、自分たちの技術スタック用のフォルダを
-作り直す（例: `app/`, `src/`, `backend/` など）。
+詳細は [`test_v2/common/README.md`](test_v2/common/README.md) と
+[ADR-0005](../docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
+
+## 共通層
+
+各バージョンの `common/lib/` に全ノード共有のライブラリ群を置き、各ノードの
+`platformio.ini` から `lib_extra_dirs = ../common/lib` で参照する。
+
+| ライブラリ | 内容 |
+|---|---|
+| `ModuleCore/` | `IModule` 抽象基底 + `ModuleTimer` |
+| `OrcProtocol/` | CTRL/BEAT/NOTE の 20 B パケット定義（`magic=0x4F52`）。test_v2 では NOTE に `instrumentId` 追加 |
+| `OrcNetModule/` | WiFi UDP マルチキャスト送受信 |
+| `StatusLedModule/` | 状態に応じた LED 点滅出力 |
+| `SerialDebug/` | `SERIAL_DEBUG` フラグで切替えるシリアルデバッグマクロ |
+
+## 役割分担
+
+| ノード | test_v1 | test_v2 | ハードウェア | partId |
+|---|---|---|---|---|
+| node_01 | 指揮者（SoftAP + IMU）| 同左（初期テンポ 100 BPM）| XIAO ESP32-S3 Sense + GY-521 | — |
+| node_02 | 楽器 1（金管 1 / C4 ベース）| 輪唱 声部 1（headRest=0, instr=0）| Arduino UNO R4 WiFi | 0x02 |
+| node_03 | 楽器 2（金管 2 / E4 ベース）| 輪唱 声部 2（headRest=8, instr=1）| Arduino UNO R4 WiFi | 0x03 |
+| node_04 | 楽器 3（木管 1 / G4 ベース）| 輪唱 声部 3（headRest=16, instr=2）| Arduino UNO R4 WiFi | 0x04 |
+| node_05 | ドラム（未実装）| — | (未実装) | 0x05 |
+
+どちらも node_03〜 は node_02 をコピーして `ProjectConfig.h` だけ差し替えれば動く設計
+（仕様書 §2.4.3.6）。test_v2 は楽譜 `score_data.cpp` も 3 台同一（= 輪唱）。
+
+## 仕様の核
+
+| 項目 | 値 |
+|---|---|
+| WiFi SSID / pass | `OrchestraAP` / `orchestra2026` |
+| マルチキャスト | `239.0.0.1:5001` |
+| WiFi チャネル | 6 |
+| 共通ヘッダ | 12 B（magic + version + type + seq + timestampMs）|
+| ペイロード | 8 B（CTRL / BEAT / NOTE 共通サイズ）|
+| パケット長 | 20 B 固定 |
+| BPM 範囲 | 40–240（初期値 test_v1=120 / test_v2=100）|
+| マスタクロック | 指揮者ノードの `millis()`、楽器側は EMA で offset 推定 |
+| MOP-1 同期誤差 | ≤ 20 ms（ADR-0006 に準拠）|
+| MOP-2 通信遅延 | ≤ 10 ms |
