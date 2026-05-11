@@ -39,6 +39,11 @@ ONE_CYCLE_POINTS = 1024          # 単一周期波形の点数
 NOISE_BANDS_HZ = [0, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, SR // 2]
 FMIN = 50.0                      # 基音探索の下限
 FMAX = 2200.0                    # 基音探索の上限
+PYIN_FRAME = 2048                # pyin のフレーム長(hop はその 1/4 = 512 → フレームレート ≒ SR/512)
+PYIN_HOP = PYIN_FRAME // 4       # = 512
+F0_TRACK_HZ = SR / PYIN_HOP      # ≒ 86.13 Hz (f0 トラックの時間解像度)
+VIBRATO_BAND_HZ = (3.0, 9.0)     # ビブラート/トレモロとみなす周波数帯
+F0_PREVIEW_POINTS = 600          # 描画用に f0(セント) トラックを間引く点数
 # 先頭/末尾の無音トリム(ピーク RMS からの相対 dB)。録音のルームトーンや準備音を無音扱いする閾値。
 TRIM_LEAD_DB = 20.0              # 先頭: -20dB 未満は無音とみなしてカット(準備音・息・暗騒音も切る)
 TRIM_TRAIL_DB = 50.0             # 末尾: -50dB 未満をカット(減衰の尾は残すため緩め)
@@ -150,9 +155,12 @@ def analyze_file(path: str, name: str | None = None) -> dict:
     env = rms / (rms_peak + 1e-12)        # 0..1, ピーク=1
     n_env = len(env)
 
-    # ── 基音検出 ────────────────────────────────────────
-    fundamental = _detect_fundamental(y)
+    # ── 基音検出 (f0 トラックも保持: ビブラート解析と描画に使う) ──
+    fundamental, f0_track = _detect_fundamental(y)
     midi = _hz_to_midi(fundamental)
+
+    # ── ビブラート / トレモロ の検出 ───────────────────
+    modulation = _detect_modulation(f0_track, env, ENV_HZ)
 
     # ── ADSR + ループ点の当てはめ ────────────────────────
     adsr = _fit_adsr(env, ENV_HZ)
@@ -216,6 +224,7 @@ def analyze_file(path: str, name: str | None = None) -> dict:
             "loop_end_sec": _r(adsr["loop_end_sec"], 4),
         },
         "inharmonicity_b": _r(inharmonicity_b, 7),
+        "modulation": modulation,
         "harmonics": harmonics,
         "noise": noise,
         "waveform": {
@@ -225,33 +234,148 @@ def analyze_file(path: str, name: str | None = None) -> dict:
         "features": features,
     }
 
+    # 描画用 f0 トラック(中央値からのセント差)
+    f0_cents_prev, f0_prev_rate = _f0_cents_preview(f0_track, duration_sec)
+
     preview = {
         "waveform": _waveform_preview(y, 2000),
         "spectrum_freq": spectrum_preview["freq"],
         "spectrum_db": spectrum_preview["db"],
+        "f0_cents": f0_cents_prev,
+        "f0_rate_hz": _r(f0_prev_rate, 3),
     }
     return {"instrument": instrument, "preview": preview}
 
 
 # ── 基音 ─────────────────────────────────────────────────────
-def _detect_fundamental(y: np.ndarray) -> float:
+def _detect_fundamental(y: np.ndarray):
+    """基音 (中央値, Hz) と f0 トラック(フレームごとの Hz・無声は NaN / 失敗時 None) を返す。"""
     try:
-        f0, _, voiced_prob = librosa.pyin(
-            y, fmin=max(FMIN, 55.0), fmax=min(FMAX, 2000.0), sr=SR, frame_length=2048)
+        f0, _, _ = librosa.pyin(
+            y, fmin=max(FMIN, 55.0), fmax=min(FMAX, 2000.0),
+            sr=SR, frame_length=PYIN_FRAME, hop_length=PYIN_HOP)
         f0v = f0[~np.isnan(f0)]
         if f0v.size >= 3:
             # 安定区間(中央あたり)の中央値を採る
-            return float(np.median(f0v))
+            return float(np.median(f0v)), np.asarray(f0, dtype=float)
     except Exception:
         pass
-    # フォールバック: 振幅最大付近の自己相関
+    # フォールバック: 振幅最大付近の自己相関(トラックは取れない)
     peak = int(np.argmax(np.abs(y)))
     seg = y[peak:peak + min(y.size - peak, int(0.2 * SR))]
     f0 = _autocorr_f0(seg if seg.size > 1024 else y, SR)
     if f0 is None or not (FMIN <= f0 <= FMAX):
         raise AnalysisError(
             "基音を検出できませんでした。和音やノイズではなく、ピッチのはっきりした単音を渡してください。")
-    return float(f0)
+    return float(f0), None
+
+
+# ── ビブラート / トレモロ ────────────────────────────────────
+def _zero_modulation() -> dict:
+    z = lambda: {"rate_hz": 0.0, "depth_cents": 0.0, "depth": 0.0,
+                 "onset_sec": 0.0, "regularity": 0.0, "detected": False}
+    return {"vibrato": z(), "tremolo": z()}
+
+
+def _periodicity(seg: np.ndarray, rate_hz: float, band: tuple):
+    """中央を切り出し済みの 1 次元信号から、band 内の最強周期成分を推定する。
+    返り値: (周波数 Hz, 振幅 = 元信号と同じ単位の正弦波振幅, 卓越度 regularity, RMS, ピーク到達インデックス)
+    周期性が弱いときは None。
+    """
+    n = seg.size
+    if n < 32:
+        return None
+    seg = seg - float(np.mean(seg))
+    # 低周波ドリフト(band 下限の半分以下)を移動平均で除去
+    w = max(3, int(round(rate_hz / (band[0] * 0.5))))
+    if 3 <= w < n:
+        seg = seg - np.convolve(seg, np.ones(w) / w, mode="same")
+    rms = float(np.sqrt(np.mean(seg ** 2)))
+    if rms < 1e-9:
+        return None
+    win = np.hanning(n)
+    win_sum = float(np.sum(win)) + 1e-12
+    sp = np.abs(np.fft.rfft(seg * win))
+    fq = np.fft.rfftfreq(n, d=1.0 / rate_hz)
+    sel = (fq >= band[0]) & (fq <= band[1])
+    if not np.any(sel) or float(sp[sel].max()) < 1e-12:
+        return None
+    band_idx = np.where(sel)[0]
+    k = int(band_idx[np.argmax(sp[band_idx])])
+    freq = float(fq[k])
+    amp = 2.0 * float(sp[k]) / win_sum               # 窓補正つき振幅推定(片振幅)
+    med = float(np.median(sp[sel])) + 1e-12
+    regularity = float(sp[k] / med)
+    # ピーク到達: |seg| が片振幅の半分を最初に超えるフレーム
+    over = np.where(np.abs(seg) >= amp * 0.5)[0]
+    onset_idx = int(over[0]) if over.size else 0
+    return freq, amp, regularity, rms, onset_idx
+
+
+def _detect_modulation(f0_track, env: np.ndarray, env_rate: int) -> dict:
+    """f0 トラックから ビブラート(ピッチの周期揺れ)を、振幅エンベロープから トレモロ(音量の周期揺れ)を
+    検出する。検出できなければ各値 0 / detected=False(キーは常に出す)。中央 20〜80% の区間で評価する。"""
+    out = _zero_modulation()
+
+    # ── ビブラート ──────────────────────────────────
+    if f0_track is not None:
+        ft = np.asarray(f0_track, dtype=float)
+        good = ~np.isnan(ft)
+        if good.sum() >= 24 and good.sum() >= ft.size * 0.6:
+            ft = np.interp(np.arange(ft.size), np.flatnonzero(good), ft[good])
+            cents = 1200.0 * np.log2(ft / (np.median(ft) + 1e-12))
+            lo, hi = int(cents.size * 0.2), int(cents.size * 0.8)
+            r = _periodicity(cents[lo:hi], F0_TRACK_HZ, VIBRATO_BAND_HZ)
+            if r is not None:
+                freq, amp, reg, rms, onset_idx = r
+                pp = 2.0 * amp                       # 全振幅(セント)
+                if pp >= 8.0 and reg >= 4.0 and rms >= 3.0:
+                    out["vibrato"] = {
+                        "rate_hz": _r(freq, 2),
+                        "depth_cents": _r(min(pp, 200.0), 1),
+                        "depth": _r(min(pp, 200.0) / 100.0, 3),   # 半音=1.0 の換算値も置いておく
+                        "onset_sec": _r((lo + onset_idx) / F0_TRACK_HZ, 3),
+                        "regularity": _r(min(reg / 12.0, 1.0), 3),
+                        "detected": True,
+                    }
+
+    # ── トレモロ ────────────────────────────────────
+    e = np.asarray(env, dtype=float)
+    if e.size >= 48:
+        lo, hi = int(e.size * 0.2), int(e.size * 0.8)
+        base = float(np.mean(e[lo:hi])) + 1e-9
+        r = _periodicity(e[lo:hi], env_rate, VIBRATO_BAND_HZ)
+        if r is not None:
+            freq, amp, reg, rms, onset_idx = r
+            depth = 2.0 * amp / base                  # 全振幅 / 平均レベル(相対)
+            if depth >= 0.04 and reg >= 4.0 and rms / base >= 0.015:
+                out["tremolo"] = {
+                    "rate_hz": _r(freq, 2),
+                    "depth": _r(min(depth, 1.0), 3),
+                    "depth_cents": 0.0,
+                    "onset_sec": _r((lo + onset_idx) / env_rate, 3),
+                    "regularity": _r(min(reg / 12.0, 1.0), 3),
+                    "detected": True,
+                }
+    return out
+
+
+def _f0_cents_preview(f0_track, duration_sec: float):
+    """描画用に f0 トラックを「中央値からのセント差」にして間引く。返り値 (値リスト, レート Hz)。"""
+    if f0_track is None:
+        return [], 0.0
+    ft = np.asarray(f0_track, dtype=float)
+    good = ~np.isnan(ft)
+    if good.sum() < 8:
+        return [], 0.0
+    ft = np.interp(np.arange(ft.size), np.flatnonzero(good), ft[good])
+    cents = 1200.0 * np.log2(ft / (np.median(ft) + 1e-12))
+    if cents.size > F0_PREVIEW_POINTS:
+        cents = _resample_curve(cents, F0_PREVIEW_POINTS)
+        rate = F0_PREVIEW_POINTS / max(duration_sec, 1e-6)
+    else:
+        rate = F0_TRACK_HZ
+    return _r(cents, 2), rate
 
 
 # ── ADSR ─────────────────────────────────────────────────────
