@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sound_lab — 楽器音アナライザ & 編集スタジオ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- 重要: studio.css が読めない(file:// 直開きなど)場合でも案内が読める最小スタイル -->
+<style>
+  body{font-family:'DM Sans','Noto Sans JP',system-ui,sans-serif;color:#1E1B4B;margin:0;padding:32px 20px 80px;
+       background:linear-gradient(135deg,#E0E7FF 0%,#FCE7F3 50%,#DBEAFE 100%)}
+  .wrap{max-width:1180px;margin:0 auto}
+  .card{background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.7);border-radius:1.5rem;padding:22px 24px;margin-bottom:18px}
+  .hidden{display:none !important}
+  code{font-family:'JetBrains Mono',monospace;font-size:.82em}
+</style>
+<link rel="stylesheet" href="/static/studio.css">
+</head>
+<body>
+<div class="blob3"></div>
+<div class="wrap">
+
+  <header>
+    <h1>sound_lab — 楽器音アナライザ &amp; 編集スタジオ</h1>
+    <p>楽器の<strong>単音</strong>を渡すと、ADSR・倍音・残差ノイズ・非調和性・ビブラート/トレモロまで解析し、
+      その場で<strong>鳴らしながら</strong>音色を作り込めます。仕上げた音色は Processing 用 JSON / WAV に書き出せます。</p>
+  </header>
+
+  <!-- file:// で開かれた / サーバに繋がらないときの案内 -->
+  <div class="card" id="needserver" style="display:none;border-color:rgba(244,114,182,.5);background:rgba(255,255,255,.78)">
+    <h2><span class="dot"></span>解析サーバが必要です</h2>
+    <p style="font-size:.92rem;line-height:1.75">
+      このページは <b>解析用 Python サーバ経由</b>で開く必要があります。HTML を直接ダブルクリックしても動きません。<br>
+      <b>① かんたん</b>: <code>sound_lab/analyzer/start.command</code> をダブルクリック（初回は依存インストールで数分）。自動でブラウザが開きます。<br>
+      <b>② ターミナル</b>:
+      <code>cd sound_lab/analyzer &amp;&amp; python3 -m venv .venv &amp;&amp; source .venv/bin/activate &amp;&amp; pip install -r requirements.txt &amp;&amp; python app.py</code><br>
+      起動できたら <a href="http://127.0.0.1:5005">http://127.0.0.1:5005</a> を開いてください（今このページが <span class="mono" id="curproto"></span> ならそれが原因です）。
+      <br><span style="color:#6366F1">※ 解析は不要だが「スタジオで音を作ってみたい」だけなら、下の <b>内蔵デモ音色で試す</b> でもサーバなしで触れます。</span>
+    </p>
+  </div>
+
+  <!-- アップロード -->
+  <div class="card" id="uploadCard">
+    <div id="drop" tabindex="0" role="button" aria-label="音源ファイルを選択">
+      <div class="big">🎵 音源ファイルをドロップ / クリックして選択</div>
+      <div class="sub"><b>.wav</b> 推奨 ・ .flac / .ogg / .mp3 / .aiff / .m4a 可 ・ 〜32&nbsp;MB ・ <b>1音だけ</b>を渡してください</div>
+    </div>
+    <input type="file" id="file" accept=".wav,.flac,.ogg,.mp3,.aiff,.aif,.m4a,audio/*" />
+    <div class="row" style="margin-top:16px;flex-wrap:wrap">
+      <button class="btn-primary" id="analyzeBtn" disabled>解析する</button>
+      <button class="btn-ghost" id="demoBtn">内蔵デモ音色で試す</button>
+      <button class="btn-ghost" id="loadJsonBtn">保存した JSON を読み込む</button>
+      <input type="file" id="jsonFile" accept=".json,application/json" style="display:none" />
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <!-- ===== スタジオ ===== -->
+  <div id="studio" class="hidden">
+
+    <div class="src" id="srcline"></div>
+
+    <!-- 常駐トランスポート -->
+    <div class="card transport" id="transport">
+      <div class="trow">
+        <button class="t-btn" id="droneBtn" title="現在選んでいる音を鳴らしっぱなしにして、手で調整に集中する">🔁 鳴らしっぱなし</button>
+        <button class="t-btn" id="latchBtn" title="鍵盤をクリックするたびに 鳴る / 止まる をトグル（ハンズフリー）">🔒 ラッチ</button>
+        <span class="t-sep"></span>
+        <button class="t-btn ic" id="octDown" title="鍵盤を 1 オクターブ下げる（↓キー）">◀&nbsp;8va</button>
+        <span class="t-note" id="curNoteLbl">C4 (60)</span>
+        <button class="t-btn ic" id="octUp" title="鍵盤を 1 オクターブ上げる（↑キー）">8va&nbsp;▶</button>
+        <span class="t-sep"></span>
+        <label class="t-vol" title="マスター音量">🔉<input type="range" id="tVol" min="0" max="1.1" step="0.01" value="0.6"></label>
+        <span class="t-sep"></span>
+        <button class="t-btn" id="playOrigBtn" title="アップロードした原音をそのまま鳴らして聴き比べ（A/B）" disabled>🔊 原音を再生</button>
+        <button class="t-btn danger" id="panicBtn" title="鳴っている音を全部止める（Space）">⏹ 全停止</button>
+        <span class="t-hint" id="audioHint">鍵盤か PC キーを押すと音が起動します</span>
+      </div>
+    </div>
+
+    <!-- 鍵盤 -->
+    <div class="card kbcard">
+      <div class="kbhint">🎹 鍵盤クリック or PC キー（<b>z s x d c v g b h n j m</b> ／ 上段 <b>q 2 w 3 e r 5 t 6 y 7 u i</b>）を<b>押している間</b>鳴ります。↑↓ でオクターブ移動。Space で全停止。</div>
+      <div id="keyboard" class="keyboard"></div>
+    </div>
+
+    <!-- 解析の可視化 -->
+    <div class="card">
+      <div class="card-head"><h2><span class="dot"></span> 📈 解析結果</h2></div>
+      <div class="stats" id="stats"></div>
+      <div class="adsr-line" id="adsrline"></div>
+      <div class="vizgrid">
+        <div><div class="canvlabel">波形（トリム後）</div><canvas id="cWave" height="120"></canvas></div>
+        <div><div class="canvlabel">スペクトル（対数周波数 / dB ・ 縦線＝倍音）</div><canvas id="cSpec" height="150"></canvas></div>
+        <div><div class="canvlabel">ピッチの揺れ（中央値からのセント差 ・ ビブラート検出に使用）</div><canvas id="cF0" height="84"></canvas></div>
+        <div><div class="canvlabel">解析した倍音の振幅（dB）</div><canvas id="cHarm" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 編集パネル群（JS が生成） -->
+    <div id="studioGrid" class="studio-grid"></div>
+
+    <!-- 書き出し -->
+    <div class="card">
+      <div class="card-head"><h2><span class="dot"></span> 💾 書き出し / 操作</h2></div>
+      <div class="exportrow">
+        <button class="btn-primary" id="dlJsonBtn">⬇ 調整後のインストゥルメント JSON</button>
+        <span class="exsub">→ Processing の <code>instrument_player/data/</code> に置けばこの音色で鳴る（<code>fx</code> 欄はブラウザ専用の付加情報）</span>
+      </div>
+      <div class="exportrow">
+        <button class="btn-ghost" id="dlWavBtn">⬇ いまの音を WAV で書き出し</button>
+        <label class="exsub">長さ <input type="number" id="wavDur" min="0.3" max="12" step="0.1" value="2.5" /> 秒 ／ 音程 = 鍵盤で最後に選んだ音（<b>全FX込み</b>でレンダリング）</label>
+      </div>
+      <div class="exportrow">
+        <button class="btn-ghost" id="reAnalyzeBtn">↻ 同じ音源を再解析</button>
+        <button class="btn-ghost" id="resetAllBtn">↺ 全パラメータを初期値に戻す</button>
+        <span class="exsub">各パネル右上の <b>↺</b> でその欄だけリセットできます。</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    解析: <span class="mono">Python + librosa</span> ／ ブラウザの再合成・編集: <span class="mono">Web Audio</span> ／
+    Processing で本番再合成: <span class="mono">sound_lab/processing/instrument_player</span>（Minim）。
+    フォーマット仕様 → <span class="mono">sound_lab/library_format.md</span>
+  </footer>
+</div>
+
+<script src="/static/engine.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
