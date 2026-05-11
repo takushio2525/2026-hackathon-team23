@@ -23,12 +23,17 @@
 
   "envelope":  { ... },          // 全体振幅エンベロープ + ADSR 近似（下記）
   "inharmonicity_b": 0.00021,    // 非調和性係数 B: f_n ≈ n·f0·√(1 + B·n²)。0=完全調和
+  "modulation": { ... },         // ビブラート / トレモロ（周期的なピッチ・音量の揺れ。下記）
   "harmonics": [ { ... }, ... ], // 倍音ごとの定義（下記）
   "noise":     { ... },          // 残差ノイズ成分（下記）
   "waveform":  { ... },          // 単一周期波形（任意・ウェーブテーブル用）
-  "features":  { ... }           // 表示用の特徴量（合成には使わない）
+  "features":  { ... },          // 表示用の特徴量（合成には使わない）
+  "fx":        { ... }           // 任意。ブラウザ編集スタジオで足したエフェクト設定（下記）
 }
 ```
+
+`fx` は解析器は出力せず、ブラウザの編集スタジオで「調整後の JSON」を書き出したときだけ付く。
+本体の再合成（倍音 + エンベロープ + ノイズ + 非調和性 + `modulation`）には不要で、Processing 現行版は無視する。
 
 ## `envelope` — 全体振幅エンベロープ
 
@@ -57,6 +62,34 @@
   リリース（`release_sec` でフェード）。
 
 `attack/decay/sustain/release` の 4 値だけで鳴らす簡易モードも可（Processing スケッチに切替あり）。
+
+## `modulation` — ビブラート / トレモロ
+
+解析器が「周期的なピッチの揺れ（ビブラート）」「周期的な音量の揺れ（トレモロ）」を検出して入れる。
+検出できなければ各値 0・`detected: false`（キーは常に存在する）。基音は単一値（`fundamental_hz`）として
+持つので、揺れは合成時にこの定義から **掛け直す**（再合成は元の揺れを再現せず、ここの値で付け直す）。
+
+```jsonc
+"modulation": {
+  "vibrato": {
+    "rate_hz": 5.6,        // 揺れの速さ
+    "depth_cents": 24.0,   // 揺れの全幅(セント)。実際の偏差は ±depth_cents/2
+    "depth": 0.24,         // depth_cents / 100（半音=1.0 換算。あれば使ってよい）
+    "onset_sec": 0.35,     // 音の頭から これだけ後に揺れが立ち上がる(おおよそ)
+    "shape": "sine",       // 任意。波形(sine/triangle/sawtooth/square)。無ければ sine
+    "regularity": 0.7,     // 0..1 周期性の強さ(表示用の目安)
+    "detected": true
+  },
+  "tremolo": {
+    "rate_hz": 5.2, "depth": 0.08,   // depth = 全幅(平均レベルに対する比)。1-depth..1 で変調
+    "depth_cents": 0.0, "onset_sec": 0.0, "shape": "sine", "regularity": 0.6, "detected": true
+  }
+}
+```
+
+**合成側の使い方**: `vibrato` … 各倍音の周波数に `2^((depth_cents/2)·gate(t)·sin(2π·rate·t)/1200)` を掛ける
+（`gate(t)` は `min(1, t/onset_sec)`）。`tremolo` … 最終振幅に `1 - depth/2 + (depth/2)·sin(2π·rate·t)` を掛ける。
+Processing 版（`instrument_player.pde`）はこの 2 つを実装済み。
 
 ## `harmonics[]` — 倍音
 
@@ -129,6 +162,21 @@
 }
 ```
 
+## `fx` — ブラウザ編集スタジオで足したエフェクト（任意）
+
+`sound_lab/analyzer/static`（ブラウザの編集スタジオ）で「調整後の JSON」を書き出したときだけ付く付加情報。
+リバーブ・ドライブ・コーラス・マスターフィルタ・ボディ EQ・移調・グライド・ノイズの出し方など、
+**本体の再合成（倍音 / エンベロープ / ノイズ / 非調和性 / `modulation`）には含まれない演出**をまとめてある。
+Processing 現行版は読まずに無視する（=これが付いていても従来どおり鳴る）。スタジオ側はこの欄を読み戻して
+編集状態を復元する。キー名は `reverb.{mix,size_sec,damping,pre_ms,width}` / `drive.{amount,tone_hz}` /
+`chorus.{mix,rate_hz,depth,width}` / `filter.{mode,cutoff_hz,q,lfo_rate_hz,lfo_depth}` /
+`body_eq.{low_gain,mid_freq,mid_gain,mid_q,presence_gain,high_gain}` ほか。
+
+なお、スタジオで `brightness`（高次倍音の傾き）・倍音ごとの手動ゲイン・`oddEvenBal`・倍音数制限・
+非調和性ミックスをいじった場合、その結果は **`harmonics[]` 本体に畳み込んで** 書き出される
+（`ratio` / `amp` / `amp_db` が更新される）ので、`fx` を読めない環境でもその音色で鳴る。
+ADSR スライダーの値も `envelope.attack_sec` 等に反映される（`envelope.values[]` 自体は変えない）。
+
 ## API レスポンス（`POST /analyze`）
 
 解析ツールのバックエンドは、上記 `instrument` に加えて描画用の生データを返す（JSON には保存しない）。
@@ -139,7 +187,9 @@
   "preview": {
     "waveform": [ [min,max], ... ],// 波形を ~2000 区間に間引いた min/max ペア
     "spectrum_freq": [ ... ],      // スペクトル描画用の周波数軸
-    "spectrum_db":   [ ... ]       // 同 振幅(dB)
+    "spectrum_db":   [ ... ],      // 同 振幅(dB)
+    "f0_cents":      [ ... ],      // ピッチトラック（中央値からのセント差）。ビブラート可視化用。取れなければ []
+    "f0_rate_hz":    86.13         // f0_cents[] のサンプルレート
   }
 }
 ```
