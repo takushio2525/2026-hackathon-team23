@@ -30,15 +30,20 @@
 
 ### ファームウェア（PlatformIO）
 
-仕様準拠のテスト実装は `firmware/test/` 配下、本番想定の素テンプレは
-`firmware/production/` 配下。
+テスト実装は `firmware/test_v1/`（最初の同期検証版）と `firmware/test_v2/`（きらきら星 輪唱 +
+楽器番号付き NOTE）配下、本番想定の素テンプレは `firmware/production/` 配下。
 
 ```bash
-# 仕様準拠のテスト版 (XIAO ESP32-S3 Sense + GY-521)
-cd firmware/test/node_01 && pio run
+# きらきら星 輪唱の検証版 (XIAO ESP32-S3 Sense + GY-521 が指揮者)
+pio run -d firmware/test_v2/node_01      # 指揮者
+pio run -d firmware/test_v2/node_02      # 輪唱 声部 1 (node_03 / node_04 も同様)
+# PC 側は pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde
+
+# 最初の同期検証版
+pio run -d firmware/test_v1/node_01
 
 # 本番想定の素テンプレ
-cd firmware/production/node_01 && pio run
+pio run -d firmware/production/node_01
 ```
 
 ### LaTeX 報告書

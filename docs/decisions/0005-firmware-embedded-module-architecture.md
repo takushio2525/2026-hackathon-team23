@@ -24,12 +24,12 @@
 
 - リポジトリ: <https://github.com/takushio2525/Embedded-Module-Architecture>
 - ローカル参照: `/Users/shiozawatakumi/Documents/Embedded-Module-Architecture/`
-- 適用範囲: `firmware/test/node_01/` 〜 `firmware/test/node_05/`
+- 適用範囲: `firmware/test_v1/node_01/` 〜 `firmware/test_v1/node_04/`、`firmware/test_v2/node_01/` 〜 `firmware/test_v2/node_04/`
   （仕様書「Arduino オーケストラ」準拠の本実装系統）
 - `firmware/production/` 配下は PlatformIO 新規プロジェクト相当の素テンプレで、
   EMA はまだ適用していない（テスト系で十分に検証してから取り込む運用）
 - 共通層（`IModule`、`ModuleTimer`、通信プロトコル定義など）は
-  `firmware/test/common/lib/` に置き、各ノードの `platformio.ini` から
+  各テスト版の `common/lib/` に置き、各ノードの `platformio.ini` から
   `lib_extra_dirs = ../common/lib` で参照する
 
 ### 主要パターン（リファレンス準拠）
@@ -68,7 +68,7 @@
 
 ### ポジティブ
 
-- ノード間で共通コード（UDP 層・状態表示 LED・時間管理）を `firmware/test/common/lib/` に
+- ノード間で共通コード（UDP 層・状態表示 LED・時間管理）を 各テスト版の `common/lib/` に
   集約でき、重複実装を避けられる
 - 塩澤以外のメンバーもリファレンスリポジトリを読めば書き方が分かる
 - 単体テスト（`test/`）がモジュール単位で書きやすい
