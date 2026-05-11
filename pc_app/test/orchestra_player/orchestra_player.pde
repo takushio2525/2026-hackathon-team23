@@ -7,7 +7,10 @@
 //   キー 'l' で LOOP、's' で SERIAL に切替
 //
 // SERIAL モードの動作:
-//   - 起動時に Serial ポート一覧を表示し、SERIAL_PORT_NAME のポートを開く
+//   - 起動直後は「ポート選択画面」を表示する。一覧をクリックすると接続し、
+//     接続後に通常の演奏 UI に切り替わる。
+//   - キー 'r' でポート一覧を再列挙 (デバイスを挿し直したとき用)。
+//   - キー 'd' で切断して選択画面に戻る (別ポートに繋ぎ直したいとき用)。
 //   - magic (0x52 0x4F リトルエンディアン) を待ち、20 B たまったら 1 パケットとして処理
 //   - NoteOn (gate=1) パケット 1 個に「音の高さ + 長さ (durationMs)」が乗っており、
 //     attack して durationMs 経過後に scheduleAutoRelease() が自動消音する
@@ -26,12 +29,14 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 // ─── 設定 ──────────────────────────────────────────
-// 楽器ノード (UNO R4 WiFi) の USB シリアルポート名を直接指定する。
-// Mac で `ls /dev/cu.*` するか、起動時にコンソールへ出る一覧で確認できる。
-// SERIAL_PORT_NAME が空文字 ("") のときだけ SERIAL_PORT_INDEX にフォールバック。
-final String SERIAL_PORT_NAME  = "/dev/cu.usbmodem34B7DA64482C2";
-final int    SERIAL_PORT_INDEX = 0;     // フォールバック用 (Serial.list() のインデックス)
-final int    SERIAL_BAUD       = 115200;
+// 起動時に Serial.list() を取得し、クリックで選ばせる方式に変更。
+// ポート名の直打ちは廃止 (常に画面上で選択する)。
+final int SERIAL_BAUD = 115200;
+
+// ─── ポート選択 UI 状態 ────────────────────────────
+String[] availablePorts = new String[0];   // Serial.list() のスナップショット
+String   currentPortName = null;           // 接続中ポート名 (未接続は null)
+boolean  showPortSelector = true;          // true: 選択画面を描画 / false: 通常 UI
 
 // ─── パケット仕様 ────────────────────────────────────
 final int  PACKET_SIZE = 20;
@@ -93,49 +98,111 @@ int     lastBeatNo = 0;
 int     lastPartId = -1;   // 直近に受けた NotePacket の partId (未受信は -1)
 
 void setup() {
-    size(720, 340);
+    size(720, 360);
     minim = new Minim(this);
     out = minim.getLineOut(Minim.STEREO, 1024, 44100);
 
     println("=== Orchestra Test Player ===");
     println("Mode: SERIAL (press 'l' to switch to LOOP for offline test, 's' to come back)");
+    println("Hotkeys: [click] ポート選択画面で接続 / [r] 一覧を再列挙 / [d] 切断して選択画面へ");
+    refreshPorts();
+}
+
+// シリアルポート一覧を取り直し、コンソールにも出力する。
+// USB を後から挿したケースに備えて起動時 / 'r' キー押下で呼ぶ。
+void refreshPorts() {
+    availablePorts = Serial.list();
     println("");
     println("Available serial ports:");
-    String[] ports = Serial.list();
-    for (int i = 0; i < ports.length; i++) {
-        println("  [" + i + "] " + ports[i]);
-    }
-    if (ports.length == 0) {
-        println("(!) No serial ports detected. Plug in the instrument node and restart.");
+    if (availablePorts.length == 0) {
+        println("  (none) — デバイスを挿してから 'r' で再列挙してください");
         return;
     }
-    // 1) SERIAL_PORT_NAME に一致するポートを最優先で選ぶ
-    String chosen = null;
-    if (SERIAL_PORT_NAME != null && SERIAL_PORT_NAME.length() > 0) {
-        for (String p : ports) {
-            if (p.equals(SERIAL_PORT_NAME)) { chosen = p; break; }
-        }
-        if (chosen == null) {
-            println("(!) SERIAL_PORT_NAME '" + SERIAL_PORT_NAME +
-                    "' が見つかりません。SERIAL_PORT_INDEX にフォールバックします。");
-        }
+    for (int i = 0; i < availablePorts.length; i++) {
+        println("  [" + i + "] " + availablePorts[i]);
     }
-    // 2) 見つからなければ SERIAL_PORT_INDEX を使う
-    if (chosen == null) {
-        int idx = constrain(SERIAL_PORT_INDEX, 0, ports.length - 1);
-        chosen = ports[idx];
-    }
-    println("Opening: " + chosen);
+}
+
+// 指定ポート名を開く。成功したら通常 UI に遷移、失敗したら選択画面のまま。
+void openPort(String name) {
+    closePort();
     try {
-        port = new Serial(this, chosen, SERIAL_BAUD);
+        port = new Serial(this, name, SERIAL_BAUD);
         port.buffer(1);
+        currentPortName = name;
+        showPortSelector = false;
+        println("Opened: " + name);
     } catch (Exception e) {
-        println("(!) Failed to open serial port: " + e.getMessage());
+        println("(!) Failed to open " + name + ": " + e.getMessage());
         port = null;
+        currentPortName = null;
+    }
+}
+
+// 接続中ポートを閉じる。受信途中のフレーム/キューもリセットして再接続に備える。
+void closePort() {
+    if (port != null) {
+        try { port.stop(); } catch (Exception e) { /* 無視 */ }
+        port = null;
+    }
+    currentPortName = null;
+    rxIdx   = 0;
+    inFrame = false;
+    packetQueue.clear();
+}
+
+// ポート選択画面の描画。クリック判定と座標を揃えるため、
+// ボタン矩形は (x=16, y=70+i*38, w=width-32, h=32) の固定レイアウトにする。
+void drawPortSelector() {
+    background(20);
+    fill(220);
+    textSize(16);
+    text("── Select serial port ──", 16, 32);
+    textSize(12);
+    fill(180);
+    text("クリックで接続 / [R] 再列挙 / [L] LOOP モードで起動 (ポート不要)", 16, 52);
+
+    if (availablePorts.length == 0) {
+        fill(220, 160, 60);
+        textSize(13);
+        text("シリアルポートが見つかりません。デバイスを接続して 'r' で再列挙してください。",
+             16, 90);
+        return;
+    }
+
+    textSize(13);
+    for (int i = 0; i < availablePorts.length; i++) {
+        int x = 16, y = 70 + i * 38, w = width - 32, h = 32;
+        boolean hover = (mouseX >= x && mouseX <= x + w &&
+                         mouseY >= y && mouseY <= y + h);
+        fill(hover ? color(70, 130, 90) : color(40, 70, 55));
+        rect(x, y, w, h, 6);
+        fill(230);
+        text("[" + i + "] " + availablePorts[i], x + 12, y + 21);
+    }
+}
+
+void mousePressed() {
+    if (!showPortSelector) return;
+    for (int i = 0; i < availablePorts.length; i++) {
+        int x = 16, y = 70 + i * 38, w = width - 32, h = 32;
+        if (mouseX >= x && mouseX <= x + w &&
+            mouseY >= y && mouseY <= y + h) {
+            openPort(availablePorts[i]);
+            return;
+        }
     }
 }
 
 void draw() {
+    // ポート未選択時は選択画面に専有させる (通常 UI は描かない)。
+    // LOOP モードに切り替えた場合は showPortSelector が false になっており
+    // ポート無しでもこの分岐を抜けて演奏 UI を描く。
+    if (showPortSelector) {
+        drawPortSelector();
+        return;
+    }
+
     background(20);
     noStroke();
     fill(currentMode == MODE_LOOP ? color(220, 160, 60) : color(60, 200, 120));
@@ -152,8 +219,9 @@ void draw() {
     textSize(13);
     text("Orchestra Test Player", 16, 26);
     text("Mode: " + (currentMode == MODE_LOOP ? "LOOP (BPM " + LOOP_BPM + ")" : "SERIAL")
-         + "   [l]=LOOP  [s]=SERIAL", 16, 46);
-    text("Connected: " + (port != null), 16, 70);
+         + "   [l]=LOOP  [s]=SERIAL  [d]=切断  [r]=再列挙", 16, 46);
+    text("Connected: " + (port != null) +
+         (currentPortName != null ? "  (" + currentPortName + ")" : ""), 16, 70);
     text("Received packets: " + receivedCount, 16, 90);
     text("Last event: " + lastEventLabel, 16, 110);
     text("BPM (×8): " + lastBpmQ8 + " → " + nf(lastBpmQ8 / 8.0f, 0, 2), 16, 130);
@@ -179,10 +247,33 @@ void draw() {
 }
 
 void keyPressed() {
+    // 'r': ポート一覧を再列挙して選択画面に戻る。接続中なら切断する。
+    if (key == 'r' || key == 'R') {
+        closePort();
+        showPortSelector = true;
+        refreshPorts();
+        return;
+    }
+    // 'd': 切断して選択画面に戻る (別ポートに繋ぎ直したいとき用)。
+    if (key == 'd' || key == 'D') {
+        closePort();
+        showPortSelector = true;
+        return;
+    }
+    // 'l': LOOP モードへ。ポート未選択でも LOOP は鳴らせるので選択画面を閉じる。
     if (key == 'l' || key == 'L') {
+        showPortSelector = false;
         switchMode(MODE_LOOP);
-    } else if (key == 's' || key == 'S') {
+        return;
+    }
+    // 's': SERIAL モードへ。ポート未接続なら選択画面に戻す。
+    if (key == 's' || key == 'S') {
         switchMode(MODE_SERIAL);
+        if (port == null) {
+            showPortSelector = true;
+            refreshPorts();
+        }
+        return;
     }
 }
 
