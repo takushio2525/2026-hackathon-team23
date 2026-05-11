@@ -505,6 +505,9 @@ class InstrModel {
   float   noiseLevel;
   float[] noiseEnv;   float noiseEnvRate;
   float[] noiseTable; // スペクトル整形済み白色ノイズ(ループ用)
+  // モジュレーション(ビブラート=ピッチの周期揺れ / トレモロ=音量の周期揺れ)。無ければ 0
+  float   vibRateHz, vibDepthCents, vibOnsetSec;   // depthCents は「全幅」(deviation = ±depthCents/2)
+  float   tremRateHz, tremDepth;
 
   InstrModel(JSONObject root, float synthSampleRate){
     fundamentalHz = root.getFloat("fundamental_hz", 261.626f);
@@ -551,6 +554,16 @@ class InstrModel {
     float[] bandsHz   = (no!=null) ? toFloatArray(no.getJSONArray("bands_hz")) : new float[]{0,(int)(synthSampleRate/2)};
     float[] bandLevs  = (no!=null) ? toFloatArray(no.getJSONArray("band_levels")) : new float[]{1};
     noiseTable = makeShapedNoise(synthSampleRate, bandsHz, bandLevs);
+
+    // モジュレーション(任意)。古い JSON には無いので hasKey で守る
+    JSONObject mod = root.hasKey("modulation") ? root.getJSONObject("modulation") : null;
+    JSONObject vib = (mod!=null && mod.hasKey("vibrato")) ? mod.getJSONObject("vibrato") : null;
+    JSONObject trem= (mod!=null && mod.hasKey("tremolo")) ? mod.getJSONObject("tremolo") : null;
+    vibRateHz     = (vib!=null && vib.getBoolean("detected", false)) ? vib.getFloat("rate_hz", 0) : 0;
+    vibDepthCents = (vib!=null && vib.getBoolean("detected", false)) ? vib.getFloat("depth_cents", 0) : 0;
+    vibOnsetSec   = (vib!=null) ? vib.getFloat("onset_sec", 0) : 0;
+    tremRateHz    = (trem!=null && trem.getBoolean("detected", false)) ? trem.getFloat("rate_hz", 0) : 0;
+    tremDepth     = (trem!=null && trem.getBoolean("detected", false)) ? constrain(trem.getFloat("depth", 0),0,0.95f) : 0;
   }
 
   // 白色ノイズを FFT 帯域ゲインで整形 → ループ用バッファ
@@ -604,6 +617,7 @@ class ResynthVoice extends UGen {
   float[] phase;         // 倍音ごとの位相
   double  noisePos;
   float   tSec = 0;      // 経過秒
+  float   vibPhase = 0, tremPhase = 0;   // ビブラート/トレモロ LFO の位相
   boolean done = false;
 
   // ゲート状態(audio スレッドが読むので volatile で公開)
@@ -692,11 +706,18 @@ class ResynthVoice extends UGen {
     float sr = sampleRate();
     if (done){ for (int i=0;i<channels.length;i++) channels[i]=0; return; }
     float a = ampAt(tSec);
+    // ビブラート: 全幅 vibDepthCents → 偏差は ±vibDepthCents/2。onset で 0→1 にゲート
+    float pitchMul = 1.0f;
+    if (m.vibDepthCents > 0.01f && m.vibRateHz > 0.001f){
+      float vg = m.vibOnsetSec > 0.001f ? min(1, tSec/m.vibOnsetSec) : 1;
+      pitchMul = pow(2, (m.vibDepthCents*0.5f*vg*sin(vibPhase))/1200.0f);
+      vibPhase += TWO_PI * m.vibRateHz / sr; if (vibPhase >= TWO_PI) vibPhase -= TWO_PI;
+    }
     float s = 0;
     for (int k=0;k<m.N;k++){
       float amp = m.harmAmp[k]; if (amp<=0) continue;
       int   n1  = m.harmN[k];
-      float f   = targetF0 * m.harmRatio[k] * sqrt(1 + m.inharmB*n1*n1);
+      float f   = targetF0 * m.harmRatio[k] * sqrt(1 + m.inharmB*n1*n1) * pitchMul;
       if (f >= sr*0.5f) continue;
       phase[k] += TWO_PI * f / sr;
       if (phase[k] >= TWO_PI) phase[k] -= TWO_PI;
@@ -708,6 +729,11 @@ class ResynthVoice extends UGen {
       float ne = noiseEnvAt(tSec) * m.noiseLevel * relMul;
       s += m.noiseTable[(int)noisePos] * ne;
       noisePos += 1; if (noisePos >= m.noiseTable.length) noisePos -= m.noiseTable.length;
+    }
+    // トレモロ: 1-tremDepth .. 1 で振幅を周期変調
+    if (m.tremDepth > 0.001f && m.tremRateHz > 0.001f){
+      s *= 1.0f - m.tremDepth*0.5f + m.tremDepth*0.5f*sin(tremPhase);
+      tremPhase += TWO_PI * m.tremRateHz / sr; if (tremPhase >= TWO_PI) tremPhase -= TWO_PI;
     }
     s *= a * gain * 0.9f;
     for (int i=0;i<channels.length;i++) channels[i] = s;
