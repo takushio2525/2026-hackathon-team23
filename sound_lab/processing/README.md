@@ -55,9 +55,9 @@
   `r` で解析し直しながら詰められる。`data/` 内の `*.json` は起動時に全部スキャンして一覧表示、`[` / `]` で即切替。
 - きらきら星シーケンサ: `SONG_NOTES` / `SONG_BEATS` / `songBeatMs` を書き換えれば任意のメロディに変えられる。
 
-## 本番システムへの組み込み
+## 他システムへの組み込み
 
-チームの本番（`pc_app/test/orchestra_player`）は今サイン波で鳴らしている。`ResynthVoice` と
-`InstrModel` をそちらに移植し、NOTE パケット受信時に `pressNote(noteNumber)`、`durationMs` 経過後（または
-NoteOff 受信時）に `releaseNote(noteNumber)` を呼べば、楽器ノードごとに本物の音色で鳴らせる。
-`InstrModel` は Minim 非依存の素の配列なので移植は容易。
+`pc_app/test_v2/orchestra_resynth`（きらきら星 輪唱の PC 側）は、ここの `ResynthVoice` /
+`InstrModel` を移植して、NOTE パケット受信時に音色定義（`data/*.json`、Arduino が送る楽器番号で選択）
+で発音 → `durationMs` 経過で自動 release、という形で実際に使っている。`pc_app/test_v1/orchestra_player`
+はまだサイン波。`InstrModel` は Minim 非依存の素の配列なので移植は容易。
