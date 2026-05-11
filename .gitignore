@@ -97,3 +97,6 @@ sound_lab/processing/instrument_player/data/*.json
 
 # ===== その他 =====
 *.tmp
+
+# Playwright MCP の一時成果物
+.playwright-mcp/
