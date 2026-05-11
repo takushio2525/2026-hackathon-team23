@@ -1,0 +1,6 @@
+# sound_lab 解析ツールのバックエンド依存
+# 仮想環境推奨:  python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+Flask>=3.0
+librosa>=0.10        # 基音検出(pyin)・STFT・各種スペクトル特徴量。numpy/scipy/soundfile/numba を連れてくる
+numpy>=1.24
+soundfile>=0.12      # 音声ファイル I/O(librosa の読み込みバックエンド)
