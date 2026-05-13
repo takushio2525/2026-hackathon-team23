@@ -97,7 +97,7 @@
                 "BACKTRACE_SUPPORT",
                 "LWIP_DNS=1",
                 "CFG_TUSB_MCU=OPT_MCU_RAXXX",
-                "SERIAL_DEBUG=1",
+                "SERIAL_DEBUG=0",
                 "_RA_CORE=CM4",
                 "_RENESAS_RA_",
                 "ARDUINO=10810",
