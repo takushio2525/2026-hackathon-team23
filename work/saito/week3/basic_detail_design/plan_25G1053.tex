@@ -1,0 +1,584 @@
+\documentclass[uplatex,dvipdfmx]{jlreq}
+\usepackage[fleqn,tbtags]{mathtools}
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet]{pxchfon}
+\usepackage{stix2}
+\usepackage{hira-stix}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{url}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0.2em}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+\title{担当箇所の基本設計・詳細設計\\
+{\large 楽譜データ形式・4パート振り分け・発音情報仕様}}
+\author{25G1053 齋藤翔太}
+\date{2026年5月12日}
+\maketitle
+
+\section*{本書の目的}
+
+本書は，チーム23「Arduino オーケストラ」における齋藤担当範囲の基本設計・詳細設計を
+まとめたものである．対象タスクは表\ref{tab:wbs-scope}の4項目である．
+作成済みの「楽譜データ・発音情報仕様書」で定めた内容をもとに，システム設計書として
+機能，構成，インターフェース，状態遷移，ハードウェア条件，ソフトウェア構造，
+処理フローが追える形に整理する．
+
+\begin{table}[H]
+\centering
+\caption{本書が対象とするWBS}
+\label{tab:wbs-scope}
+\begin{tabular}{p{0.16\textwidth}p{0.76\textwidth}}
+\toprule
+\textbf{WBS} & \textbf{担当内容} \\
+\midrule
+116 & 楽譜データ形式 基本設計．4種類の楽器パートをArduinoのメモリに埋め込む方針を決める．\\
+128 & 楽譜データ詳細設計．課題曲を4種類の楽器パートに振り分ける．\\
+129 & 楽譜データ詳細設計．テンポ，音の高さ，拍をどんな形でデータに書くか決める．\\
+130 & 楽譜データ詳細設計．ArduinoからPCへ送る音データの中身と送信タイミングを決める．\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{基本設計}
+
+\subsection{設計方針}
+
+本担当範囲では，楽器ノードが自分のパートの楽譜を保持し，指揮者ノードから届く
+拍情報に合わせて発音情報をPCへ送る仕組みを設計する．
+設計方針は次の通りである．
+
+\begin{itemize}
+  \item 楽譜はPC側ではなく，各楽器ノード（node\_02〜node\_05）のプログラムメモリに埋め込む．
+  \item 楽譜はミリ秒ではなく，音高と拍を基準にした相対表現で持つ．
+  \item テンポは楽譜に固定せず，指揮者ノードから届くBPMにより実時間へ変換する．
+  \item 通信仕様は塩澤担当のArduino設計に合わせ，PCへ送るNOTEは20バイト固定長のバイナリ形式に統一する．
+  \item 4つの楽器ノードは共通処理を使い，\code{partId}，\code{startBeatNo}，楽譜配列だけを差し替える．
+\end{itemize}
+
+\subsection{機能一覧とFBS対応}
+
+齋藤担当範囲は，チーム全体FBSのうちF3「楽譜進行」とF4「発音情報配信」に対応する．
+表\ref{tab:functions}に機能一覧を示す．
+
+\begin{longtable}{p{0.12\textwidth}p{0.22\textwidth}p{0.52\textwidth}}
+\caption{担当範囲の機能一覧}\label{tab:functions}\\
+\toprule
+\textbf{ID} & \textbf{機能} & \textbf{役割} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{機能} & \textbf{役割} \\
+\midrule
+\endhead
+F3.2 & 楽譜データ保持 &
+各楽器ノードが自分のパートの楽譜をC配列として保持する．外部ストレージは使用しない．\\
+F3.3 & BEAT同期での音符進行 &
+指揮者ノードから届くBEAT番号とマスタ時刻に合わせ，発火すべき楽譜イベントを選ぶ．\\
+F3.4 & NOTEイベント生成 &
+音符開始時にNoteOn，音符終了時にNoteOffを生成する．休符ではNOTEを送信しない．\\
+F3.5 & パート固有ロジック &
+\code{partId}，\code{startBeatNo}，楽譜配列をノードごとに差し替え，4声の輪唱とリズムを構成する．\\
+F4.1 & NOTEパケット生成 &
+発音情報を\code{partId}，\code{noteNumber}，\code{velocity}，\code{gate}，
+\code{durationMs}へ変換する．\\
+F4.2 & Processingへの送信 &
+20バイト固定長のNOTEをUSB SerialでPCへ送信する．\\
+\bottomrule
+\end{longtable}
+
+\subsection{システム構成}
+
+ユーザは指揮者ノードを振る．指揮者ノードはBPMとBEATを楽器ノードへ送る．
+楽器ノードは自分の楽譜を進め，PC上のProcessingへ発音情報を送る．
+Processingは受け取ったNOTEから音を合成し，スピーカへ出力する．
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  node distance=10mm and 14mm,
+  box/.style={draw, rounded corners, align=center, minimum width=31mm, minimum height=10mm},
+  small/.style={draw, rounded corners, align=center, minimum width=25mm, minimum height=9mm},
+  arrow/.style={-{Latex[length=2.2mm]}, thick}
+]
+\node[box] (user) {ユーザ\\指揮を振る};
+\node[box, right=of user] (conductor) {node\_01\\指揮者ノード};
+\node[box, right=of conductor] (wifi) {WiFi UDP\\CTRL / BEAT};
+\node[small, above right=4mm and 13mm of wifi] (n2) {node\_02\\金管1};
+\node[small, right=13mm of wifi] (n3) {node\_03\\金管2};
+\node[small, below right=4mm and 13mm of wifi] (n4) {node\_04\\金管3};
+\node[small, below=13mm of n4] (n5) {node\_05\\ドラム};
+\node[box, right=23mm of n3] (pc) {PC / Processing\\音色合成};
+\node[box, right=of pc] (spk) {スピーカ\\演奏音};
+
+\draw[arrow] (user) -- (conductor);
+\draw[arrow] (conductor) -- (wifi);
+\draw[arrow] (wifi) -- (n2);
+\draw[arrow] (wifi) -- (n3);
+\draw[arrow] (wifi) -- (n4);
+\draw[arrow] (wifi) -- (n5);
+\draw[arrow] (n2) -- node[above, font=\small]{NOTE} (pc);
+\draw[arrow] (n3) -- (pc);
+\draw[arrow] (n4) -- (pc);
+\draw[arrow] (n5) -- (pc);
+\draw[arrow] (pc) -- (spk);
+\end{tikzpicture}
+}
+\caption{ユーザ目線のシステム構成}
+\label{fig:system}
+\end{figure}
+
+\subsection{操作インターフェースと状態遷移}
+
+齋藤担当範囲では，専用の物理スイッチや画面は追加しない．
+ユーザの操作は指揮者ノードを振ることに集約され，楽器ノードは通信状態と
+楽譜進行状態に応じて動作する．
+
+\begin{table}[H]
+\centering
+\caption{ユーザ操作と楽器ノードの挙動}
+\label{tab:user-flow}
+\begin{tabular}{p{0.24\textwidth}p{0.31\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{ユーザ操作} & \textbf{入力される情報} & \textbf{楽器ノードの挙動} \\
+\midrule
+電源を入れる & USB給電，WiFi接続開始 & \code{Idle}から\code{WaitSync}へ進み，CTRL受信を待つ．\\
+指揮を振り始める & BEATとBPMが届く & \code{startBeatNo}に達したパートから演奏を開始する．\\
+速く振る／遅く振る & CTRLのBPM値が変化する & 次の音符から新しいBPMで発音長を計算する．\\
+BEATが一時的に欠ける & BEAT未受信時間がしきい値を超える & 直前BPMで\code{SelfRun}し，実BEAT復帰後は通常演奏へ戻る．\\
+曲が終わる & 最終イベントまで発火 & デモ時は曲頭へ戻り，ループ演奏する．\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[
+  state/.style={draw, rounded corners, align=center, minimum width=27mm, minimum height=10mm},
+  edgeLabel/.style={font=\scriptsize, fill=white, inner sep=1.2pt},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[state] (idle) at (0,0) {Idle\\起動直後};
+\node[state] (sync) at (4.3,0) {WaitSync\\時計同期待ち};
+\node[state] (wait) at (8.6,0) {WaitStart\\入り拍待ち};
+\node[state] (play) at (13.2,0) {Playing\\演奏中};
+\node[state] (finish) at (8.6,-2.8) {Finished\\曲末};
+\node[state] (self) at (13.2,-2.8) {SelfRun\\自走中};
+
+\draw[arrow] (idle) -- node[above, edgeLabel]{WiFi接続} (sync);
+\draw[arrow] (sync) -- node[above, edgeLabel]{CTRL受信} (wait);
+\draw[arrow] (wait) -- node[above, edgeLabel]{開始拍に到達} (play);
+\draw[arrow] (play) to[bend left=18] node[right, edgeLabel]{欠損} (self);
+\draw[arrow] (self) to[bend left=18] node[left, edgeLabel]{復帰} (play);
+\draw[arrow] (play.south west) -- ++(-1.1,-0.9) -- node[above, edgeLabel]{曲末} (finish.east);
+\draw[arrow] (finish) -- node[left, edgeLabel]{ループ} (wait);
+\end{tikzpicture}
+}
+\caption{楽器ノードの状態遷移}
+\label{fig:state}
+\end{figure}
+
+\subsection{4パート振り分け}
+
+課題曲候補は\textbf{「かえるのうた」}とする．輪唱しやすく，テンポ追従の確認がしやすいためである．
+4パートの割り当てを表\ref{tab:part-map}に示す．
+
+\begin{table}[H]
+\centering
+\caption{4パート振り分け}
+\label{tab:part-map}
+\begin{tabular}{p{0.13\textwidth}p{0.15\textwidth}p{0.13\textwidth}p{0.12\textwidth}p{0.35\textwidth}}
+\toprule
+\textbf{ノード} & \textbf{partId} & \textbf{役割} & \textbf{入り拍} & \textbf{楽譜内容} \\
+\midrule
+node\_02 & \code{0x02} & 金管1 & 0拍 & 主旋律を曲頭から演奏する．\\
+node\_03 & \code{0x03} & 金管2 & 4拍 & 主旋律を4拍遅れて演奏する．\\
+node\_04 & \code{0x04} & 金管3 & 8拍 & 主旋律を8拍遅れて演奏する．\\
+node\_05 & \code{0x05} & ドラム & 0拍 & 1拍ごとのリズム伴奏を演奏する．\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{詳細設計}
+
+\subsection{ハードウェア設計}
+
+本担当範囲で直接追加する部品はないが，楽譜データとNOTE送信が前提とする機器，
+接続関係，動作条件を表\ref{tab:hardware}と図\ref{fig:hardware}に示す．
+
+\begin{longtable}{p{0.20\textwidth}p{0.23\textwidth}p{0.47\textwidth}}
+\caption{使用する機器と役割}\label{tab:hardware}\\
+\toprule
+\textbf{機器} & \textbf{型番・構成} & \textbf{役割} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{機器} & \textbf{型番・構成} & \textbf{役割} \\
+\midrule
+\endhead
+楽器ノード & Arduino UNO R4 WiFi × 4 & \code{node\_02}〜\code{node\_05}．楽譜配列を保持し，NOTEを送信する．\\
+指揮者ノード & Arduino系マイコン × 1 & CTRL / BEATをWiFi UDPで配信する．楽譜データは保持しない．\\
+PC & MacまたはPC × 1〜4 & Processingを実行し，USB SerialからNOTEを受け取る．\\
+接続ケーブル & USB Type-C等 & 楽器ノードとPCを1対1，またはUSBハブ経由で接続する．\\
+音声出力 & PC内蔵または外部スピーカ & Processingが合成した音を出力する．\\
+ストレージ & 追加なし & 楽譜はArduinoのプログラムメモリに埋め込むため，SDカードは使わない．\\
+\bottomrule
+\end{longtable}
+
+\begin{figure}[H]
+\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[
+  node distance=10mm and 16mm,
+  box/.style={draw, align=center, minimum width=34mm, minimum height=10mm},
+  arrow/.style={-{Latex[length=2.2mm]}, thick}
+]
+\node[box] (n1) {node\_01\\CTRL / BEAT送信};
+\node[box, right=of n1] (n) {node\_02〜05\\楽譜配列 + NOTE生成};
+\node[box, right=of n] (pc) {PC\\Processing};
+\node[box, right=of pc] (spk) {スピーカ};
+\draw[arrow] (n1) -- node[above, font=\small]{WiFi UDP} (n);
+\draw[arrow] (n) -- node[above, font=\small]{USB Serial 20B NOTE} (pc);
+\draw[arrow] (pc) -- node[above, font=\small]{音声信号} (spk);
+\end{tikzpicture}
+}
+\caption{ハードウェア接続関係}
+\label{fig:hardware}
+\end{figure}
+
+\subsection{ソフトウェア構成}
+
+楽器ノードは共通コードを使い，\code{ProjectConfig.h}と\code{score\_data.cpp}だけを
+パートごとに差し替える．これにより，ノード間の処理差分を楽譜データと設定値に限定する．
+
+\begin{verbatim}
+firmware/
+|-- node_02/
+|   |-- include/
+|   |   |-- ProjectConfig.h    // partId, startBeatNo, 楽器種別
+|   |   `-- score_data.h       // ScoreEvent の宣言
+|   `-- src/
+|       |-- applyPattern.cpp   // 楽譜進行
+|       `-- score_data.cpp     // node_02 用楽譜本体
+|-- node_03/                   // node_02 と同構造
+|-- node_04/
+`-- node_05/
+\end{verbatim}
+
+\subsection{楽譜データ形式}
+
+楽譜は\code{ScoreEvent}配列として定義する．小数の\code{float}拍ではなく，
+\code{durationQ8}という固定小数表現を使う．\code{durationQ8 = 256}を1拍とし，
+テンポ変更時はBPMから実時間へ変換する．
+
+\begin{table}[H]
+\centering
+\caption{\code{ScoreEvent}のフィールド}
+\label{tab:scoreevent}
+\begin{tabular}{p{0.20\textwidth}p{0.20\textwidth}p{0.50\textwidth}}
+\toprule
+\textbf{フィールド} & \textbf{型} & \textbf{意味} \\
+\midrule
+\code{beatAt} & \code{uint16\_t} & このイベントを発火する拍番号．各パートの入り拍からの相対値．\\
+\code{noteNumber} & \code{uint8\_t} & MIDIノート番号．\code{60}=C4．\code{0}は休符．\\
+\code{velocity} & \code{uint8\_t} & 楽譜上の強さ．0〜127．CTRLのvelocityと合成する．\\
+\code{durationQ8} & \code{uint16\_t} & 音の長さ．256が1拍，128が0.5拍，512が2拍．\\
+\code{flags} & \code{uint8\_t} & bit0=NoteOn，bit1=NoteOff拡張，bit2=休符．\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{verbatim}
+struct ScoreEvent {
+  uint16_t beatAt;      // 発火する拍番号（パート開始からの相対拍）
+  uint8_t noteNumber;   // MIDIノート番号。0なら休符
+  uint8_t velocity;     // 楽譜上の強さ 0〜127
+  uint16_t durationQ8;  // 256 = 1拍
+  uint8_t flags;        // bit0=NoteOn, bit2=休符
+};
+\end{verbatim}
+
+\subsection{音高・拍・休符の表現}
+
+\begin{table}[H]
+\centering
+\caption{楽譜データの表現ルール}
+\label{tab:notation-rule}
+\begin{tabular}{p{0.24\textwidth}p{0.66\textwidth}}
+\toprule
+\textbf{項目} & \textbf{ルール} \\
+\midrule
+音高 & MIDIノート番号で表す．C4は60，D4は62，E4は64，F4は65，G4は67とする．\\
+休符 & \code{noteNumber = 0}かつ休符フラグを立てる．NOTEは送信せず，拍だけ進める．\\
+拍 & \code{durationQ8}で表す．四分音符=256，八分音符=128，二分音符=512とする．\\
+テンポ & 楽譜にはBPMを持たせない．CTRLで届くBPMから実時間へ変換する．\\
+輪唱の入り & \code{ProjectConfig.h}の\code{startBeatNo}で指定する．\\
+NoteOff & \code{durationQ8}から計算した時刻で自動生成する．\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{パート別設定}
+
+\begin{verbatim}
+struct ProjectConfig {
+  uint8_t partId;          // 0x02〜0x05
+  uint16_t startBeatNo;    // 輪唱の入り拍
+  uint8_t instrumentKind;  // 1=金管, 2=ドラム
+  bool loopEnabled;        // デモ時はtrue
+};
+\end{verbatim}
+
+\begin{table}[H]
+\centering
+\caption{\code{ProjectConfig}のノード別値}
+\label{tab:config-values}
+\begin{tabular}{p{0.14\textwidth}p{0.16\textwidth}p{0.18\textwidth}p{0.18\textwidth}p{0.22\textwidth}}
+\toprule
+\textbf{ノード} & \textbf{partId} & \textbf{startBeatNo} & \textbf{instrumentKind} & \textbf{楽譜} \\
+\midrule
+node\_02 & \code{0x02} & 0 & 金管 & 主旋律A \\
+node\_03 & \code{0x03} & 4 & 金管 & 主旋律A \\
+node\_04 & \code{0x04} & 8 & 金管 & 主旋律A \\
+node\_05 & \code{0x05} & 0 & ドラム & リズム伴奏 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{楽譜データ例}
+
+主旋律Aの冒頭は表\ref{tab:melody}のように表す．
+
+\begin{table}[H]
+\centering
+\caption{主旋律A「かえるのうた」冒頭}
+\label{tab:melody}
+\begin{tabular}{cccccc}
+\toprule
+\textbf{順番} & \textbf{beatAt} & \textbf{音名} & \textbf{noteNumber} & \textbf{durationQ8} & \textbf{意味} \\
+\midrule
+1 & 0 & ド & 60 & 256 & 1拍鳴らす \\
+2 & 1 & レ & 62 & 256 & 1拍鳴らす \\
+3 & 2 & ミ & 64 & 256 & 1拍鳴らす \\
+4 & 3 & ファ & 65 & 256 & 1拍鳴らす \\
+5 & 4 & ミ & 64 & 256 & 1拍鳴らす \\
+6 & 5 & レ & 62 & 256 & 1拍鳴らす \\
+7 & 6 & ド & 60 & 256 & 1拍鳴らす \\
+8 & 7 & 休符 & 0 & 256 & 1拍待つ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{verbatim}
+const ScoreEvent kScore[] PROGMEM = {
+  {0, 60, 96, 256, 0x01}, // ド
+  {1, 62, 96, 256, 0x01}, // レ
+  {2, 64, 96, 256, 0x01}, // ミ
+  {3, 65, 96, 256, 0x01}, // ファ
+  {4, 64, 96, 256, 0x01}, // ミ
+  {5, 62, 96, 256, 0x01}, // レ
+  {6, 60, 96, 256, 0x01}, // ド
+  {7,  0,  0, 256, 0x04}  // 休符
+};
+\end{verbatim}
+
+\subsection{ArduinoからPCへ送るNOTEデータ}
+
+ArduinoからPCへ送るNOTEは，20バイト固定長のバイナリデータとする．
+共通ヘッダ12バイトの後ろに，表\ref{tab:note-payload}のNOTEペイロード8バイトを置く．
+
+\begin{table}[H]
+\centering
+\caption{NOTEペイロード}
+\label{tab:note-payload}
+\begin{tabular}{p{0.12\textwidth}p{0.20\textwidth}p{0.18\textwidth}p{0.40\textwidth}}
+\toprule
+\textbf{offset} & \textbf{field} & \textbf{type} & \textbf{意味} \\
+\midrule
+12 & \code{partId} & \code{uint8\_t} & \code{0x02}〜\code{0x05}．発音元パート．\\
+13 & \code{noteNumber} & \code{uint8\_t} & MIDIノート番号．休符は送らない．\\
+14 & \code{velocity} & \code{uint8\_t} & 0〜127．楽譜値とCTRL値の合成後．\\
+15 & \code{gate} & \code{uint8\_t} & \code{1=NoteOn}，\code{0=NoteOff}．\\
+16 & \code{durationMs} & \code{uint16\_t} & 発音予定長さ．Processing側の参考値．\\
+18 & 予約 & \code{uint8\_t[2]} & 0で埋める．\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+音符イベント発火時は\code{gate=1}のNoteOnを送る．
+\code{durationQ8}ぶん経過した時点で\code{gate=0}のNoteOffを送る．
+休符イベントではNOTEを送らず，楽譜ポインタだけを進める．
+
+\subsection{内部API}
+
+\begin{longtable}{p{0.31\textwidth}p{0.57\textwidth}}
+\caption{楽譜進行で使用する内部API}\label{tab:api}\\
+\toprule
+\textbf{関数} & \textbf{役割} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{関数} & \textbf{役割} \\
+\midrule
+\endhead
+\code{loadScoreEvent(index)} &
+\code{PROGMEM}上の\code{kScore[index]}をRAM上の一時変数へ読む．\\
+\code{isRest(event)} &
+\code{noteNumber == 0}または休符フラグから休符か判定する．\\
+\code{durationQ8ToMs(durationQ8, bpm)} &
+\code{durationQ8}を現在BPMに基づきミリ秒へ変換する．\\
+\code{mergeVelocity(score, ctrl)} &
+楽譜上のvelocityと指揮者側CTRLのvelocityを合成する．\\
+\code{emitNoteOn(event)} &
+\code{pendingOn}を立て，NOTE送信モジュールへ渡すデータを作る．\\
+\code{emitNoteOff()} &
+発音中の音を止めるため，\code{pendingOff}を立てる．\\
+\code{advanceScore(beatNo)} &
+BEAT番号から発火対象イベントを順に処理する．\\
+\code{buildNotePacket()} &
+共通ヘッダとNOTEペイロードを20バイト列にシリアライズする．\\
+\bottomrule
+\end{longtable}
+
+\subsection{処理フロー}
+
+楽器ノードは入力，ロジック，出力の3フェーズで動作する．
+楽譜データに関係する処理は\code{advanceScore()}に集約する．
+
+\begin{figure}[H]
+\centering
+\resizebox{0.95\linewidth}{!}{%
+\begin{tikzpicture}[
+  node distance=8mm,
+  proc/.style={draw, rounded corners, align=center, minimum width=53mm, minimum height=8mm},
+  decision/.style={draw, diamond, aspect=2.3, align=center, inner sep=1mm},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[proc] (start) {起動・WiFi接続・Serial開始};
+\node[proc, below=of start] (sync) {CTRL受信で時計同期};
+\node[decision, below=of sync] (wait) {beatNo >=\\startBeatNo?};
+\node[proc, below=of wait] (beat) {BEATをマスタ時刻で発火};
+\node[decision, below=of beat] (event) {発火対象\\ScoreEventあり?};
+\node[decision, below=of event] (rest) {休符?};
+\node[proc, below left=8mm and 19mm of rest] (note) {NoteOn生成\\NoteOff時刻予約};
+\node[proc, below right=8mm and 19mm of rest] (skip) {NOTE送信なし\\拍だけ進行};
+\node[proc, below=22mm of rest] (off) {時刻到達でNoteOff生成};
+\node[proc, below=of off] (send) {20バイトNOTEをSerial.write};
+\node[proc, below=of send] (loop) {次BEATへ};
+
+\draw[arrow] (start) -- (sync);
+\draw[arrow] (sync) -- (wait);
+\draw[arrow] (wait) -- node[right, font=\small]{はい} (beat);
+\draw[arrow] (wait.east) -- ++(18mm,0) node[right, font=\small]{いいえ: 待機} |- (sync.east);
+\draw[arrow] (beat) -- (event);
+\draw[arrow] (event) -- node[right, font=\small]{はい} (rest);
+\draw[arrow] (event.west) -- ++(-16mm,0) node[left, font=\small]{なし} |- (loop.west);
+\draw[arrow] (rest) -- node[left, font=\small]{いいえ} (note);
+\draw[arrow] (rest) -- node[right, font=\small]{はい} (skip);
+\draw[arrow] (note) |- (off);
+\draw[arrow] (skip) |- (loop);
+\draw[arrow] (off) -- (send);
+\draw[arrow] (send) -- (loop);
+\draw[arrow] (loop.west) -- ++(-30mm,0) |- (beat.west);
+\end{tikzpicture}
+}
+\caption{楽譜進行とNOTE送信の処理フロー}
+\label{fig:flow}
+\end{figure}
+
+\subsection{BEAT受信時の処理}
+
+\begin{enumerate}
+  \item 受信したBEATの\code{beatNo}と\code{playAtMasterMs}をキューに入れる．
+  \item \code{beatNo < startBeatNo}の場合は，自パートの入り前なので演奏しない．
+  \item \code{effectiveBeatNo = beatNo - startBeatNo}を計算する．
+  \item \code{kScore[currentEventIndex].beatAt <= effectiveBeatNo}のイベントを順に読む．
+  \item 休符ならNOTEを送らず，\code{currentEventIndex}だけ進める．
+  \item 音符なら現在BPMから発音長を求め，NoteOnを送る．
+  \item 発音中の音について，予約した\code{noteOffAtMs}を過ぎたらNoteOffを送る．
+\end{enumerate}
+
+\subsection{テンポ変更時の処理}
+
+楽譜データは拍単位で記録するため，テンポ変更時に配列を書き換える必要はない．
+CTRLで新しいBPMを受け取った後，次に発火する音符から式\ref{eq:duration-ms}で実時間を計算する．
+
+\begin{equation}
+\label{eq:duration-ms}
+durationMs = \frac{60000}{BPM} \times \frac{durationQ8}{256}
+\end{equation}
+
+すでに鳴っている音については，発音開始時に予約した\code{noteOffAtMs}を優先する．
+これにより，途中でBPMが変わっても鳴りかけの音が不自然に切れない．
+
+\subsection{例外処理}
+
+\begin{longtable}{p{0.28\textwidth}p{0.28\textwidth}p{0.34\textwidth}}
+\caption{例外・分岐時の処理}\label{tab:exceptions}\\
+\toprule
+\textbf{状況} & \textbf{判定条件} & \textbf{処理} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{状況} & \textbf{判定条件} & \textbf{処理} \\
+\midrule
+\endhead
+入り拍前 & \code{beatNo < startBeatNo} & 演奏せず待機する．\\
+休符 & \code{noteNumber == 0} & NOTEを送らず，次イベントへ進む．\\
+BEAT欠損 & \code{beatTimeoutMs}超過 & 直前BPMから仮想BEATを作り\code{SelfRun}する．\\
+遅延BEAT & 発音予定時刻を許容値以上過ぎた場合 & 発音をスキップし，ログに警告を出す．\\
+同じBEATの重複 & \code{seq}または\code{beatNo}が処理済み & 二重発音を防ぐため捨てる．\\
+曲末 & \code{currentEventIndex >= kScoreLength} & デモでは曲頭へ戻る．提出仕様では停止へ変更可能．\\
+Serial送信失敗 & \code{Serial.write()}の戻り値が20未満 & 送信失敗ログを出し，次NOTEで復帰する．\\
+\bottomrule
+\end{longtable}
+
+\section{関連資料との整合性}
+
+\begin{longtable}{p{0.29\textwidth}p{0.31\textwidth}p{0.30\textwidth}}
+\caption{関連資料との整合確認}\label{tab:consistency}\\
+\toprule
+\textbf{資料} & \textbf{記載内容} & \textbf{本書の対応} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{資料} & \textbf{記載内容} & \textbf{本書の対応} \\
+\midrule
+\endhead
+\code{docs/design/score\_format.md} &
+楽譜は各楽器マイコン内部で保持する． &
+\code{ScoreEvent}配列をArduinoのプログラムメモリに埋め込む．\\
+\code{docs/design/protocol.md} &
+指揮者から楽器はUDP，楽器からPCは発音情報を送る． &
+CTRL / BEATとNOTEを分け，NOTEはUSB Serial 20バイトで定義する．\\
+ADR-0004 &
+指揮1台，楽器4台，輪唱曲，金管楽器を想定． &
+金管3声 + ドラム1声で「主旋律3 + リズム1」を満たす．\\
+ADR-0007 &
+指揮テンポ変更に演奏速度が追従する． &
+楽譜を拍単位で持ち，BPMから実時間へ変換する．\\
+\code{arduino\_塩澤.pdf} &
+\code{ScoreEvent}，\code{startBeatNo}，20バイトNOTEを定義． &
+同じ構造を採用し，結合時の形式不一致を避ける．\\
+\bottomrule
+\end{longtable}
+
+\section{生成AIの利用について}
+
+本書の作成には生成AIを利用した．主な利用目的は，作成済み仕様書の内容を基本設計・詳細設計
+として再構成すること，ルーブリック項目への対応漏れを確認すること，および既存チーム資料との
+整合性を確認することである．最終的な仕様判断は，チーム内資料とWBSに基づいて行った．
+
+\end{document}
