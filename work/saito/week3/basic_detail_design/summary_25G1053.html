@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>齋藤担当範囲まとめ | 楽譜データ・発音情報設計</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #d7dce2;
+      --panel: #ffffff;
+      --soft: #f6f8fb;
+      --accent: #0f766e;
+      --accent-2: #334155;
+      --warn: #9a3412;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+      color: var(--ink);
+      background: #eef2f6;
+      line-height: 1.75;
+    }
+
+    header {
+      background: #12312e;
+      color: #ffffff;
+      padding: 40px 24px 32px;
+    }
+
+    header .inner,
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: 0;
+      opacity: 0.82;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 16px 0 0;
+      max-width: 780px;
+      color: #dce7e5;
+    }
+
+    main {
+      padding: 28px 24px 48px;
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin: 18px 0;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 20px 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #ecfdf5;
+      padding: 12px 14px;
+      margin: 14px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 22px;
+      color: var(--accent);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #e9eef3;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      background: #edf2f7;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+      font-size: 0.95em;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      align-items: stretch;
+      margin-top: 14px;
+    }
+
+    .step {
+      position: relative;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 92px;
+    }
+
+    .step b {
+      display: block;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .system {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr 1fr;
+      gap: 10px;
+      align-items: center;
+      margin: 16px 0;
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      min-height: 74px;
+    }
+
+    .box strong {
+      display: block;
+      color: var(--accent-2);
+    }
+
+    .arrow {
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .parts {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .part {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      min-height: 116px;
+    }
+
+    .part strong {
+      display: block;
+      color: var(--accent);
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+
+    @media (max-width: 820px) {
+      .grid,
+      .flow,
+      .system,
+      .parts {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="inner">
+      <p class="eyebrow">25G1053 齋藤翔太 / 担当箇所まとめ</p>
+      <h1>楽譜データ形式・5パート振り分け・発音情報仕様</h1>
+      <p>5台のArduinoをすべて楽器ノードとして扱い，指揮棒は別マイコンに分離する方針へ更新した担当範囲の要約です。</p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>今回の変更点</h2>
+      <div class="note">
+        旧方針では <code>node_01</code> を指揮者ノード，<code>node_02</code>〜<code>node_05</code> を楽器ノードとしていました。今回の話し合い後は，<code>node_01</code>〜<code>node_05</code> の5台すべてを楽器ノードとし，指揮棒は別マイコンが担当します。
+      </div>
+      <div class="grid">
+        <div class="metric">
+          <strong>5台</strong>
+          <span>Arduino楽器ノード</span>
+        </div>
+        <div class="metric">
+          <strong>1台</strong>
+          <span>指揮棒用の別マイコン</span>
+        </div>
+        <div class="metric">
+          <strong>20B</strong>
+          <span>PCへ送るNOTE固定長</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>システム構成</h2>
+      <p>指揮棒用マイコンはBPMとBEATをWiFi UDPで送信します。各Arduino楽器ノードは自分の楽譜を進め，発音情報をUSB SerialでPCへ送ります。</p>
+      <div class="system">
+        <div class="box"><strong>ユーザ</strong>指揮棒を振る</div>
+        <div class="box"><strong>指揮棒用マイコン</strong>CTRL / BEATを送信</div>
+        <div class="box"><strong>Arduino楽器ノード</strong>node_01〜node_05</div>
+        <div class="box"><strong>PC / Processing</strong>NOTEを受信して発音</div>
+      </div>
+      <p class="arrow">ユーザ操作 → テンポ・拍の配信 → 楽譜進行 → 音色合成</p>
+    </section>
+
+    <section>
+      <h2>齋藤担当範囲</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>WBS</th>
+            <th>担当内容</th>
+            <th>今回の扱い</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>116</td>
+            <td>楽譜データ形式の基本設計</td>
+            <td>5台分の楽譜をArduinoメモリ内の<code>ScoreEvent</code>配列として持つ。</td>
+          </tr>
+          <tr>
+            <td>128</td>
+            <td>課題曲のパート振り分け</td>
+            <td>金管3声，低音1声，ドラム1声の5パートに分ける。</td>
+          </tr>
+          <tr>
+            <td>129</td>
+            <td>テンポ，音高，拍の表現</td>
+            <td>音高はMIDIノート番号，拍は<code>durationQ8</code>，テンポは指揮棒用マイコンから届くBPMを使う。</td>
+          </tr>
+          <tr>
+            <td>130</td>
+            <td>ArduinoからPCへ送る音データ</td>
+            <td>各楽器ノードが20バイト固定長のNOTEをUSB Serialで送る。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5パート割り当て</h2>
+      <div class="parts">
+        <div class="part">
+          <strong>node_01</strong>
+          <span>金管1 / partId 0x01</span>
+          <p class="small">0拍から主旋律を演奏する。</p>
+        </div>
+        <div class="part">
+          <strong>node_02</strong>
+          <span>金管2 / partId 0x02</span>
+          <p class="small">4拍遅れて主旋律を演奏する。</p>
+        </div>
+        <div class="part">
+          <strong>node_03</strong>
+          <span>金管3 / partId 0x03</span>
+          <p class="small">8拍遅れて主旋律を演奏する。</p>
+        </div>
+        <div class="part">
+          <strong>node_04</strong>
+          <span>低音 / partId 0x04</span>
+          <p class="small">拍の頭を支える低音伴奏を演奏する。</p>
+        </div>
+        <div class="part">
+          <strong>node_05</strong>
+          <span>ドラム / partId 0x05</span>
+          <p class="small">1拍ごとのリズム伴奏を演奏する。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>楽譜データ形式</h2>
+      <p>楽譜は各Arduinoのプログラムメモリに<code>ScoreEvent</code>配列として埋め込みます。PC側から楽譜を読み込ませるのではなく，楽器ノード自身が自分のパートを進めます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>フィールド</th>
+            <th>意味</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>beatAt</code></td><td>パート開始から何拍目に発火するか。</td></tr>
+          <tr><td><code>noteNumber</code></td><td>MIDIノート番号。0の場合は休符。</td></tr>
+          <tr><td><code>velocity</code></td><td>楽譜上の強さ。CTRLの値と合成できる。</td></tr>
+          <tr><td><code>durationQ8</code></td><td>音の長さ。256を1拍として扱う。</td></tr>
+          <tr><td><code>flags</code></td><td>NoteOnや休符などの補助情報。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>NOTE送信仕様</h2>
+      <p>ArduinoからPCへ送るNOTEは20バイト固定長です。共通ヘッダ12バイトの後ろにNOTEペイロード8バイトを置きます。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>offset</th>
+            <th>field</th>
+            <th>意味</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>12</td><td><code>partId</code></td><td><code>0x01</code>〜<code>0x05</code>で発音元パートを表す。</td></tr>
+          <tr><td>13</td><td><code>noteNumber</code></td><td>MIDIノート番号。休符は送信しない。</td></tr>
+          <tr><td>14</td><td><code>velocity</code></td><td>0〜127の強さ。</td></tr>
+          <tr><td>15</td><td><code>gate</code></td><td><code>1=NoteOn</code>，<code>0=NoteOff</code>。</td></tr>
+          <tr><td>16</td><td><code>durationMs</code></td><td>発音予定長さ。</td></tr>
+          <tr><td>18</td><td>予約</td><td>0で埋める。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>処理フロー</h2>
+      <div class="flow">
+        <div class="step"><b>1. 起動</b>WiFiとSerialを初期化し，CTRL受信を待つ。</div>
+        <div class="step"><b>2. 同期</b>指揮棒用マイコンからBPMとBEATを受け取る。</div>
+        <div class="step"><b>3. 入り判定</b><code>startBeatNo</code>に達したパートから演奏する。</div>
+        <div class="step"><b>4. NOTE生成</b>対象の<code>ScoreEvent</code>からNoteOn / NoteOffを作る。</div>
+        <div class="step"><b>5. 送信</b>20バイトNOTEをPCへ送る。</div>
+      </div>
+      <p class="small">BEAT欠損時は直前BPMから仮想BEATを作って自走し，実BEATが復帰したら通常演奏に戻します。</p>
+    </section>
+
+    <section>
+      <h2>提出時に見るポイント</h2>
+      <p><span class="warn">重要:</span> 今回の版では，Arduino 5台をすべて楽器として扱います。指揮棒は別マイコンなので，楽譜データ・partId・NOTE送信対象には含めません。</p>
+      <p>PDF版の詳細設計書と同じ内容を，短時間で確認できるように整理しています。</p>
+    </section>
+  </main>
+</body>
+</html>
