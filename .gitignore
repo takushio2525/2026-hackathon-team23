@@ -68,6 +68,11 @@ venv/
 # ===== Node / 一般 =====
 node_modules/
 
+# ===== Astro Starlight (docs/) =====
+docs/dist/
+docs/.astro/
+docs/node_modules/
+
 # ===== エディタ / IDE =====
 .idea/
 *.swp
