@@ -56,8 +56,9 @@ pio run -d firmware/production/node_01
 - ピン・定数・閾値は `ProjectConfig.h` に集約（モジュール本体にハードコードしない）
 - モジュール間の直接呼び出しは禁止。通信は `SystemData` のフィールド経由のみ
 
-詳細は [`test_v2/common/README.md`](test_v2/common/README.md) と
-[ADR-0005](../docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
+詳細は [`test_v2/common/README.md`](test_v2/common/README.md) と、
+`docs/` サイトの「アーキテクチャ > Embedded-Module-Architecture」または
+[ADR-0005 のソース](../docs/src/content/docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
 
 ## 共通層
 

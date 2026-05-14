@@ -20,11 +20,11 @@
 作成した PDF をこのフォルダに置く。
 
 正規議事録に抜けていた決定事項（例: IMU採用）は、議事録を書き直さず
-[`docs/decisions/`](../docs/decisions/) に ADR（設計判断記録）として残す。
+`docs/src/content/docs/decisions/`（ドキュメントサイトの「意思決定の記録」） に ADR（設計判断記録）として残す。
 
 1. 担当者が議事録 PDF を作成（ファイル名規則: `23_第N回議事録_<学籍番号>.pdf`）
 2. `MMDD_N回/` ディレクトリを作ってその下に置いてコミット
-3. 補足や PDF で漏れた決定事項は ADR（[`docs/decisions/`](../docs/decisions/)）に記録
+3. 補足や PDF で漏れた決定事項は ADR（`docs/src/content/docs/decisions/`（ドキュメントサイトの「意思決定の記録」））に記録
 4. 必要なら Claude に依頼して同じディレクトリに **AI 要約 Markdown**（`第N回議事録_AI要約byClaude.md`）を生成させてもよい
 
 `_template.md` は markdown で議事録を取りたい場合の参考テンプレ（汎用）。

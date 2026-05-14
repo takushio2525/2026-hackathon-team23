@@ -24,7 +24,8 @@
 共通コード（UDP 層・時間管理・共有プロトコル定義など）は [`common/lib/`](common/lib/) に置き、
 各ノードの `platformio.ini` から `lib_extra_dirs = ../common/lib` で参照する。
 
-詳細と判断の背景は [ADR-0005](../docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
+詳細と判断の背景は `docs/` サイトの「アーキテクチャ > Embedded-Module-Architecture」、
+または [ADR-0005 のソース](../../docs/src/content/docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
 
 Arduino をベタ書きした経験しかないメンバーは、先にリファレンスの
 `ARCHITECTURE.md` と `example/` 系コードを読んでから実装を始めること。

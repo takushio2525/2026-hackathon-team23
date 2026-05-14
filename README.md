@@ -15,31 +15,44 @@
 **独創性のポイント**: 指揮者 Arduino 内蔵の IMU で指揮棒ジェスチャを認識し、
 **振る速度でテンポ・振幅で強弱・振動でビブラート**を表現する。
 
-**通信方式**: UDP ベース（大枠の方針は [`docs/design/protocol.md`](docs/design/protocol.md)、詳細は今後詰める）
+**通信方式**: UDP マルチキャスト（`239.0.0.1:5001`）。詳細は `docs/` サイトの「アーキテクチャ > 通信プロトコル」参照。
 
 ### チームメンバーと役割
 
 | メンバー | 担当 |
 |---|---|
-| 塩澤匠生 | 指揮者マイコン（IMU ジェスチャ認識） |
-| 齋藤翔太 | 音階生成（ドレミファソラシド） |
+| 塩澤匠生 | Arduino 系全般（node_01〜05 の firmware + 共通層） |
+| 齋藤翔太 | 楽譜データ・音階生成ロジック検討 |
 | 梅澤颯太 | Processing（音色合成・演奏再生） |
 | 片岡聖・地曵賢人・御代川稜 | 議事録（持ち回り）|
 
-詳細・未決事項は [`docs/roles.md`](docs/roles.md) を参照。
+詳細は `docs/` サイトの「役割と運用 > チーム役割」を参照。
 
-### 主要ドキュメント
+### 📖 ドキュメントサイト（Astro Starlight）
 
-| パス | 内容 |
+プロジェクトの全体像・アーキテクチャ・開発手順・コード解説は
+**`docs/` 配下に Astro Starlight サイト** として整備してある。
+
+```bash
+cd docs
+npm install
+npm run dev      # http://localhost:4321 を開く
+```
+
+サイト構成：
+
+| セクション | 内容 |
 |---|---|
-| [`docs/overview.md`](docs/overview.md) | プロジェクト概要・目標・評価軸 |
-| [`docs/design/architecture.md`](docs/design/architecture.md) | システム全体構成（概略） |
-| [`docs/design/protocol.md`](docs/design/protocol.md) | 通信方針（概略） |
-| [`docs/design/conductor_gesture.md`](docs/design/conductor_gesture.md) | 指揮ジェスチャの方針 |
-| [`docs/design/score_format.md`](docs/design/score_format.md) | 楽譜データの扱い（方針） |
-| [`docs/decisions/`](docs/decisions/) | 重要な設計判断（ADR） |
-| [`meetings/`](meetings/) | 議事録（PDF） |
-| [`references/lectures/`](references/lectures/) | 授業資料 |
+| **はじめに** | プロジェクト概要・クイックスタート・用語集 |
+| **コンセプト** | なぜ作るか・シナリオと体験・ゴールとスコープ |
+| **アーキテクチャ** | 全体図・EMA・通信プロトコル・楽譜・同期戦略・三段階開発 |
+| **開発ガイド** | 環境構築から書き込み・PC アプリ・Git まで初学者向けに |
+| **コードを読む** | リポジトリマップ・firmware/pc_app の歩き方・トラブル集 |
+| **意思決定の記録（ADR）** | 設計判断 7 件（プロトコル選択・IMU 採用・MOE 等） |
+| **役割と運用** | チーム役割・ミーティングと提出スケジュール |
+
+GitHub 上で Markdown ソースを直接読む場合は
+[`docs/src/content/docs/`](docs/src/content/docs/) 配下を辿る。
 
 ---
 
@@ -211,7 +224,9 @@ clone から PR、コンフリクト解消までを丁寧に書いてある。
 
 | ファイル | 内容 |
 |---|---|
-| `CLAUDE.md` | AI 開発支援ツール（Claude Code）用のプロジェクト設定。不要なら削除してよい |
+| [`AGENTS.md`](AGENTS.md) | AI エージェント（Claude Code 等）向けの規約集約点。技術スタック・コマンド表・コミット規約 |
+| [`.agent/`](.agent/) | AI 向け詳細仕様（architecture / conventions / api / activeContext / progress） |
+| `CLAUDE.md` | `@AGENTS.md` への 1 行リダイレクト |
 
 ---
 
