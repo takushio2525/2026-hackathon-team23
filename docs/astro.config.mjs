@@ -11,9 +11,9 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
 	integrations: [
 		starlight({
-			title: 'Arduino オーケストラ — チーム 23',
-			description: '指揮者 1 ＋ 楽器 4 ＋ PC で輪唱を奏でる、5 台同期演奏システムの設計と実装の解説',
-			customCss: ['./src/styles/docs-theme.css'],
+			title: 'タクトーン',
+			description: 'IMU ジェスチャーで奏でる Arduino オーケストラ — チーム 23 の設計・実装解説',
+			customCss: ['./src/styles/paper-theme.css'],
 			// social: [
 			// 	{ icon: 'github', label: 'GitHub', href: 'https://github.com/takushio2525/2026-hackathon-team23' },
 			// ],
