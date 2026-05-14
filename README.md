@@ -33,9 +33,16 @@
 プロジェクトの全体像・アーキテクチャ・開発手順・コード解説は
 **`docs/` 配下に Astro Starlight サイト** として整備してある。
 
+**🖱️ macOS で一番ラクな方法**: Finder で
+[`docs/start-docs.command`](docs/start-docs.command) をダブルクリック。
+初回は `npm install` が自動で走り、サーバー起動後にブラウザで http://localhost:4321
+が自動で開く（終了は出てきたターミナルウィンドウで `Ctrl+C`）。
+
+**コマンドラインから**:
+
 ```bash
 cd docs
-npm install
+npm install      # 初回のみ
 npm run dev      # http://localhost:4321 を開く
 ```
 
