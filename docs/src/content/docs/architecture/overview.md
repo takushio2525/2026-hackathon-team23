@@ -130,3 +130,7 @@ flowchart LR
 - パケット仕様 → [通信プロトコル](/architecture/protocol/)
 - 拍検出の中身 → [同期戦略](/architecture/sync/)
 - バージョン構成 → [三段階開発](/architecture/three-stages/)
+
+### さらに深掘りしたい
+
+- ロジックと数式を順番に潜っていく学習導線 → [アルゴリズム詳説 — 読み順ガイド](/deep-dive/)

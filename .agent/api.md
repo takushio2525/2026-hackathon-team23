@@ -30,7 +30,7 @@
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 2 B | `bpmFixed` | BPM × 256（固定小数。例: 100.0 BPM → 25600） |
+| 12 | 2 B | `bpmQ8` | BPM × 8（Q8 固定小数。例: 100.0 BPM → 800、120.5 BPM → 964） |
 | 14 | 1 B | `velocity` | 0–127（強弱。ストレッチ未実装時は固定 64） |
 | 15 | 1 B | `state` | `0=Idle`, `1=Calibrating`, `2=Conducting`, `3=Fallback` |
 | 16 | 4 B | `reserved` | 0 埋め（将来拡張） |
@@ -47,12 +47,13 @@
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 1 B | `midiNote` | MIDI ノート番号（0–127、60=C4） |
-| 13 | 1 B | `velocity` | 0–127 |
-| 14 | 2 B | `durationMs` | 発音時間（ミリ秒） |
-| 16 | 1 B | `partId` | ノード ID（`0x02`〜`0x05`） |
-| 17 | 1 B | **`instrumentId`** | 音色 ID（`sound_lab/data/<id>.json` を参照）。test_v2 で追加（旧 `reserved[0]`） |
-| 18 | 2 B | `reserved` | 0 埋め |
+| 12 | 1 B | `partId` | ノード ID（`0x02`〜`0x05`、輪唱のどの声部か） |
+| 13 | 1 B | `noteNumber` | MIDI ノート番号（0–127、60=C4） |
+| 14 | 1 B | `velocity` | 0–127 |
+| 15 | 1 B | `gate` | `1=NoteOn`、`0=NoteOff`（test_v2 は常に `1`、消音は PC が `durationMs` から自動） |
+| 16 | 2 B | `durationMs` | 発音時間（ミリ秒） |
+| 18 | 1 B | **`instrumentId`** | 音色 ID（`data/<id>.json` の何番目か）。test_v2 で追加（旧 `reserved` 領域） |
+| 19 | 1 B | `reserved` | 0 埋め |
 
 NOTE は UDP ではなく **USB シリアル（115200 bps）** で楽器ノード → PC に流す。
 20 B のバイナリパケットをそのまま流すため、楽器ノードはデフォルト `SERIAL_DEBUG=0`。
@@ -159,19 +160,23 @@ constexpr uint8_t PART_ID = 0x02;          // node_02=0x02, node_03=0x03, node_0
 
 ```cpp
 struct ScoreEvent {
-    uint16_t beatOffset;       // 曲頭からの拍オフセット
-    uint8_t  midiNote;         // MIDI ノート番号（0=休符）
-    uint16_t durationBeats;    // 拍数（1 拍 = 1.0、半拍 = 0.5 を 256 倍で保持する場合あり）
-    uint8_t  velocity;         // 0–127
+    uint16_t beatAt;          // 参考値: 1 始まりの拍番号（ログ可読性のため。進行は index 駆動）
+    uint8_t  noteNumber;      // MIDI ノート番号（0 = 休符）
+    uint8_t  velocity;        // 0-127
+    uint16_t durationQ8;      // 1/256 拍単位（256 = 1 拍）
+    uint8_t  flags;           // bit0=NoteOn / bit2=休符（タイの続き）
+    uint8_t  subNote;         // 細分音符の MIDI（0 = 予約なし）
+    uint8_t  subVelocity;
+    uint16_t subOffsetQ8;     // 拍頭からのオフセット（128 = 半拍 = 8 分音符）
+    uint16_t subDurationQ8;
 };
 
-extern const ScoreEvent SCORE_DATA[];
-extern const size_t     SCORE_LENGTH;
-extern const uint16_t   SCORE_TOTAL_BEATS;
+extern const ScoreEvent kScore[];
+extern const size_t     kScoreLength;
 ```
 
-実装は配列リテラルで直書き。曲を変える際は 3 ノード分を同時に書き換える
-（または共通ヘッダに切り出して `#include` させる）。
+**1 拍 = 1 ScoreEvent** で巡回参照。曲長は `kScoreLength` 自体（`SCORE_TOTAL_BEATS` などの
+別変数は存在しない）。実装は配列リテラルで直書き。曲を変える際は 3 ノード分を同時に書き換える。
 
 ## 音色定義（`sound_lab/data/*.json`）
 

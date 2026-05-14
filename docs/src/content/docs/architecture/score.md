@@ -30,30 +30,43 @@ sidebar:
 
 ```cpp
 struct ScoreEvent {
-    uint16_t beatOffset;       // 曲頭からの拍オフセット（拍 × 256 の固定小数も可）
-    uint8_t  midiNote;         // MIDI ノート番号（0 = 休符、60 = C4）
-    uint16_t durationBeats;    // 拍数（1.0 拍 = 256）
-    uint8_t  velocity;         // 0–127
+    uint16_t beatAt;         // 参考値: 1 始まりの拍番号（進行は index 駆動なのでログ用）
+    uint8_t  noteNumber;     // MIDI ノート番号（0 = 休符）
+    uint8_t  velocity;       // 0-127
+    uint16_t durationQ8;     // 1/256 拍単位（256 = 1 拍、240 = ≒0.94 拍、480 = ≒1.9 拍）
+    uint8_t  flags;          // bit0=NoteOn / bit2=休符（タイの続き）
+
+    // ── 細分音符（拍頭からのオフセットで予約発火する 2 音目）──
+    uint8_t  subNote;        // 0 のときは予約しない
+    uint8_t  subVelocity;
+    uint16_t subOffsetQ8;    // 拍頭からのオフセット（128 = 半拍 = 8 分音符）
+    uint16_t subDurationQ8;
 };
 
-extern const ScoreEvent SCORE_DATA[];
-extern const size_t     SCORE_LENGTH;
-extern const uint16_t   SCORE_TOTAL_BEATS;
+extern const ScoreEvent kScore[];
+extern const size_t     kScoreLength;
 ```
 
-実体は `src/score_data.cpp` に配列リテラルで直書き：
+**1 拍 = 1 ScoreEvent** が原則。指揮者の BEAT を 1 個受けるたびにインデックスを 1 個進める。
+2 拍ぶん伸ばす音は `durationQ8 = 480` を 1 行に書き、続く 1 拍は `flags = 0x04`（休符 = タイの続き）で
+表現する。実体は `src/score_data.cpp`：
 
 ```cpp
-// 「きらきら星」抜粋（例示）
-const ScoreEvent SCORE_DATA[] = {
-    { /* beatOffset */ 0,   /* note */ 60, /* dur */ 256, /* vel */ 100 }, // C
-    { /* beatOffset */ 256, /* note */ 60, /* dur */ 256, /* vel */ 100 }, // C
-    { /* beatOffset */ 512, /* note */ 67, /* dur */ 256, /* vel */ 100 }, // G
+// 「きらきら星」抜粋
+const ScoreEvent kScore[] = {
+    // {beatAt, noteNumber, velocity, durationQ8, flags, subNote, subVel, subOffQ8, subDurQ8}
+    {  1, 60, 100, 240, 0x01, 0, 0, 0, 0 },  // ド   C4
+    {  2, 60, 100, 240, 0x01, 0, 0, 0, 0 },  // ド   C4
+    {  7, 67, 100, 480, 0x01, 0, 0, 0, 0 },  // ソー G4（2 拍）
+    {  8,  0,   0,   0, 0x04, 0, 0, 0, 0 },  //       タイの続き（休符扱い）
     // ...
 };
+const size_t kScoreLength = sizeof(kScore) / sizeof(kScore[0]);
 ```
 
-`SCORE_TOTAL_BEATS` は曲全体の長さ（`beatOffset` の最大値 + 最後の `durationBeats` ぶん）。
+きらきら星は細分音符を使わないので `sub*` は全行 0。8 分音符付きの曲を扱うときに
+`subNote != 0` を立てると、`fireScoreEvent()` が拍頭から `subOffsetQ8 / 256` 拍ぶん遅らせて
+2 音目を予約発火する。
 
 ## 輪唱の「頭ずらし」
 
@@ -66,23 +79,26 @@ const ScoreEvent SCORE_DATA[] = {
 | node_03 | 8 | 1（木管） | 拍 8 から開始 |
 | node_04 | 16 | 2（弦） | 拍 16 から開始 |
 
-楽器ノードのロジック（疑似コード）：
+楽器ノードのロジック（`firmware/test_v2/node_02/src/applyPattern.cpp` 実装）：
 
 ```cpp
-// 指揮者からの beatNo を自分の楽譜位置に変換
-int32_t myBeat = beatNo - headRestBeats;
-if (myBeat < 0) {
-    // まだ自分の番じゃない（先頭の休符）
+// 指揮者の拍番号 firedBeatNo（1 始まり）→ 自分の楽譜インデックス
+const int32_t effective = (int32_t)firedBeatNo - 1 - (int32_t)cfg.headRestBeats;
+if (effective < 0) {
+    // まだ「頭の休符」期間 → 何も鳴らさない（拍を消費するだけ）
     return;
 }
-// 曲全体でループ
-uint16_t scoreBeat = myBeat % SCORE_TOTAL_BEATS;
-// scoreBeat に該当する ScoreEvent を引く
+// 曲長で剰余を取り、kScore の該当イベントを発火
+const uint32_t scoreIndex = (uint32_t)effective % (uint32_t)kScoreLength;
+fireScoreEvent(data, kScore[scoreIndex], now);
 ```
+
+`kScoreLength` 個の `ScoreEvent` が並ぶ配列を、拍番号で巡回参照する。曲長 `SCORE_TOTAL_BEATS`
+のような別変数は存在しない（1 ScoreEvent = 1 拍が固定なので `kScoreLength` がそのまま曲の拍数）。
 
 ## 「PC を途中起動しても合流できる」仕組み
 
-`beatNo` はリポジトリ起動から単調増加するが、楽譜は `% SCORE_TOTAL_BEATS` でループするので、
+`beatNo` は指揮者起動から単調増加するが、楽譜は `effective % kScoreLength` でループするので、
 **任意のタイミングで楽器が立ち上がっても、その瞬間の `beatNo` から正しい位置を計算できる**。
 
 実例:
@@ -98,7 +114,7 @@ uint16_t scoreBeat = myBeat % SCORE_TOTAL_BEATS;
 
 1. 新しい曲の `ScoreEvent` 配列を作る（DAW のエクスポートや手打ち）
 2. `node_0{2,3,4}/src/score_data.cpp` を 3 台分とも置き換える（または共通ヘッダに切り出して include させる）
-3. `SCORE_TOTAL_BEATS` を再計算
+3. `kScoreLength` は `sizeof(kScore) / sizeof(kScore[0])` で自動算出されるので再計算不要
 4. `headRestBeats` を曲構造に合わせて調整（4 声なら 0 / 8 / 16 / 24 など）
 
 将来的に複数曲対応するなら：
@@ -141,3 +157,7 @@ JSON フォーマット例:
 - 通信形式 → [通信プロトコル](/architecture/protocol/)
 - 拍検出 → [同期戦略](/architecture/sync/)
 - PC 側合成 → [pc_app の歩き方](/code/pc-app/)
+
+### さらに深掘りしたい
+
+- `firedBeatNo → scoreIndex` 変換式、輪唱、細分音符、途中起動耐性 → [楽譜進行ロジック](/deep-dive/score-progression/)

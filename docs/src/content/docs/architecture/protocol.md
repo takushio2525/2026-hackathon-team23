@@ -77,7 +77,7 @@ sidebar:
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 2 B | `bpmFixed` | BPM × 256（固定小数。例: 100.0 BPM → 25600） |
+| 12 | 2 B | `bpmQ8` | BPM × 8（Q8 固定小数。例: 100.0 BPM → 800、120.5 BPM → 964） |
 | 14 | 1 B | `velocity` | 0–127（強弱。ストレッチ未実装時は固定 64） |
 | 15 | 1 B | `state` | `0=Idle`, `1=Calibrating`, `2=Conducting`, `3=Fallback` |
 | 16 | 4 B | `reserved` | 0 埋め（将来拡張） |
@@ -90,11 +90,12 @@ sidebar:
 
 ### BPM の固定小数表現
 
-`uint16_t` の精度を稼ぐため、BPM を 256 倍した整数で送る。
+`uint16_t` で BPM を扱うため、**8 倍した整数（Q8 固定小数）** で送る。
 
-- 例: 100.0 BPM → `25600`、120.5 BPM → `30848`
-- 受信側で `bpm = bpmFixed / 256.0f` に戻す
-- 40 BPM 〜 240 BPM の範囲をカバー（[`logic_params::BPM_MIN/MAX`](/.agent/api.md)）
+- 例: 100.0 BPM → `800`、120.5 BPM → `964`
+- 送信側: `bpmQ8 = (uint16_t)(bpm * 8.0f + 0.5f)`（`OrcSenderModule.cpp`）
+- 受信側: `bpm = bpmQ8 / 8.0f`（`OrcReceiverModule.cpp`）
+- 0.125 BPM 単位で表現できる。40 BPM 〜 240 BPM の範囲は `320`〜`1920` に収まる
 
 ## BEAT パケット（type=0x02）
 
@@ -131,12 +132,17 @@ playAtMasterMs = (指揮者時計の現在時刻) + 50 ms
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 1 B | `midiNote` | MIDI ノート番号（0–127、60=C4） |
-| 13 | 1 B | `velocity` | 0–127 |
-| 14 | 2 B | `durationMs` | 発音時間（ミリ秒） |
-| 16 | 1 B | `partId` | ノード ID（`0x02`〜`0x05`） |
-| 17 | 1 B | `instrumentId` | 音色 ID（`sound_lab/data/<id>.json` を参照）。test_v2 で追加 |
-| 18 | 2 B | `reserved` | 0 埋め |
+| 12 | 1 B | `partId` | ノード ID（`0x02`〜`0x05`、輪唱のどの声部か） |
+| 13 | 1 B | `noteNumber` | MIDI ノート番号（0–127、60=C4） |
+| 14 | 1 B | `velocity` | 0–127 |
+| 15 | 1 B | `gate` | `1=NoteOn`、`0=NoteOff`（test_v2 は常に `1`、消音は PC 側が `durationMs` から自動） |
+| 16 | 2 B | `durationMs` | 発音時間（ミリ秒） |
+| 18 | 1 B | `instrumentId` | 音色 ID（`data/*.json` の何番目か）。test_v2 で追加（旧 `reserved` 領域に充当） |
+| 19 | 1 B | `reserved` | 0 埋め |
+
+> ⚠️ test_v1 のドキュメントでは「先頭が `midiNote`」と書かれていたが、test_v2 実装で
+> ヘッダ直後に `partId` を置く順序へ変更されている（`OrcProtocol.h::NotePayload`）。
+> パース時のオフセットを誤らないよう注意する。
 
 ### なぜ UDP ではなく USB Serial?
 
@@ -186,3 +192,8 @@ PC 側 `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` が `sound_lab/d
 - 拍検出と時刻同期の中身 → [同期戦略](/architecture/sync/)
 - 楽譜データの形式 → [楽譜フォーマット](/architecture/score/)
 - PC 側の合成 → [pc_app の歩き方](/code/pc-app/)
+
+### さらに深掘りしたい
+
+- なぜ UDP マルチキャスト / SoftAP / `239.0.0.1` か → [UDP マルチキャスト](/deep-dive/udp-multicast/)
+- 20 B 固定パケットのバイトレイアウト・エンディアン → [バイナリパケット](/deep-dive/binary-packet/)
