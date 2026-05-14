@@ -250,3 +250,10 @@ upload_speed = 921600
 - PC 側 → [pc_app の歩き方](/code/pc-app/)
 - バージョン差分 → [test_v1 / test_v2 / production の差分](/code/versions/)
 - 困ったら → [よく出るトラブルと対処](/code/troubleshooting/)
+
+### さらに深掘りしたい
+
+- `applyPattern.cpp` を行単位で読み解く → [拍検出アルゴリズム](/deep-dive/beat-detection/)
+- 受信側の `OrcReceiverModule` と発火タイミング → [時刻同期メカニズム](/deep-dive/time-sync/)
+- 楽器ノードの楽譜進行ロジック → [楽譜進行ロジック](/deep-dive/score-progression/)
+- 新しいモジュールを足す → [モジュール拡張ガイド](/deep-dive/module-extension/)

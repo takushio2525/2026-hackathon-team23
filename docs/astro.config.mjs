@@ -69,6 +69,19 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'アルゴリズム詳説',
+					items: [
+						{ label: '読み順ガイド', slug: 'deep-dive' },
+						{ label: '拍検出アルゴリズム', slug: 'deep-dive/beat-detection' },
+						{ label: '時刻同期メカニズム', slug: 'deep-dive/time-sync' },
+						{ label: 'UDP マルチキャスト', slug: 'deep-dive/udp-multicast' },
+						{ label: 'バイナリパケット', slug: 'deep-dive/binary-packet' },
+						{ label: '楽譜進行ロジック', slug: 'deep-dive/score-progression' },
+						{ label: '加算合成エンジン', slug: 'deep-dive/additive-synthesis' },
+						{ label: 'モジュール拡張ガイド', slug: 'deep-dive/module-extension' },
+					],
+				},
+				{
 					label: '意思決定の記録（ADR）',
 					items: [{ autogenerate: { directory: 'decisions' } }],
 				},

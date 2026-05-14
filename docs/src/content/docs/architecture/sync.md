@@ -122,14 +122,18 @@ local_ms = master_ms - offset;
 playAtMasterMs = millis() + 50;   // beatLookaheadMs = 50 ms
 ```
 
-楽器側：
+楽器側（実装は `firmware/test_v2/node_02/src/applyPattern.cpp`）：
 
-1. BEAT 受信
-2. `play_local = playAtMasterMs - offset` で自時計時刻に変換
-3. `millis() < play_local` の間 `delay()` して待つ
-4. `play_local` ぴったりで NOTE を発射
+1. BEAT 受信時に `OrcReceiverModule` が `pending` キューに積む
+2. `applyPattern()` 毎ループで `targetLocalMs = playAtMasterMs - sync.offsetMs` を計算
+3. `waitMs = targetLocalMs - millis()` を見て、`waitMs <= 0`（到達済み）なら発火、`> 0` なら次ループに先送り
+4. 期限切れでも捨てず即発火する（捨てると鳴らなくなるので、遅延吸収より「鳴らす」を優先）
 
-これにより、**ネットワーク遅延が 50 ms 未満なら必ず時刻が揃う**。
+`delay()` でビジーウェイトしないのがポイント。EMA の 3 フェーズループは 5 ms 周期で回り続けるので、
+**最大でも次ループ（5 ms 後）で発火判定が更新される**。これにより `waitMs` の解像度は ±5 ms。
+
+ネットワーク遅延が `beatLookaheadMs = 50 ms` 未満であれば、各楽器は同じ `playAtMasterMs` を
+それぞれの `sync.offsetMs` だけ補正した自時計時刻で発火するため、**楽器間の発音は揃う**。
 
 ### なぜ 50 ms
 
@@ -184,3 +188,8 @@ IMU が反応しない or WiFi が切れた場合：
 - パケット仕様 → [通信プロトコル](/architecture/protocol/)
 - コード本体 → [firmware の歩き方](/code/firmware/)
 - 全体図 → [全体図](/architecture/overview/)
+
+### さらに深掘りしたい
+
+- 拍検出の数学・状態機械を完全に追う → [拍検出アルゴリズム](/deep-dive/beat-detection/)
+- 時刻同期 EMA の収束特性・誤差予算 → [時刻同期メカニズム](/deep-dive/time-sync/)

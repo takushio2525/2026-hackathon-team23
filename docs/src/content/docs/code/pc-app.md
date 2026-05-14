@@ -271,3 +271,8 @@ test_v2 のほうが圧倒的にリアルな音だが、コード量は数倍。
 - 音色 JSON を作る → `sound_lab/README.md`（リポジトリ内）
 - バージョン差分 → [test_v1 / test_v2 / production の差分](/code/versions/)
 - 困ったら → [よく出るトラブルと対処](/code/troubleshooting/)
+
+### さらに深掘りしたい
+
+- 加算合成 / ADSR / 非調和性 / ボイスプールの実装 → [加算合成エンジン](/deep-dive/additive-synthesis/)
+- NOTE パケットのバイトレベル受信 → [バイナリパケット](/deep-dive/binary-packet/)
