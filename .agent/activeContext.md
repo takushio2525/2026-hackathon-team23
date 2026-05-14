@@ -5,23 +5,26 @@
 
 ## 現在の対象
 
-- **2026-05-14**: グローバル CLAUDE.md の AGENTS.md 中心構成に追従する全面リファクタリング
-- 同時にプレゼン本番（2026-07-01 成果発表会）に向けた解説資料整備
+- **2026-05-14**: AGENTS.md 中心構成への全面移行 + docs/ の Astro Starlight 化が完了。
+  プレゼン本番（2026-07-01 成果発表会）に向けて、解説サイトの公開準備フェーズ。
 
 ## 直近の観点
 
-1. AGENTS.md と `.agent/` 体系を構築し、CLAUDE.md を `@AGENTS.md` リダイレクトに切替
-2. `docs/` を Astro Starlight 化し、既存 Markdown（overview / roles / design / decisions）を統合
-3. 初学者（チーム外・Git/PlatformIO/Processing 未経験）でも追える深さの解説ページ群を新規執筆
-4. ルート README / CONTRIBUTING / .gitignore / 各サブ README を新 docs に整合
+1. AGENTS.md / `.agent/` / CLAUDE.md=`@AGENTS.md` への移行は push 済み（commit `b3f3b67`）
+2. docs/ Starlight サイト（35 ページ）の初版が push 済み（commit `dc3da4f`）、ローカルで
+   `cd docs && npm run dev` 起動可能
+3. ルート README・CONTRIBUTING・サブ README は新 docs に整合済み（commit `09c530d`）
 
 ## 次の一手
 
-- Phase A（AGENTS / `.agent/` 構築）→ 完了見込み
-- Phase B（Starlight 化・既存退避・コンテンツ移植）
-- Phase C（新規ページ執筆）
-- Phase D（ビルド検証 & 整合性）
-- Phase E（機能単位でコミット & プッシュ）
+- **公開先の決定**: GitHub Pages か Vercel か。決まれば `docs/astro.config.mjs` の
+  `site` / `base` を埋め、GitHub Actions のデプロイワークフローを追加
+- **チームレビュー**: 5/14 以降のミーティングでドキュメントサイトを共有し、
+  メンバー視点でのフィードバックを反映
+- **未公開 ADR**: 第 3 〜 4 回ミーティングで新規に決まった事項（MOP / V&V / TPM）が
+  あれば、`docs/src/content/docs/decisions/0008-*.md` を追加
+- **コンテンツ追補**: pc_app/test_v2 のスケッチを直接読みながら、`code/pc-app.md` の
+  コード例を実装と完全一致させる（現状は読みやすさ優先で疑似コード気味）
 
 ## ユーザーの今回の好み
 
@@ -34,4 +37,6 @@
 - 過去ログ（`work/` 配下・`meetings/0429_3回/事前課題共有/`）の旧 `docs/*.md` リンクは
   時系列スナップショットとして残置（リンク切れ許容）
 - GitHub Pages 公開可否は未定（`astro.config.mjs` の `site` / `base` は当面コメントアウト）
-- CONTRIBUTING.md は Starlight 側「開発ガイド」を SSOT としつつ、誘導文書として残す
+- CONTRIBUTING.md は Git 特化版として残し、開発ガイド全般は Starlight 側を SSOT
+- `code/pc-app.md` は実装と完全一致していない疑似コードを含む。スケッチが安定したら
+  実コードに置き換える

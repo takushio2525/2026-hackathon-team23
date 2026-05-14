@@ -5,7 +5,7 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
-- 2026-05-14: AGENTS.md 中心構成へフル移行（AGENTS.md / `.agent/` / CLAUDE.md=@AGENTS.md）。docs/ を Astro Starlight 化し、初学者向け解説資料を整備（プレゼン本番 2026-07-01 に向けた取組）
+- 2026-05-14: AGENTS.md 中心構成へフル移行（`b3f3b67`）と docs/ の Astro Starlight 化・初学者向け 35 ページ整備（`dc3da4f`）、関連 README 整合（`09c530d`）を一括 push。次の検討は GitHub Pages 公開先決定と未公開 ADR の追加
 - 2026-05-13: 発表用 rink ファイルを新規追加（`1d11877`）。シリアルデバッグ出力を無効化（`fd7eb18`）
 
 ## 2026-05 — test_v2 / 計画書整備
