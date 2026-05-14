@@ -13,7 +13,7 @@ export default defineConfig({
 		starlight({
 			title: 'Arduino オーケストラ — チーム 23',
 			description: '指揮者 1 ＋ 楽器 4 ＋ PC で輪唱を奏でる、5 台同期演奏システムの設計と実装の解説',
-			customCss: ['./src/styles/glass-pastel.css'],
+			customCss: ['./src/styles/docs-theme.css'],
 			// social: [
 			// 	{ icon: 'github', label: 'GitHub', href: 'https://github.com/takushio2525/2026-hackathon-team23' },
 			// ],

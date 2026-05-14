@@ -1,0 +1,278 @@
+/*
+ * Docs Theme — Astro Starlight 用「読みやすさ優先」テーマ
+ * Stripe / GitHub Docs 風: 純白背景 + 濃インク + 青アクセント1色 + 薄グレー罫線。
+ * Glass Pastel（SaaS/UI 向け）とは別系統。長文閲覧と検索性を最優先する。
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+	/* === Docs Theme トークン（ライト = GitHub Docs 系） === */
+	--dt-bg: #ffffff;
+	--dt-bg-subtle: #f6f8fa;        /* サイドバー・コードブロック背景 */
+	--dt-bg-inline: rgba(175, 184, 193, 0.2);
+	--dt-ink: #1f2328;              /* 本文 */
+	--dt-ink-muted: #59636e;        /* キャプション・ミュート */
+	--dt-ink-subtle: #818b98;       /* さらに薄い */
+	--dt-accent: #0969da;           /* リンク・CTA */
+	--dt-accent-hi: #0550ae;        /* hover */
+	--dt-border: #d1d9e0;
+	--dt-border-muted: #d8dee4;
+
+	/* === Starlight CSS 変数の上書き === */
+	--sl-font: 'Inter', 'Noto Sans JP', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+	/* テキスト/背景 */
+	--sl-color-white: #ffffff;
+	--sl-color-black: var(--dt-ink);
+	--sl-color-text: var(--dt-ink);
+	--sl-color-text-accent: var(--dt-accent);
+	--sl-color-text-invert: #ffffff;
+	--sl-color-bg: var(--dt-bg);
+	--sl-color-bg-nav: var(--dt-bg);
+	--sl-color-bg-sidebar: var(--dt-bg-subtle);
+	--sl-color-bg-inline-code: var(--dt-bg-inline);
+	--sl-color-bg-accent: var(--dt-accent);
+
+	/* アクセント階調 */
+	--sl-color-accent-low: #ddf4ff;
+	--sl-color-accent: var(--dt-accent);
+	--sl-color-accent-high: var(--dt-accent-hi);
+
+	/* グレー階調（明側） */
+	--sl-color-gray-1: #f6f8fa;
+	--sl-color-gray-2: #eaeef2;
+	--sl-color-gray-3: #d1d9e0;
+	--sl-color-gray-4: #59636e;
+	--sl-color-gray-5: #1f2328;
+	--sl-color-gray-6: #0d1117;
+
+	/* 罫線 */
+	--sl-color-hairline: var(--dt-border);
+	--sl-color-hairline-light: var(--dt-border-muted);
+	--sl-color-hairline-shade: #adbac7;
+
+	/* 行送り・読みやすさ */
+	--sl-line-height: 1.65;
+	--sl-text-base: 16px;
+}
+
+/* === ダークモード（GitHub Dark 系） === */
+:root[data-theme='dark'] {
+	--dt-bg: #0d1117;
+	--dt-bg-subtle: #161b22;
+	--dt-bg-inline: rgba(110, 118, 129, 0.4);
+	--dt-ink: #e6edf3;
+	--dt-ink-muted: #9198a1;
+	--dt-ink-subtle: #6e7681;
+	--dt-accent: #4493f8;
+	--dt-accent-hi: #79c0ff;
+	--dt-border: #30363d;
+	--dt-border-muted: #21262d;
+
+	--sl-color-white: var(--dt-ink);
+	--sl-color-black: #ffffff;
+	--sl-color-text: var(--dt-ink);
+	--sl-color-text-accent: var(--dt-accent);
+	--sl-color-bg: var(--dt-bg);
+	--sl-color-bg-nav: var(--dt-bg);
+	--sl-color-bg-sidebar: var(--dt-bg-subtle);
+	--sl-color-bg-inline-code: var(--dt-bg-inline);
+
+	--sl-color-accent-low: #0c2d6b;
+	--sl-color-accent: var(--dt-accent);
+	--sl-color-accent-high: var(--dt-accent-hi);
+
+	--sl-color-gray-1: #161b22;
+	--sl-color-gray-2: #21262d;
+	--sl-color-gray-3: #30363d;
+	--sl-color-gray-4: #9198a1;
+	--sl-color-gray-5: #e6edf3;
+	--sl-color-gray-6: #ffffff;
+
+	--sl-color-hairline: var(--dt-border);
+	--sl-color-hairline-light: var(--dt-border-muted);
+	--sl-color-hairline-shade: #484f58;
+}
+
+/* === ベース === */
+body {
+	background: var(--dt-bg);
+	color: var(--dt-ink);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+/* 本文の読みやすさ */
+.sl-markdown-content {
+	line-height: 1.7;
+	font-size: 16px;
+}
+
+.sl-markdown-content p,
+.sl-markdown-content ul,
+.sl-markdown-content ol {
+	color: var(--dt-ink);
+}
+
+/* === 見出し === */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4 {
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--dt-ink);
+}
+
+.sl-markdown-content h1 {
+	font-size: 2rem;
+	border-bottom: 1px solid var(--dt-border);
+	padding-bottom: 0.4em;
+	margin-top: 0;
+}
+
+.sl-markdown-content h2 {
+	font-size: 1.5rem;
+	border-bottom: 1px solid var(--dt-border-muted);
+	padding-bottom: 0.3em;
+	margin-top: 2em;
+}
+
+.sl-markdown-content h3 {
+	font-size: 1.25rem;
+	margin-top: 1.6em;
+}
+
+/* === リンク === */
+.sl-markdown-content a,
+a {
+	color: var(--dt-accent);
+	text-decoration: none;
+}
+
+.sl-markdown-content a:hover,
+a:hover {
+	color: var(--dt-accent-hi);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* === コード === */
+.sl-markdown-content code:not(pre code) {
+	background: var(--dt-bg-inline);
+	padding: 0.15em 0.4em;
+	border-radius: 6px;
+	font-size: 0.875em;
+	font-weight: 500;
+}
+
+.sl-markdown-content pre {
+	background: var(--dt-bg-subtle) !important;
+	border: 1px solid var(--dt-border-muted);
+	border-radius: 8px;
+	padding: 1em;
+	overflow-x: auto;
+	line-height: 1.5;
+}
+
+.sl-markdown-content pre code {
+	background: transparent !important;
+	font-size: 0.875em;
+}
+
+/* === 引用 === */
+.sl-markdown-content blockquote {
+	border-left: 4px solid var(--dt-border);
+	padding: 0 1em;
+	color: var(--dt-ink-muted);
+	margin: 1em 0;
+}
+
+/* === テーブル === */
+.sl-markdown-content table {
+	border-collapse: collapse;
+	margin: 1em 0;
+	font-size: 0.95em;
+}
+
+.sl-markdown-content th,
+.sl-markdown-content td {
+	border: 1px solid var(--dt-border);
+	padding: 0.5em 0.9em;
+	text-align: left;
+}
+
+.sl-markdown-content th {
+	background: var(--dt-bg-subtle);
+	font-weight: 600;
+}
+
+.sl-markdown-content tr:nth-child(even) td {
+	background: var(--dt-bg-subtle);
+}
+
+/* === ヘッダー・サイドバー === */
+header.header {
+	background: var(--dt-bg);
+	border-bottom: 1px solid var(--dt-border);
+}
+
+nav.sidebar {
+	background: var(--dt-bg-subtle);
+	border-right: 1px solid var(--dt-border);
+}
+
+/* サイドバー active */
+.sidebar a[aria-current='page'] {
+	background: var(--sl-color-accent-low);
+	color: var(--dt-accent);
+	font-weight: 600;
+	border-radius: 6px;
+}
+
+/* === CTA ボタン === */
+.action.primary {
+	background: var(--dt-accent);
+	border: 1px solid var(--dt-accent);
+	color: #ffffff;
+	border-radius: 6px;
+	box-shadow: none;
+}
+
+.action.primary:hover {
+	background: var(--dt-accent-hi);
+	border-color: var(--dt-accent-hi);
+}
+
+.action.secondary,
+.action.minimal {
+	border: 1px solid var(--dt-border);
+	border-radius: 6px;
+	color: var(--dt-ink);
+}
+
+/* === フォーカス可視（アクセシビリティ） === */
+:focus-visible {
+	outline: 2px solid var(--dt-accent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* === 検索ボックス === */
+site-search button {
+	background: var(--dt-bg-subtle);
+	border: 1px solid var(--dt-border);
+	color: var(--dt-ink-muted);
+	border-radius: 6px;
+}
+
+/* === モーション控えめ === */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
