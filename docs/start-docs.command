@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # このファイルをダブルクリックすると、ドキュメントサイトのローカルサーバーが立ち上がり、
-# ブラウザが自動で開きます。終了するときはこのターミナルウィンドウで Ctrl+C → 閉じる。
+# ブラウザ（Google Chrome があれば Chrome、無ければデフォルトブラウザ）が自動で開く。
+# 終了するときはこのターミナルウィンドウで Ctrl+C → 閉じる。
 
 set -e
 cd "$(dirname "$0")"
@@ -14,8 +15,16 @@ if [ ! -d node_modules ]; then
     echo ""
 fi
 
-# 3 秒後にデフォルトブラウザでサイトを開く（サーバー起動待ち）
-( sleep 3 && open "http://localhost:4321" ) &
+# サーバー起動後にブラウザを自動で開く（3 秒待ってから）
+open_url() {
+    sleep 3
+    if [ -d "/Applications/Google Chrome.app" ]; then
+        open -a "Google Chrome" "http://localhost:4321"
+    else
+        open "http://localhost:4321"
+    fi
+}
+open_url &
 
 echo "================================================================"
 echo "  ドキュメントサイトを起動します"
