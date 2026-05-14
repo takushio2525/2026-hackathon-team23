@@ -1,0 +1,676 @@
+/*
+ * Paper Theme — Astro Starlight 用「ノート / 紙質感」テーマ
+ *
+ * 紙の暖色 + 温かい墨色のインク + テラコッタ1色アクセント。
+ * ノートを開いたような落ち着いた読書感を狙う。Editorial（museum-like）寄り。
+ *
+ * 設計原則:
+ *   - 背景は純白を避けてオフホワイト/クリーム。長文を読んでも目が疲れない
+ *   - 文字色は黒を避けて温かみのある墨色（#1a1916）でコントラスト 16:1（AAA）
+ *   - アクセントはテラコッタ 1 色（リンク / ボタン / active）に統一
+ *   - 罫線は薄ベージュ、紙の線っぽく
+ *   - 見出し・本文ともセリフ系（Noto Serif JP）で紙物感
+ *   - UI ラベル（検索バー、コード等）は Inter で硬めに
+ *   - 全 sl-* 変数を網羅的に上書き、Starlight デフォルトの淡色残りを潰す
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ============================================================
+ * ライトモード（紙の昼）
+ * ============================================================ */
+:root {
+	/* 紙の色 */
+	--pt-bg: #fbf8f1;              /* 本紙のクリーム */
+	--pt-bg-subtle: #f4efe2;       /* サイドバー、コードブロック */
+	--pt-bg-hi: #f8f3e3;           /* hover */
+	--pt-bg-inline: rgba(184, 94, 60, 0.10);  /* インラインコード = テラコッタ薄 */
+
+	/* インク（墨）の色 */
+	--pt-ink: #1a1916;             /* 本文・見出し */
+	--pt-ink-muted: #57544c;       /* キャプション、メタ */
+	--pt-ink-subtle: #8a8270;      /* さらに薄い、罫線色文字 */
+
+	/* アクセント（テラコッタ） */
+	--pt-accent: #b85e3c;
+	--pt-accent-hi: #8f4527;
+	--pt-accent-soft: #e8c9b8;     /* アクセント薄、active 背景 */
+
+	/* 罫線（紙の線） */
+	--pt-border: #e1dccb;
+	--pt-border-strong: #c9c4b2;
+	--pt-border-soft: #ece6d2;
+
+	/* === フォント === */
+	--sl-font: 'Noto Serif JP', 'Iowan Old Style', 'Apple Garamond', Georgia, 'Times New Roman', serif;
+	--sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+	--sl-text-base: 16px;
+	--sl-line-height: 1.8;
+
+	/* === Starlight CSS 変数（網羅的に上書き）=== */
+
+	/* テキスト/背景 */
+	--sl-color-white: var(--pt-ink);
+	--sl-color-black: var(--pt-bg);
+	--sl-color-text: var(--pt-ink);
+	--sl-color-text-accent: var(--pt-accent);
+	--sl-color-text-invert: var(--pt-bg);
+	--sl-color-bg: var(--pt-bg);
+	--sl-color-bg-nav: var(--pt-bg);
+	--sl-color-bg-sidebar: var(--pt-bg-subtle);
+	--sl-color-bg-inline-code: var(--pt-bg-inline);
+	--sl-color-bg-accent: var(--pt-accent);
+
+	/* アクセント階調 */
+	--sl-color-accent-low: var(--pt-accent-soft);
+	--sl-color-accent: var(--pt-accent);
+	--sl-color-accent-high: var(--pt-accent-hi);
+
+	/* グレー階調（ライト = クリーム階調にすり替え）*/
+	--sl-color-gray-1: #f4efe2;
+	--sl-color-gray-2: #ece6d2;
+	--sl-color-gray-3: #c9c4b2;
+	--sl-color-gray-4: #8a8270;
+	--sl-color-gray-5: #57544c;
+	--sl-color-gray-6: #1a1916;
+	--sl-color-gray-7: #0d0c0a;
+
+	/* 罫線 */
+	--sl-color-hairline: var(--pt-border);
+	--sl-color-hairline-light: var(--pt-border-soft);
+	--sl-color-hairline-shade: var(--pt-border-strong);
+}
+
+/* ============================================================
+ * ダークモード（紙の夜 = ダークセピア）
+ * ============================================================ */
+:root[data-theme='dark'] {
+	--pt-bg: #1f1b14;              /* 暗い革表紙 */
+	--pt-bg-subtle: #28231a;
+	--pt-bg-hi: #2c2719;
+	--pt-bg-inline: rgba(212, 154, 121, 0.18);
+
+	--pt-ink: #efe5d0;             /* 古い和紙の文字色 */
+	--pt-ink-muted: #b8ab92;
+	--pt-ink-subtle: #847b69;
+
+	--pt-accent: #d49a79;          /* 夜に映えるテラコッタライト */
+	--pt-accent-hi: #e8b896;
+	--pt-accent-soft: rgba(212, 154, 121, 0.25);
+
+	--pt-border: #3a3327;
+	--pt-border-strong: #574d3a;
+	--pt-border-soft: #2c281d;
+
+	--sl-color-white: var(--pt-ink);
+	--sl-color-black: var(--pt-bg);
+	--sl-color-text: var(--pt-ink);
+	--sl-color-text-accent: var(--pt-accent);
+	--sl-color-text-invert: var(--pt-bg);
+	--sl-color-bg: var(--pt-bg);
+	--sl-color-bg-nav: var(--pt-bg);
+	--sl-color-bg-sidebar: var(--pt-bg-subtle);
+	--sl-color-bg-inline-code: var(--pt-bg-inline);
+	--sl-color-bg-accent: var(--pt-accent);
+
+	--sl-color-accent-low: var(--pt-accent-soft);
+	--sl-color-accent: var(--pt-accent);
+	--sl-color-accent-high: var(--pt-accent-hi);
+
+	--sl-color-gray-1: #28231a;
+	--sl-color-gray-2: #2c281d;
+	--sl-color-gray-3: #3a3327;
+	--sl-color-gray-4: #847b69;
+	--sl-color-gray-5: #b8ab92;
+	--sl-color-gray-6: #efe5d0;
+	--sl-color-gray-7: #fdf6e3;
+
+	--sl-color-hairline: var(--pt-border);
+	--sl-color-hairline-light: var(--pt-border-soft);
+	--sl-color-hairline-shade: var(--pt-border-strong);
+}
+
+/* ============================================================
+ * ベース
+ * ============================================================ */
+body {
+	background: var(--pt-bg);
+	color: var(--pt-ink);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+ * Starlight Hero（ホームの大見出しゾーン）
+ * 画像で問題になっていた箇所。Starlight の hero は body 外の特殊要素なので
+ * 専用セレクタを当てる
+ * ============================================================ */
+.hero {
+	background: var(--pt-bg);
+}
+
+.hero h1,
+.hero .title,
+.hero [class*='title'] {
+	font-family: var(--sl-font);
+	color: var(--pt-ink) !important;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+
+.hero .tagline,
+.hero [class*='tagline'] {
+	color: var(--pt-ink-muted) !important;
+	font-size: 1.15rem;
+	line-height: 1.7;
+}
+
+.hero .actions a,
+.hero [class*='actions'] a {
+	font-family: 'Inter', system-ui, sans-serif;
+	font-weight: 600;
+	border-radius: 8px;
+	padding: 0.7em 1.4em;
+}
+
+.hero .actions a.action.primary,
+.hero a[class*='primary'] {
+	background: var(--pt-accent) !important;
+	border: 1px solid var(--pt-accent) !important;
+	color: #ffffff !important;
+	box-shadow: 0 2px 4px rgba(184, 94, 60, 0.2);
+}
+
+.hero .actions a.action.primary:hover,
+.hero a[class*='primary']:hover {
+	background: var(--pt-accent-hi) !important;
+	border-color: var(--pt-accent-hi) !important;
+}
+
+.hero .actions a.action.secondary,
+.hero .actions a.action.minimal,
+.hero a[class*='secondary'],
+.hero a[class*='minimal'] {
+	background: transparent !important;
+	border: 1px solid var(--pt-border-strong) !important;
+	color: var(--pt-ink) !important;
+}
+
+/* ============================================================
+ * 本文 Markdown
+ * ============================================================ */
+.sl-markdown-content {
+	font-family: var(--sl-font);
+	font-size: 16px;
+	line-height: 1.85;
+	color: var(--pt-ink);
+}
+
+.sl-markdown-content p,
+.sl-markdown-content li {
+	color: var(--pt-ink);
+}
+
+/* 見出し */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4,
+.sl-markdown-content h5,
+.sl-markdown-content h6 {
+	font-family: var(--sl-font);
+	font-weight: 700;
+	color: var(--pt-ink);
+	letter-spacing: -0.005em;
+}
+
+.sl-markdown-content h1 {
+	font-size: 2.1rem;
+	border-bottom: 2px solid var(--pt-border-strong);
+	padding-bottom: 0.35em;
+	margin-top: 0;
+	margin-bottom: 0.8em;
+}
+
+.sl-markdown-content h2 {
+	font-size: 1.55rem;
+	border-bottom: 1px solid var(--pt-border);
+	padding-bottom: 0.3em;
+	margin-top: 2.2em;
+	margin-bottom: 0.7em;
+}
+
+.sl-markdown-content h3 {
+	font-size: 1.25rem;
+	margin-top: 1.8em;
+	margin-bottom: 0.5em;
+}
+
+.sl-markdown-content h4 {
+	font-size: 1.08rem;
+	margin-top: 1.4em;
+}
+
+/* リンク */
+.sl-markdown-content a,
+a {
+	color: var(--pt-accent);
+	text-decoration: underline;
+	text-decoration-color: var(--pt-border-strong);
+	text-underline-offset: 3px;
+	text-decoration-thickness: 1px;
+}
+
+.sl-markdown-content a:hover,
+a:hover {
+	color: var(--pt-accent-hi);
+	text-decoration-color: var(--pt-accent);
+}
+
+/* インラインコード */
+.sl-markdown-content code:not(pre code) {
+	font-family: var(--sl-font-mono);
+	background: var(--pt-bg-inline);
+	color: var(--pt-accent-hi);
+	padding: 0.12em 0.42em;
+	border-radius: 4px;
+	font-size: 0.86em;
+	font-weight: 500;
+}
+
+:root[data-theme='dark'] .sl-markdown-content code:not(pre code) {
+	color: var(--pt-accent);
+}
+
+/* コードブロック */
+.sl-markdown-content pre {
+	background: var(--pt-bg-subtle) !important;
+	border: 1px solid var(--pt-border);
+	border-radius: 6px;
+	padding: 1em 1.2em;
+	overflow-x: auto;
+	line-height: 1.6;
+	font-family: var(--sl-font-mono);
+}
+
+.sl-markdown-content pre code {
+	background: transparent !important;
+	color: var(--pt-ink);
+	font-size: 0.88em;
+	font-family: var(--sl-font-mono);
+}
+
+/* 引用（紙のノートの傍注っぽく） */
+.sl-markdown-content blockquote {
+	border-left: 3px solid var(--pt-accent);
+	background: var(--pt-bg-subtle);
+	padding: 0.5em 1.2em;
+	color: var(--pt-ink-muted);
+	margin: 1.4em 0;
+	font-style: italic;
+	border-radius: 0 4px 4px 0;
+}
+
+/* テーブル */
+.sl-markdown-content table {
+	border-collapse: collapse;
+	margin: 1.4em 0;
+	font-size: 0.95em;
+	width: auto;
+}
+
+.sl-markdown-content th,
+.sl-markdown-content td {
+	border: 1px solid var(--pt-border);
+	padding: 0.55em 1em;
+	text-align: left;
+}
+
+.sl-markdown-content th {
+	background: var(--pt-bg-subtle);
+	font-weight: 700;
+	color: var(--pt-ink);
+}
+
+.sl-markdown-content tr:nth-child(even) td {
+	background: var(--pt-bg-hi);
+}
+
+/* リスト */
+.sl-markdown-content ul,
+.sl-markdown-content ol {
+	padding-left: 1.6em;
+}
+
+.sl-markdown-content li {
+	margin: 0.3em 0;
+}
+
+.sl-markdown-content li::marker {
+	color: var(--pt-accent);
+}
+
+/* 水平線 */
+.sl-markdown-content hr {
+	border: none;
+	border-top: 1px solid var(--pt-border);
+	margin: 2.4em 0;
+}
+
+/* ============================================================
+ * ヘッダー・サイドバー
+ * ============================================================ */
+header.header {
+	background: var(--pt-bg) !important;
+	border-bottom: 1px solid var(--pt-border);
+}
+
+header.header .site-title,
+header.header [class*='site-title'] {
+	color: var(--pt-ink);
+	font-family: var(--sl-font);
+	font-weight: 700;
+}
+
+/* 検索ボックス */
+site-search button,
+.search-input,
+[class*='search'] button {
+	background: var(--pt-bg-subtle) !important;
+	border: 1px solid var(--pt-border) !important;
+	color: var(--pt-ink-muted) !important;
+	border-radius: 6px;
+	font-family: 'Inter', sans-serif;
+}
+
+/* サイドバー */
+nav.sidebar,
+nav[class*='sidebar'] {
+	background: var(--pt-bg-subtle) !important;
+	border-right: 1px solid var(--pt-border);
+}
+
+.sidebar a,
+nav[class*='sidebar'] a {
+	color: var(--pt-ink) !important;
+	font-family: 'Inter', 'Noto Sans JP', sans-serif;
+	font-size: 0.93rem;
+	border-radius: 4px;
+}
+
+.sidebar a:hover,
+nav[class*='sidebar'] a:hover {
+	background: var(--pt-bg-hi);
+	color: var(--pt-accent) !important;
+}
+
+.sidebar a[aria-current='page'],
+nav[class*='sidebar'] a[aria-current='page'] {
+	background: var(--pt-accent-soft) !important;
+	color: var(--pt-accent-hi) !important;
+	font-weight: 600;
+	border-radius: 4px;
+}
+
+:root[data-theme='dark'] .sidebar a[aria-current='page'],
+:root[data-theme='dark'] nav[class*='sidebar'] a[aria-current='page'] {
+	color: var(--pt-accent) !important;
+}
+
+/* サイドバーのグループラベル */
+.sidebar summary,
+.sidebar [class*='group-label'] {
+	color: var(--pt-ink-muted) !important;
+	font-family: 'Inter', sans-serif;
+	font-weight: 600;
+	font-size: 0.78rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+/* ============================================================
+ * 右ペイン（目次 / On this page）
+ * ============================================================ */
+[class*='right-sidebar'] a,
+[class*='toc'] a {
+	color: var(--pt-ink-muted) !important;
+	font-family: 'Inter', sans-serif;
+	font-size: 0.87rem;
+}
+
+[class*='right-sidebar'] a:hover,
+[class*='toc'] a:hover {
+	color: var(--pt-accent) !important;
+}
+
+[class*='right-sidebar'] a[aria-current],
+[class*='toc'] a[aria-current] {
+	color: var(--pt-accent) !important;
+	font-weight: 600;
+}
+
+/* ============================================================
+ * ページ下部の前後ナビゲーション
+ * ============================================================ */
+[class*='pagination-links'] a,
+.pagination-links a {
+	background: var(--pt-bg-subtle);
+	border: 1px solid var(--pt-border);
+	color: var(--pt-ink);
+	border-radius: 6px;
+	padding: 0.8em 1.2em;
+}
+
+[class*='pagination-links'] a:hover {
+	border-color: var(--pt-accent);
+	color: var(--pt-accent);
+	text-decoration: none;
+}
+
+/* ============================================================
+ * テーマ切替トグル
+ * ============================================================ */
+starlight-theme-select select {
+	background: var(--pt-bg-subtle) !important;
+	color: var(--pt-ink) !important;
+	border: 1px solid var(--pt-border) !important;
+}
+
+/* ============================================================
+ * Expressive Code（Starlight 標準のコードブロックフレーム）
+ *
+ * デフォルトはダーク前提（#0d0c0a の黒背景 + 黒コピーボタン）で Paper と
+ * 完全衝突する。Expressive Code 公開の --ec-* CSS 変数を全部 Paper トーンで
+ * 注入し、ライト/ダークとも変数経由で追従させる。
+ * ============================================================ */
+.expressive-code,
+.expressive-code .frame,
+.expressive-code .frame.is-terminal,
+.expressive-code .frame.has-title {
+	--ec-codeBg: var(--pt-bg-subtle);
+	--ec-codeFg: var(--pt-ink);
+	--ec-codeSelBg: var(--pt-accent-soft);
+
+	/* ターミナル風フレーム（信号機3ドット付き）*/
+	--ec-frm-trmBg: var(--pt-bg-subtle);
+	--ec-frm-trmTtbBg: var(--pt-bg-hi);
+	--ec-frm-trmTtbBrdBtmCol: var(--pt-border);
+	--ec-frm-trmTtbFc: var(--pt-ink-muted);
+
+	/* エディタ風フレーム（タブ付き）*/
+	--ec-frm-edBg: var(--pt-bg-subtle);
+	--ec-frm-edActTabBg: var(--pt-bg);
+	--ec-frm-edActTabFg: var(--pt-ink);
+	--ec-frm-edActTabBrdCol: var(--pt-border);
+	--ec-frm-edTabBarBg: var(--pt-bg-hi);
+	--ec-frm-edTabBarBrdBtmCol: var(--pt-border);
+	--ec-frm-edTabBarBrdCol: var(--pt-border);
+	--ec-frm-inlBtnFg: var(--pt-ink-muted);
+	--ec-frm-inlBtnBg: transparent;
+
+	/* コピーボタン */
+	--ec-frm-frameBoxShdCssVal: 0 1px 3px rgba(26, 25, 22, 0.08);
+	--ec-frm-tooltipSuccessBg: var(--pt-accent);
+	--ec-frm-tooltipSuccessFg: #ffffff;
+
+	/* 行番号・ハイライト */
+	--ec-gtrBrdCol: var(--pt-border);
+	--ec-gtrBg: var(--pt-bg-hi);
+	--ec-gtrFg: var(--pt-ink-subtle);
+}
+
+/* コピーボタン本体（変数で届かない部分を強制） */
+.expressive-code .copy button,
+.expressive-code button[class*='copy'],
+figure.expressive-code .copy button {
+	background: var(--pt-bg-hi) !important;
+	border: 1px solid var(--pt-border) !important;
+	color: var(--pt-ink-muted) !important;
+	border-radius: 5px !important;
+	opacity: 0.9;
+	transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.expressive-code .copy button::before {
+	border: none !important;
+	background: transparent !important;
+}
+
+.expressive-code .copy button:hover,
+.expressive-code button[class*='copy']:hover {
+	background: var(--pt-accent-soft) !important;
+	border-color: var(--pt-accent) !important;
+	color: var(--pt-accent-hi) !important;
+	opacity: 1;
+}
+
+/* コピーアイコン SVG の色を inherit させる（Expressive Code は currentColor 想定） */
+.expressive-code .copy button svg {
+	stroke: currentColor !important;
+	fill: currentColor !important;
+	opacity: 0.85;
+}
+
+/* コード本文の前景色（シンタックスハイライト用トークン色は触らず、ベース色だけ） */
+.expressive-code pre {
+	background: var(--pt-bg-subtle) !important;
+	color: var(--pt-ink);
+}
+
+.expressive-code pre code {
+	color: var(--pt-ink);
+}
+
+/* ============================================================
+ * Starlight Aside（注釈ブロック）
+ * デフォルトの紫/青系を Paper トーンに置き換える
+ * ============================================================ */
+.starlight-aside {
+	background: var(--pt-bg-subtle) !important;
+	border-left: 3px solid var(--pt-border-strong) !important;
+	border-radius: 0 4px 4px 0;
+	color: var(--pt-ink) !important;
+	padding: 0.9em 1.2em;
+	margin: 1.4em 0;
+}
+
+.starlight-aside__title {
+	color: var(--pt-ink) !important;
+	font-family: var(--sl-font);
+	font-weight: 700;
+}
+
+.starlight-aside--note {
+	background: rgba(184, 94, 60, 0.07) !important;  /* テラコッタ薄 */
+	border-left-color: var(--pt-accent) !important;
+}
+
+.starlight-aside--tip {
+	background: rgba(107, 122, 90, 0.09) !important;  /* セージ薄 */
+	border-left-color: #6b7a5a !important;
+}
+
+.starlight-aside--caution {
+	background: rgba(201, 146, 63, 0.11) !important;  /* マスタード薄 */
+	border-left-color: #c9923f !important;
+}
+
+.starlight-aside--danger {
+	background: rgba(176, 72, 72, 0.09) !important;   /* 朱薄 */
+	border-left-color: #b04848 !important;
+}
+
+:root[data-theme='dark'] .starlight-aside--note {
+	background: rgba(212, 154, 121, 0.10) !important;
+}
+
+:root[data-theme='dark'] .starlight-aside--tip {
+	background: rgba(149, 169, 124, 0.12) !important;
+	border-left-color: #95a97c !important;
+}
+
+:root[data-theme='dark'] .starlight-aside--caution {
+	background: rgba(225, 184, 110, 0.12) !important;
+	border-left-color: #e1b86e !important;
+}
+
+:root[data-theme='dark'] .starlight-aside--danger {
+	background: rgba(214, 119, 119, 0.12) !important;
+	border-left-color: #d67777 !important;
+}
+
+/* ============================================================
+ * kbd 要素（キーボードキー、検索バーの ⌘K など）
+ * Starlight デフォルトでは --sl-color-black 背景になり Paper では破綻するので強制
+ * ============================================================ */
+kbd,
+.sl-markdown-content kbd {
+	background: var(--pt-bg-hi) !important;
+	color: var(--pt-ink) !important;
+	border: 1px solid var(--pt-border-strong) !important;
+	border-radius: 4px;
+	padding: 0.1em 0.45em;
+	font-family: var(--sl-font-mono) !important;
+	font-size: 0.85em;
+	font-weight: 600;
+	box-shadow: 0 1px 0 var(--pt-border);
+	display: inline-block;
+	min-width: 1.2em;
+	text-align: center;
+}
+
+:root[data-theme='dark'] kbd,
+:root[data-theme='dark'] .sl-markdown-content kbd {
+	background: var(--pt-bg-hi) !important;
+	color: var(--pt-ink) !important;
+	border-color: var(--pt-border-strong) !important;
+	box-shadow: 0 1px 0 var(--pt-border-soft);
+}
+
+/* ============================================================
+ * サイドバー（UI フォントを Inter に強制 — 詳細度確保）
+ * ============================================================ */
+nav.sidebar a.astro-3ii7xxms,
+nav[class*='sidebar'] a {
+	font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif !important;
+}
+
+/* ============================================================
+ * フォーカス可視（アクセシビリティ）
+ * ============================================================ */
+*:focus-visible {
+	outline: 2px solid var(--pt-accent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* ============================================================
+ * モーション控えめ
+ * ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
