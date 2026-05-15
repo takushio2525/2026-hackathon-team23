@@ -49,12 +49,26 @@ hero:
 
 詳しくは [全体図](/architecture/overview/) を参照。
 
+## まず読むなら：要点ダイジェスト
+
+詳細ページがどれも長すぎて入りにくい、という方のために **「これさえ読めば全体が分かる」**
+4 本のダイジェストを用意しました。1 本 10〜15 分、合計 1 時間で **設計・実装・解析の全体像**
+を一通り把握できます。
+
+1. [①プロジェクト全体のあらまし](/essentials/project/) — 何を作っているか、どう動くか
+2. [②ファームウェアのあらまし](/essentials/firmware/) — マイコン側の理屈
+3. [③Processing のあらまし](/essentials/processing/) — PC 側「音を作る」の理屈
+4. [④音声解析のあらまし](/essentials/analyzer/) — 実音から音色 JSON を作る理屈
+
+各ダイジェストの末尾から、興味のある層の詳説ページに進めます。
+
 ## サイトの歩き方
 
 | 目的 | おすすめの順路 |
 |---|---|
 | 何ができるか知りたい | [プロジェクト概要](/intro/overview/) → [シナリオと体験](/concept/scenario/) |
-| 仕組みを理解したい | [全体図](/architecture/overview/) → [通信プロトコル](/architecture/protocol/) → [同期戦略](/architecture/sync/) |
+| 仕組みを **広く** 理解したい | [要点ダイジェスト ①〜④](/essentials/project/) |
+| 仕組みを **深く** 理解したい | [全体図](/architecture/overview/) → [通信プロトコル](/architecture/protocol/) → [同期戦略](/architecture/sync/) |
 | 自分の手で動かしたい | [クイックスタート](/intro/quickstart/) → [Arduino を書き換える](/guide/firmware/) |
 | コードを読みたい | [リポジトリ・マップ](/code/map/) → [firmware の歩き方](/code/firmware/) |
 | 設計判断の根拠を見たい | [意思決定の記録（ADR）](/decisions/0007-project-purpose-and-scope/) |
