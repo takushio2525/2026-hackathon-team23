@@ -253,6 +253,9 @@ upload_speed = 921600
 
 ### さらに深掘りしたい
 
+- **モジュールごとに 1 ページ 詳説** → [ファームウェア モジュール詳説](/firmware/)
+  - 各モジュールの `Config` / `Data` 構造、`init()` の初期化フロー、入力/出力フェーズで
+    起きること、落とし穴までを実コード基準で解説
 - `applyPattern.cpp` を行単位で読み解く → [拍検出アルゴリズム](/deep-dive/beat-detection/)
 - 受信側の `OrcReceiverModule` と発火タイミング → [時刻同期メカニズム](/deep-dive/time-sync/)
 - 楽器ノードの楽譜進行ロジック → [楽譜進行ロジック](/deep-dive/score-progression/)
