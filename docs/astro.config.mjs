@@ -99,6 +99,22 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'PC アプリ・音声処理（塩澤の実装例）',
+					items: [
+						{ label: '読み順ガイド', slug: 'pc-audio' },
+						{ label: '設計の出発点と全体方針', slug: 'pc-audio/design' },
+						{ label: 'NOTE 受信〜発音までの信号フロー', slug: 'pc-audio/signal-flow' },
+						{ label: 'Processing — スケッチ全体構造', slug: 'pc-audio/resynth-main' },
+						{ label: 'Processing — 加算合成ボイス', slug: 'pc-audio/resynth-voice' },
+						{ label: 'Processing — 音色定義と JSON', slug: 'pc-audio/instr-model' },
+						{ label: 'Processing — マルチポート受信', slug: 'pc-audio/serial-handling' },
+						{ label: '解析 — パイプライン全体', slug: 'pc-audio/analyzer-overview' },
+						{ label: '解析 — 倍音 / 非調和性 / ノイズ', slug: 'pc-audio/analyzer-harmonics' },
+						{ label: '解析 — 基音 / ADSR / 揺れ', slug: 'pc-audio/analyzer-modulation' },
+						{ label: '別方針で実装するためのガイド', slug: 'pc-audio/extending' },
+					],
+				},
+				{
 					label: '意思決定の記録（ADR）',
 					items: [{ autogenerate: { directory: 'decisions' } }],
 				},

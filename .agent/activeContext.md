@@ -5,61 +5,58 @@
 
 ## 現在の対象
 
-- **2026-05-15**: docs/ 充実化フェーズ第 3 弾。アルゴリズム詳説（数学・状態機械・理論的根拠）
-  を 5/14 で書いたので、今回は **「モジュール」を主役にした実装解説章** を追加。
-  ユーザー要望「ファームウェアについて、各モジュールの実装内容や詳しい解説、メインでの処理
-  フローとか、実際のコードについての詳しい解説を追加」「モジュールメインな方針で」に応える形。
+- **2026-05-15**: docs/ 充実化フェーズ第 4 弾。ユーザー要望「音声解析と Processing 側の
+  処理について、設計方針や詳細を増やしてほしい。test_v2 と sound_lab を題材に、塩澤の実装は
+  一例として、他メンバーが自分で実装するときの参考にできるように」に応える形で
+  **「PC アプリ・音声処理（塩澤の実装例）」章を新規追加**。
 
 ## 直近の観点
 
-1. 新セクション **「ファームウェア モジュール詳説」** を独立で追加（`docs/src/content/docs/firmware/`）。
-   既存「アルゴリズム詳説」（`deep-dive/`）と並ぶ位置に置いた。サイドバーは
-   `astro.config.mjs` で 9 番目のセクションとして登録
-2. 全 12 ページを `firmware/` 配下にフラットで配置（カテゴリ別ネストは UX を悪化させるため避けた）:
-   - `index.md` — 読み順ガイド・モジュール一覧マップ
-   - 共通 5 本: `imodule.md` / `orc-protocol.md` / `orc-net.md` / `status-led.md` / `serial-debug.md`
-   - 指揮者 2 本: `imu-module.md` / `orc-sender.md`
-   - 楽器 2 本: `orc-receiver.md` / `note-sender.md`
-   - 統合 2 本: `main-conductor.md` / `main-instrument.md`
-3. 各ページは統一フォーマット:
-   - 実体ファイルパス（`firmware/test_v2/...`）と行数
-   - 役割と責務（書くフィールド / 読むフィールド の表）
-   - Config / Data 構造体の全フィールド意味
-   - `init()` の初期化シーケンス
-   - `updateInput/Output` の処理フロー
-   - 落とし穴セクション（実機で踏んだ罠を実コードコメントから抽出）
-   - 関連ページへのリンク
-4. `code/firmware.md` の末尾「さらに深掘りしたい」に新セクションへの導線を追加
-5. `npm run build` で **55 ページ生成成功**（43 → 55、新規 12 ページ）。リンク切れ・slug エラーなし
-6. ビルド中に踏んだ唯一の罠: `serial-debug.md` の frontmatter description に
-   バッククォート ``` ` ``` を入れたら YAML パーサが失敗。ダブルクォートで括って解決
+1. 新セクション **「PC アプリ・音声処理（塩澤の実装例）」**（`docs/src/content/docs/pc-audio/`）
+   を独立で追加。既存「ファームウェア モジュール詳説」と並ぶ位置で、塩澤の Processing 実装と
+   sound_lab analyzer を「**一例**」として明示的に扱うトーンで統一。
+2. 全 11 ページを `pc-audio/` 配下にフラット配置:
+   - `index.md` — 章全体の読み順ガイド・登場人物・「正解と一例の区別」
+   - 設計層 2 本: `design.md` / `signal-flow.md`
+   - Processing 層 4 本: `resynth-main.md` / `resynth-voice.md` / `instr-model.md` /
+     `serial-handling.md`
+   - 解析層 3 本: `analyzer-overview.md` / `analyzer-harmonics.md` / `analyzer-modulation.md`
+   - 移行支援 1 本: `extending.md`
+3. 各ページの統一構造:
+   - 実体ファイルパスと行数 → 役割 → データ構造 → 中の数学/コード → 落とし穴 →
+     **「どこを書き換えるか（別実装するときの観点）」** 表
+   - 「塩澤の実装は一例」のニュアンスを各ページに分散
+4. `astro.config.mjs` にサイドバー追加（PC 章はファーム章の直下に挿入）
+5. `code/pc-app.md` 末尾の「さらに深掘りしたい」に新章への導線追加
+6. `npm run build` で **66 ページ生成成功**（55 → 66、新規 11 ページ）。リンク切れなし、
+   slug エラーなし。WARN は元からある sitemap `site` 未設定のみ
 
 ## 次の一手
 
-- **コミット 〜 push**: `[ドキュメント] ファームウェア モジュール詳説章を新規追加` で 1 コミット
-  （ドキュメントだけの変更）
+- **コミット**: `[ドキュメント] PC アプリ・音声処理章を新規追加（塩澤の実装例として）` で 1 コミット
 - **次に深掘りしたい候補**:
-  - `firmware/platformio-build.md` — `platformio.ini` / `lib_extra_dirs` / `build_flags` の解剖
+  - `pc-audio/editor-studio.md` — `sound_lab/analyzer/static/` のブラウザ編集スタジオ（fx パラメータ）の解説
+  - `pc-audio/sound-lab-processing.md` — `sound_lab/processing/instrument_player/` の単体プレーヤ解説
   - `firmware/score-data.md` — `kScore[]` フォーマットと `score_data.cpp` の書き方
-  - PC アプリ側のモジュール詳説（`orchestra_resynth.pde` の内部構成）
-- **既存ドキュメントとの整合**: `code/firmware.md` 自体も将来「概要だけ残し詳細は新章に委譲」
-  形にリファクタしてもよい
+- **既存ドキュメントの整合**: `code/pc-app.md` 自体も将来「概要だけ残し詳細は新章に委譲」
+  形にできるが、今は導線追加のみで温存
 
 ## ユーザーの今回の好み
 
-- 「モジュールメインな方針」を明示。横断的なアルゴリズム解説（5/14 で書いた deep-dive）とは
-  別軸で、**コードファイル 1 つにつき 1 ページ** の縦割り解説を望んだ
-- 「実装内容や詳しい解説、メインでの処理フロー、実際のコードについての詳しい解説」と
-  「コード基準」を重視
-- 質問返しせず即着手の運用が継続好まれている（system-reminder の `Work without stopping for
-  clarifying questions` も明示）
+- 「**塩澤は一例として、こんな感じに作らせました**」のトーンを明示要求。確定実装ではなく
+  メンバーが自分で書き直すときの参考にしたい
+- 「**他の人が自分の実装をするときに、参考とできるように**」を最優先
+- 「**test_v2 や sound_lab の実装を見つつ、その方針を核としたら**」と、現実コードからの帰納
+  を要望（理想形ではなく実コードの解剖）
+- 質問返しせず即着手の運用が継続好まれている（autonomous モード明示）
 
 ## 既知の論点
 
-- `code/firmware.md` は依然「ツアー形式の入り口」として残し、深掘りは新章に移譲した形。
-  今後、深掘り側に厚みが出てきたら入り口側はさらに短く（あるいは廃止）する選択肢あり
-- 楽器ノードの `gOutputs` 配列に `gNet` が入っているが実質何もしない件は、
-  `main-instrument.md` 内で「将来送信したくなったときのためのプレースホルダ」と説明済み
-- `node_02/03/04` の `applyPattern.cpp` / `score_data.cpp` は完全同一だが、現状は
-  3 ファイルコピペで運用。`common/lib/` への共通化はリスク（楽譜編集時の同期忘れより
-  バージョン差分が出る方が怖い）と判断したまま
+- `pc-audio/` 章は塩澤実装の解剖がメイン。チームの他メンバーが「自分の方針」で書いた実装が
+  増えたら、章名から「（塩澤の実装例）」を外して `pc-audio/<member>-impl.md` を並べる
+  形にもできる
+- `instr-model.md` と `sound_lab/library_format.md` は内容が大きく重なる。SSOT を
+  `library_format.md` に置き、docs 側は導線にする選択肢もあるが、現状はサイト読者の
+  利便性を優先して両方持つ
+- `extending.md` に「サンプル再生で書き直す案」「FM 合成案」を書いたが、誰かが実際に
+  着手したらそれぞれ専用ページに昇格させる
