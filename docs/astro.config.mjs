@@ -14,6 +14,51 @@ export default defineConfig({
 			title: 'タクトーン',
 			description: 'IMU ジェスチャーで奏でる Arduino オーケストラ — チーム 23 の設計・実装解説',
 			customCss: ['./src/styles/paper-theme.css'],
+			head: [
+				{
+					tag: 'script',
+					attrs: { type: 'module' },
+					content: `
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+
+function extractCode(pre) {
+  // expressive-code は各行を <div class="ec-line"><div class="code">...</div></div> に分割する。
+  // textContent で取ると改行が失われるので、各行を \\n で連結する。
+  const lines = pre.querySelectorAll('.ec-line');
+  if (lines.length > 0) {
+    return Array.from(lines).map((line) => {
+      const code = line.querySelector('.code');
+      return (code || line).textContent;
+    }).join('\\n');
+  }
+  return pre.textContent;
+}
+
+function renderMermaid() {
+  const blocks = document.querySelectorAll('pre[data-language="mermaid"]');
+  blocks.forEach((pre) => {
+    const code = extractCode(pre);
+    const container = pre.closest('.expressive-code') || pre.closest('figure') || pre;
+    const wrap = document.createElement('div');
+    wrap.className = 'mermaid not-content';
+    wrap.style.cssText = 'display:flex;justify-content:center;margin:1.5rem 0;overflow-x:auto;';
+    wrap.textContent = code;
+    container.replaceWith(wrap);
+  });
+  if (document.querySelectorAll('.mermaid').length > 0) {
+    mermaid.run({ querySelector: '.mermaid' });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderMermaid);
+} else {
+  renderMermaid();
+}
+`,
+				},
+			],
 			// social: [
 			// 	{ icon: 'github', label: 'GitHub', href: 'https://github.com/takushio2525/2026-hackathon-team23' },
 			// ],

@@ -153,6 +153,17 @@ flowchart TB
 
 ### 状態機械の核
 
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: 起動
+    Idle --> Calibrating: センサ準備 OK
+    Calibrating --> Conducting: 2 秒経過<br/>重力方向確定
+    Conducting --> Fallback: IMU タイムアウト<br/>(200ms 反応なし)
+    Fallback --> Conducting: IMU 復帰
+    Conducting --> Conducting: 拍検出 → BEAT 送信
+    Fallback --> Fallback: 内部タイマで<br/>等間隔自動拍
+```
+
 | 状態 | 何をしているか | 抜ける条件 |
 |---|---|---|
 | **Idle** | キャリブレーション待ち / 通信待ち | センサ準備 OK → Calibrating |
@@ -167,17 +178,24 @@ flowchart TB
 
 **「腕の振りが、ある一定の距離（経路長）を超えたら『拍』とみなす」** 仕組み。
 
-```
-加速度 (g) ─── LPF ───► 動加速度ノルム ── > 1.20 g ──► Armed 状態
-                                                          │
-                                              積分 (経路長 m)
-                                                          │
-                                                   > 0.20 m ?
-                                                          │
-                                                  Yes ────► 拍発火 (BEAT 送信)
-                                                          │
-                                                          ▼
-                                              不応期 350 ms (連射防止)
+```mermaid
+flowchart TB
+    Acc[IMU 加速度 a_t] --> LPF[LPF<br/>α = 0.10]
+    LPF --> Norm[動加速度ノルム<br/>= LPF − 重力]
+    Norm --> Q1{ノルム<br/>> 1.20g ?}
+    Q1 -- No --> Idle[Idle のまま]
+    Q1 -- Yes --> Armed[Armed 状態へ突入<br/>経路長の積分開始]
+    Armed --> Q2{経路長<br/>> 0.20m ?}
+    Q2 -- No --> Q3{Armed タイムアウト<br/>800ms ?}
+    Q3 -- Yes --> Idle
+    Q3 -- No --> Armed
+    Q2 -- Yes --> Fire[🔔 拍発火<br/>BEAT 送信]
+    Fire --> Refractory[不応期 350ms<br/>連射防止]
+    Refractory --> Release{リリース判定<br/>停止 or 40% 以下を<br/>40ms 連続?}
+    Release -- Yes --> Idle
+    Release -- No --> Refractory
+
+    style Fire fill:#FBCFE8,stroke:#C77456,stroke-width:2px
 ```
 
 | 段階 | やっていること | なぜそうするか |
@@ -224,14 +242,21 @@ flowchart TB
 
 **「指揮者と自分の時計のズレを、受信のたびに測って覚えておく」** 仕組み。
 
-```
-指揮者時計  ─── 送信時刻 timestampMs を BEAT に書く ───►
-                                                          
-楽器時計    ◄── 受信した瞬間の自時計を記録 ────────────
-                                                          
-オフセット = 自時計受信時 − 指揮者時計送信時
-        ↓ これを EMA で平滑化
-発音目標時刻（自時計） = playAtMasterMs − offset
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Cond as 指揮者ノード
+    participant Net as WiFi マルチキャスト
+    participant Inst as 楽器ノード
+
+    Note over Cond: 指揮者時計 t_master = 1234ms
+    Cond->>Net: BEAT<br/>{timestampMs:1234,<br/> playAtMasterMs:1284}
+    Net->>Inst: 配信 (遅延 ε)
+    Note over Inst: 楽器時計 t_local = 5678ms<br/>受信した
+    Inst->>Inst: offset_new = 5678 − 1234<br/>= 4444 ms
+    Inst->>Inst: offset_ema =<br/>0.7·offset_old + 0.3·offset_new
+    Inst->>Inst: 発音目標時刻<br/>= playAtMasterMs + offset_ema<br/>= 1284 + 4444 = 5728 ms
+    Note over Inst: 自時計が 5728ms に達したら NOTE 発射
 ```
 
 EMA は「指数移動平均」のこと。新しい値ほど重く、古い値も少し残す平均化方式で、
@@ -258,6 +283,29 @@ sendNote(ev.noteNumber, ev.velocity, ev.durationQ8);
 - **`headRestBeats`** が node_02=0、node_03=8、node_04=16 と違うから、輪唱になる
 - **`% kScoreLength`** で曲の長さ周期で巡回するから、PC を途中起動しても OK
 - **`durationQ8`** は 1/256 拍単位（256 = 1 拍）。8 分音符は 128
+
+### 輪唱の頭ずらしのイメージ
+
+3 台とも同じ楽譜配列を持っているが、**読み始める位置がずれている** だけで輪唱になる。
+
+```
+beatNo:    0   1   2   3   4   5   6   7   8   9  10  11  12 ...
+楽譜:     [ド][ド][ソ][ソ][ラ][ラ][ソ][ー][ファ][ファ][ミ][ミ][レ]...
+                                              ↑
+                                              曲の頭
+
+node_02 (headRest=0):   ↑読み始め → ド ド ソ ソ ラ ラ ソ ー ファファミ ミ レ
+                                  beat 0 から 鳴る
+
+node_03 (headRest=8):                                        ↑読み始め → ド ド ソ ソ ...
+                                                            beat 8 から 鳴る
+                                                            (= node_02 が "ファ" を鳴らした拍)
+
+node_04 (headRest=16):                                                            ↑読み始め
+                                                                                beat 16 から 鳴る
+```
+
+3 台同じ楽譜 + 8 拍ずつ遅らせて入る = カノン的な「きらきら星」3 声輪唱になる。
 
 詳細: [楽譜進行ロジック](/deep-dive/score-progression/)
 

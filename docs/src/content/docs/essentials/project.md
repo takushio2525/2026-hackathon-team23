@@ -36,32 +36,32 @@ sidebar:
 
 ```mermaid
 flowchart LR
-    subgraph Conductor[" 指揮者ノード (1台) "]
+    subgraph Conductor[" 指揮者ノード 1台 "]
         direction TB
-        IMU[GY-521 IMU<br/>加速度センサ]
-        BeatLogic[拍検出 + テンポ推定]
-        Sender[CTRL/BEAT 送信]
+        IMU["GY-521 IMU<br/>加速度センサ"]
+        BeatLogic["拍検出 + テンポ推定"]
+        Sender["CTRL/BEAT 送信"]
         IMU --> BeatLogic --> Sender
     end
 
     subgraph WiFi["WiFi SoftAP<br/>OrchestraAP"]
-        UDP[(UDP マルチキャスト<br/>239.0.0.1:5001)]
+        UDP[("UDP マルチキャスト<br/>239.0.0.1:5001")]
     end
 
-    subgraph Instruments[" 楽器ノード (4台) "]
+    subgraph Instruments[" 楽器ノード 4台 "]
         direction TB
-        N2[node_02<br/>声部1, 楽器0]
-        N3[node_03<br/>声部2, 楽器1]
-        N4[node_04<br/>声部3, 楽器2]
-        N5[node_05<br/>(未着手)]
+        N2["node_02<br/>声部1, 楽器0"]
+        N3["node_03<br/>声部2, 楽器1"]
+        N4["node_04<br/>声部3, 楽器2"]
+        N5["node_05<br/>未着手"]
     end
 
-    PC[PC: Processing<br/>orchestra_resynth.pde]
-    SP[🔊 スピーカ]
+    PC["PC: Processing<br/>orchestra_resynth.pde"]
+    SP["🔊 スピーカ"]
 
-    Sender -- CTRL 20Hz/<br/>BEAT 2連送 --> UDP
+    Sender -- "CTRL 20Hz/<br/>BEAT 2連送" --> UDP
     UDP --> N2 & N3 & N4
-    N2 -- NOTE<br/>USB Serial --> PC
+    N2 -- "NOTE<br/>USB Serial" --> PC
     N3 -- NOTE --> PC
     N4 -- NOTE --> PC
     PC -- 加算合成 --> SP
@@ -117,37 +117,60 @@ CTRL は **常に流れている川**、BEAT は **拍ごとのスタンプ**、
 
 ## 1 拍が鳴るまでの旅
 
-「指揮者がタクトを 1 回振ってから、PC のスピーカから音が出るまで」を時系列で追う。
+「指揮者がタクトを 1 回振ってから、PC のスピーカから音が出るまで」を、登場人物の
+やり取り図で追う。
 
-```
-t=0ms   指揮者が腕を振り始める
-        IMU が動加速度を検知 → Armed 状態に突入
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 指揮者(人)
+    participant Cond as 指揮者ノード<br/>(XIAO+IMU)
+    participant Net as WiFi マルチキャスト
+    participant Inst as 楽器ノード<br/>(UNO R4)
+    participant PC as PC<br/>(Processing)
+    participant SP as スピーカ
 
-t≈30ms  振りの経路長が 0.20 m に到達
-        → 「これは拍だ」と判定 (拍発火)
-        → BEAT パケットを生成
-        → playAtMasterMs = 今 + 50 ms をパケットに書き込む
-        → WiFi マルチキャストで 2 連送 (全楽器に届くまで 1〜3 ms)
-
-t≈33ms  楽器ノードが BEAT を受信
-        → 自分の時計と指揮者時計のオフセットを EMA で更新
-        → 「指揮者時計で playAtMasterMs に発音」を「自時計の発音目標時刻」に変換
-
-t≈80ms  楽器ノードの時計が発音目標時刻に到達
-        → 楽譜から「この拍で鳴らす音符」を取り出す
-        → NOTE バイナリ (20 B) を USB シリアルで PC に送信
-
-t≈81ms  PC の Processing が NOTE を受信
-        → instrumentId から音色 JSON を選ぶ
-        → ResynthVoice を 1 つ確保して発音開始
-        → ADSR の attack 区間が立ち上がる
-
-t≈82ms  スピーカから音が鳴る (ヒトの耳には拍と同時に聞こえる)
+    User->>Cond: 腕を振り始める (t=0ms)
+    Note over Cond: IMU が動加速度 > 1.20g<br/>→ Armed 状態
+    Note over Cond: 経路長が 0.20m に到達<br/>→ 拍発火 (t≈30ms)
+    Cond->>Cond: playAtMasterMs<br/>= 今 + 50ms を計算
+    Cond->>Net: BEAT を 2 連送
+    Net->>Inst: 配信 (遅延 1〜3ms)
+    Inst->>Inst: 時計オフセットを<br/>EMA で更新
+    Note over Inst: 発音目標時刻まで待機<br/>(t≈80ms に到達)
+    Inst->>Inst: 楽譜から音符を引く<br/>(headRest 適用)
+    Inst->>PC: NOTE (USB Serial, 20B)
+    PC->>PC: instrumentId で<br/>音色 JSON を選択
+    PC->>PC: ResynthVoice 発火<br/>(ADSR Attack 開始)
+    PC->>SP: 加算合成 出力 (t≈82ms)
+    Note over SP: 全楽器が同じ瞬間に鳴る
 ```
 
 ポイントは **「指揮者の拍の瞬間より、少し未来に鳴らす」** という発想。
 30〜50 ms ぶんの余裕を持たせるから、ネットワーク遅延がブレても全楽器が **同じ瞬間** に鳴る。
 これを **「playAtMasterMs 先読み」** と呼んでいる。
+
+### playAtMasterMs 先読みのイメージ
+
+```
+時間 ─────────────────────────────────►
+
+[指揮者]
+  拍発火              ┃
+   t=30ms             ┃ playAtMasterMs = 80ms
+                      ┃
+[楽器A]               ┃     (受信〜オフセット計算)
+  受信 t=33ms ──→ ━━━━┛ 発音 t=80ms ✓
+[楽器B]               ┃     (受信遅延 +2ms)
+  受信 t=35ms ──→ ━━━━┛ 発音 t=80ms ✓
+[楽器C]               ┃     (受信遅延 +1ms)
+  受信 t=34ms ──→ ━━━━┛ 発音 t=80ms ✓
+                      ▲
+                      └── 全楽器が同じ瞬間 (80ms) に揃って発音
+```
+
+> たとえ受信に 1〜3 ms のばらつきがあっても、**全員が同じ未来時刻** を目指すので、
+> 発音タイミングは揃う。これが「±20 ms 同期目標」を実現する核。
 
 ## なぜこの構成なのか
 
@@ -219,6 +242,27 @@ flowchart LR
 | MOP-2: 通信遅延（指揮者 → 楽器） | ≤ 10 ms | 拍の先読み 50 ms に十分収まる範囲 |
 
 実機測定では現状 **どちらもクリア** している（test_v2 で「きらきら星」3 声輪唱が成立）。
+
+### 同期は 4 つの層で成立している
+
+```mermaid
+flowchart TB
+    L1["① 物理層<br/>同じ WiFi セル (チャネル 6) にいる"]
+    L2["② 時刻層<br/>指揮者の millis() がマスタ<br/>楽器は EMA でオフセット推定"]
+    L3["③ 拍層<br/>BEAT の beatNo で<br/>「何拍目か」を共有"]
+    L4["④ 楽譜層<br/>beatNo + headRestBeats で<br/>自パートの音符を引く"]
+
+    L1 --> L2 --> L3 --> L4
+    L4 --> Out([全楽器が<br/>±20ms 以内で発音])
+
+    style L1 fill:#E8F2E2
+    style L2 fill:#F4ECDC
+    style L3 fill:#FBF6EA
+    style L4 fill:#FCE7F3
+```
+
+> どれか 1 層が欠けると同期は崩れる。逆に言うと、デバッグ時に **どの層で落ちているか** を
+> 切り分ければ問題を絞り込める。
 
 ## 用語ミニ辞典
 
