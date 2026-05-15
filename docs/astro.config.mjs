@@ -28,6 +28,15 @@ export default defineConfig({
 					],
 				},
 				{
+					label: '要点ダイジェスト（まず読む）',
+					items: [
+						{ label: '①プロジェクト全体', slug: 'essentials/project' },
+						{ label: '②ファームウェア', slug: 'essentials/firmware' },
+						{ label: '③Processing', slug: 'essentials/processing' },
+						{ label: '④音声解析', slug: 'essentials/analyzer' },
+					],
+				},
+				{
 					label: 'コンセプト',
 					items: [
 						{ label: 'なぜ作るのか', slug: 'concept/why' },
