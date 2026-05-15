@@ -150,6 +150,21 @@ fundamental_hz, f0_track = _detect_fundamental(y)
 # 失敗したら 自己相関 にフォールバック
 ```
 
+```mermaid
+flowchart TB
+    Y[波形 y] --> Pyin["librosa.pyin<br/>(HMM ベース)"]
+    Pyin --> Q1{成功?<br/>有意な F0 が取れた?}
+    Q1 -- Yes --> F0a["fundamental_hz<br/>f0_track (時系列)"]
+    Q1 -- No --> Auto["自己相関<br/>(時間シフトで周期を探す)"]
+    Auto --> Q2{成功?}
+    Q2 -- Yes --> F0b["fundamental_hz<br/>(時系列なし)"]
+    Q2 -- No --> Err["⚠ AnalysisError<br/>(基音不明)"]
+
+    style F0a fill:#E8F2E2
+    style F0b fill:#FBF6EA
+    style Err fill:#FCE7F3
+```
+
 | 手法 | 仕組み | 精度 | 速さ |
 |---|---|---|---|
 | **pyin** | HMM ベース、F0 候補に確率を割り振る | 高い | 遅め |
@@ -174,6 +189,20 @@ modulation = _detect_modulation(f0_track, env, env_hz=200)
 
 検出アルゴリズム:
 
+```mermaid
+flowchart TB
+    Track["f0_track or env<br/>(時系列)"] --> Avg[平均を引く<br/>残差を作る]
+    Avg --> FFT[残差を FFT]
+    FFT --> Peak[最強ピーク周波数を取る]
+    Peak --> Q{1〜20 Hz<br/>の範囲?}
+    Q -- No --> Skip["揺れなし<br/>JSON に書かない"]
+    Q -- Yes --> Depth[ピーク振幅から<br/>深さを計算]
+    Depth --> Out["vibrato/tremolo<br/>{ rate, depth }"]
+
+    style Out fill:#E8F2E2
+    style Skip fill:#F4ECDC
+```
+
 1. `f0_track` から平均ピッチを引いた **残差** を取る
 2. 残差の **FFT** を取って、最も強い周波数成分を探す
 3. その周波数が 1〜20 Hz の範囲なら「揺れ」と判定
@@ -193,14 +222,32 @@ adsr = _fit_adsr(env, env_hz=200)
 
 アルゴリズム概略:
 
+```mermaid
+flowchart TB
+    Env[エンベロープ env] --> Peak[最大値を探す<br/>→ Attack end の時刻]
+    Peak --> Settle["最大値の 0.7〜0.9 倍に<br/>落ち着く時刻<br/>→ Decay end (= Sustain start)"]
+    Settle --> End["末尾から逆算して<br/>−50dB を割る時刻<br/>→ Release end"]
+    End --> Loop["Sustain 区間の<br/>中央 50% を<br/>→ loop_start / loop_end"]
+    Loop --> Out["{ attack, decay,<br/>sustain_level, release,<br/>loop_start, loop_end }"]
+
+    style Out fill:#E8F2E2
 ```
-env の最大値を見つけ、その時刻を Attack end とする
-         ↓
-最大値の 0.7〜0.9 倍に落ち着く時刻を Decay end (= Sustain start) とする
-         ↓
-末尾から −50 dB を割る時刻を Release end とする
-         ↓
-Sustain 区間の中央 50% を loop_start / loop_end とする
+
+時間軸で見ると次のような区切りになる。
+
+```
+振幅
+│       ●●●●●●●
+│      ●        ●●●●●●●●●●●●●●●●●●●●●
+│     ●                                ●●●●●●●
+│    ●                                        ●●●●●
+│   ●                                              ●●
+│  ●                                                 ●●
+└─────────────────────────────────────────────────────► 時間
+   ↑    ↑                                ↑           ↑
+   0  attack                       sustain      release
+                                   end          end
+   ←A→  ←D→  ←──── S (loop_start..end) ───→ ←R→
 ```
 
 > 「loop_start / loop_end」は加算合成側で「持続音の安定区間」として参照される。
@@ -216,6 +263,23 @@ harmonics, inharmonicity_b = _analyze_harmonics(y, steady, fundamental_hz, n_env
 ```
 
 手順:
+
+```mermaid
+flowchart TB
+    Y["波形 y<br/>+ Sustain 区間"] --> FFT["長尺 FFT<br/>(窓 4096)"]
+    FFT --> Spec[スペクトル]
+    Spec --> Search["f0, 2f0, 3f0, ...<br/>の近傍で<br/>ピーク探索"]
+    Search --> Harm["倍音テーブル<br/>{ n, freq, amp }"]
+    Harm --> Fit["非調和性 B を<br/>最小二乗フィット<br/>f_n = n·f0·√(1+B·n²)"]
+    Harm --> STFT["STFT で<br/>各倍音の時間 env"]
+    Fit --> Out1["inharmonicity_b"]
+    STFT --> Out2["harmonics[].env"]
+    Harm --> Out3["harmonics[].amp"]
+
+    style Out1 fill:#E8F2E2
+    style Out2 fill:#E8F2E2
+    style Out3 fill:#E8F2E2
+```
 
 1. Sustain 区間から **長い窓**（4096 サンプル）で FFT を計算
 2. `f0, 2f0, 3f0, ...` の理論位置の近くで **ピーク** を探す
@@ -252,20 +316,23 @@ noise = _analyze_noise(y, fundamental_hz, harmonics, n_env)
 
 手順:
 
+```mermaid
+flowchart LR
+    Y[波形 y] --> STFT[STFT]
+    Harm[倍音テーブル] --> Mask[マスク領域作成<br/>各倍音 ±数ビン]
+    STFT --> Subtract[マスク領域を<br/>0 に置き換え]
+    Mask --> Subtract
+    Subtract --> Inverse[inverse STFT]
+    Inverse --> Residual[残差波形]
+    Residual --> Band[帯域分割<br/>low/mid/high]
+    Band --> Out["noise<br/>{ level, bands, color }"]
+
+    style Out fill:#E8F2E2
+```
+
 1. STFT で各倍音の **マスク領域** を作る（理論周波数 ± 数ビン）
 2. 元の STFT から **マスク領域だけ削除** して inverse STFT
 3. 残った波形のレベル・周波数特性（低域 / 中域 / 高域）を測る
-
-```
-スペクトル ─── 倍音マスクで削る ───► 残差ノイズ
-                                        │
-                                        ↓
-                                  帯域別レベル測定
-                                  (low / mid / high)
-                                        │
-                                        ↓
-                                  ノイズ色 (white / pink / blue)
-```
 
 > 木管楽器の「息」、弦楽器の「擦り」、金管の「リップ」など、倍音だけでは作れない
 > 楽器固有の質感がここに乗る。
