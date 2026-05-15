@@ -5,6 +5,7 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-15: docs/ に「ファームウェア モジュール詳説」章を新規追加（`firmware/` 配下 12 ページ・合計 4000 行超）。共通 5 本（IModule/ModuleTimer・OrcProtocol・OrcNetModule・StatusLedModule・SerialDebug）、指揮者 2 本（ImuModule・OrcSenderModule）、楽器 2 本（OrcReceiverModule・NoteSenderModule）、統合 2 本（main-conductor・main-instrument）、index 1 本。各ページは「実体ファイル → 役割 → Config/Data → init() → updateInput/Output → 落とし穴」の統一構造で、責務境界（書くフィールド/読むフィールド）を表で明示。`code/firmware.md` から導線を追加。`astro.config.mjs` にサイドバー登録、`npm run build` で 55 ページ生成成功（43→55）。`serial-debug.md` の frontmatter description にバッククォートを入れて YAML パース失敗 → ダブルクォート化で解決
 - 2026-05-14: docs/ に「アルゴリズム詳説」章を新規追加（`deep-dive/` 配下 8 ページ・合計 1700 行超）。拍検出・時刻同期・UDP マルチキャスト・バイナリパケット・楽譜進行・加算合成・モジュール拡張を実コード基準で深掘り。同時に既存 `architecture/protocol.md` `score.md` `sync.md` と `.agent/api.md` の実装乖離（`bpmQ8 ×8` / NOTE フィールド順 / `kScore/kScoreLength` / `ScoreEvent` 構造 / 楽器側発音は次ループ判定）を最小修正。`architecture/` と `code/` の既存ページ末尾に「さらに深掘りしたい」リンクを追加して学習導線を接続。サイドバー（`astro.config.mjs`）に新セクション追加、`npm run build` で 43 ページ生成を確認
 - 2026-05-14: 所属表記の矛盾を修正。誤「工学院大学 情報通信工学科」→ 正「千葉工業大学 情報変革科学部 情報工学科」に AGENTS.md / docs/index.md / docs/intro/overview.md / docs/concept/why.md の 4 ファイルを一括置換。grep で残存ゼロを確認
 - 2026-05-14: 第 4 回議事録（2026-05-13）反映で docs/ 全面整合。サイトタイトルを「タクトーン」に切替（astro.config.mjs / index.md）、`concept/why`・`concept/goals`・`intro/overview` に議事録 9〜10 章の目的・対象/非対象・成果物・既存技術差分を反映、`team/schedule` を計画書 11〜13 章で全面書き直し（4 フェーズ・WBS 表・MOE/MOP/TPM・5/20 プレゼン担当）、`team/roles` にプレゼン章別担当を追加。`npm run build` 通過

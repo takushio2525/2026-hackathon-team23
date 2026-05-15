@@ -82,6 +82,23 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'ファームウェア モジュール詳説',
+					items: [
+						{ label: '読み順ガイド', slug: 'firmware' },
+						{ label: '共通 — IModule / ModuleTimer', slug: 'firmware/imodule' },
+						{ label: '共通 — OrcProtocol', slug: 'firmware/orc-protocol' },
+						{ label: '共通 — OrcNetModule', slug: 'firmware/orc-net' },
+						{ label: '共通 — StatusLedModule', slug: 'firmware/status-led' },
+						{ label: '共通 — SerialDebug', slug: 'firmware/serial-debug' },
+						{ label: '指揮者 — ImuModule', slug: 'firmware/imu-module' },
+						{ label: '指揮者 — OrcSenderModule', slug: 'firmware/orc-sender' },
+						{ label: '楽器 — OrcReceiverModule', slug: 'firmware/orc-receiver' },
+						{ label: '楽器 — NoteSenderModule', slug: 'firmware/note-sender' },
+						{ label: '統合 — 指揮者 main', slug: 'firmware/main-conductor' },
+						{ label: '統合 — 楽器 main', slug: 'firmware/main-instrument' },
+					],
+				},
+				{
 					label: '意思決定の記録（ADR）',
 					items: [{ autogenerate: { directory: 'decisions' } }],
 				},
