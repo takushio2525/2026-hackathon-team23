@@ -276,3 +276,9 @@ test_v2 のほうが圧倒的にリアルな音だが、コード量は数倍。
 
 - 加算合成 / ADSR / 非調和性 / ボイスプールの実装 → [加算合成エンジン](/deep-dive/additive-synthesis/)
 - NOTE パケットのバイトレベル受信 → [バイナリパケット](/deep-dive/binary-packet/)
+- **PC アプリと音声解析の実装解剖（塩澤の実装例）**: 設計判断と各クラス・各解析段の中身を 11 ページで深掘り
+  → [PC アプリ・音声処理 — 読み順ガイド](/pc-audio/)
+  - 設計判断と全体方針 → [設計の出発点と全体方針](/pc-audio/design/)
+  - 加算合成ボイスの数学 → [加算合成ボイス（ResynthVoice）](/pc-audio/resynth-voice/)
+  - sound_lab の音声解析 → [音声解析パイプライン全体](/pc-audio/analyzer-overview/)
+  - 自分で書き直すための判断軸 → [別方針で実装するためのガイド](/pc-audio/extending/)
