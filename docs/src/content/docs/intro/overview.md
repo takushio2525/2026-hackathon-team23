@@ -83,8 +83,10 @@ sidebar:
 
 ### 3. 楽器番号付き NOTE で音色を切り替える
 
-NOTE パケットに `instrumentId` を載せ、PC 側 `sound_lab/data/<id>.json` の音色定義を
-参照する。**JSON を追加するだけで楽器のラインナップを増やせる**。
+NOTE パケットに `instrumentId` を載せ、PC 側 `pc_app/test_v2/orchestra_resynth/data/` 配下の
+JSON をファイル名昇順で配列化し、`instrumentId` を index として参照する。
+**`pc_app/.../data/` に JSON を追加するだけで楽器のラインナップを増やせる**
+（`sound_lab/` で試作 → コピー反映）。
 
 詳しくは [通信プロトコル](/architecture/protocol/) と
 [pc_app の歩き方](/code/pc-app/) を参照。

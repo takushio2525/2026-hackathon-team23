@@ -127,14 +127,19 @@ fireScoreEvent(data, kScore[scoreIndex], now);
 
 `instrumentId` は NOTE パケットに載るが、楽譜データ側にも対応情報が必要：
 
-- 各ノードの `ProjectConfig.h` の `INSTRUMENT_ID` で固定
-- PC 側 `sound_lab/data/<id>.json` の倍音定義と対応
+- 各ノードの `ProjectConfig.h` の `NoteSenderConfig::instrumentId`（楽器ノードの構造体リテラルの第 3 引数）で固定
+- PC 側 `pc_app/test_v2/orchestra_resynth/data/` 内の JSON を **ファイル名昇順で配列化** し、
+  `instrumentId` を **その配列の index** として参照する
 
-| `instrumentId` | 想定楽器 | JSON 例 |
+| `instrumentId` | 想定楽器 | 実体ファイル（2026-05 時点） |
 |---|---|---|
-| 0 | 金管 | `sound_lab/data/0.json` |
-| 1 | 木管 | `sound_lab/data/1.json` |
-| 2 | 弦 | `sound_lab/data/2.json` |
+| 0 | オルガン | `pc_app/test_v2/orchestra_resynth/data/0_organ.json` |
+| 1 | フルート | `pc_app/test_v2/orchestra_resynth/data/1_flute.json` |
+| 2 | ベル | `pc_app/test_v2/orchestra_resynth/data/2_bell.json` |
+| 3 | フルート（調整版） | `pc_app/test_v2/orchestra_resynth/data/3_flute_tweaked.json` |
+
+ファイル名先頭の `0_`, `1_` は人間が並び順を把握するための慣例。実コードは
+**ファイル名そのもの** ではなく **ソート順の index** で参照する点に注意。
 
 JSON フォーマット例:
 

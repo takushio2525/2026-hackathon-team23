@@ -198,7 +198,7 @@ pkt.payload.playAtMasterMs = masterNow + cfg_.beatLookaheadMs;
 
 ```cpp
 struct NotePayload {
-    uint8_t  partId;       // 0x02-0x05 (輪唱のどの声部か)
+    uint8_t  partId;       // 楽器ノードの ID（test_v2 は 0x02-0x04、production 想定は 0x02-0x05）
     uint8_t  noteNumber;   // MIDI 0-127, 60=C4
     uint8_t  velocity;     // 0-127
     uint8_t  gate;         // 1=NoteOn, 0=NoteOff
@@ -231,9 +231,10 @@ data.noteOut.pendingOn = true;   // NoteOn のみ
 
 **`instrumentId` の意味（test_v2 で追加）**
 
-旧 `reserved[0]` を `instrumentId` に充てた。PC 側は `sound_lab/data/<instrumentId>.json` を
-読んで倍音定義から音色合成する。3 ノードが instrumentId = 0 / 1 / 2 を持って、
-**輪唱の声部ごとに異なる音色** で鳴る仕掛け。
+旧 `reserved[0]` を `instrumentId` に充てた。PC 側は
+`pc_app/test_v2/orchestra_resynth/data/` 配下の JSON を **ファイル名昇順** で配列化し、
+`instrumentId` を **その配列の index** として参照して倍音定義から音色合成する。
+3 ノードが instrumentId = 0 / 1 / 2 を持って、**輪唱の声部ごとに異なる音色** で鳴る仕掛け。
 
 ## 「フルパケット」構造体
 

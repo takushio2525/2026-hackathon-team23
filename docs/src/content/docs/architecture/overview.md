@@ -81,7 +81,7 @@ flowchart LR
 - フレームワーク: **Processing 4**
 - やること:
   1. 指定したシリアルポートから NOTE バイナリを受信
-  2. NOTE の `instrumentId` で `sound_lab/data/<id>.json` の音色定義を選ぶ
+  2. NOTE の `instrumentId` で `pc_app/test_v2/orchestra_resynth/data/` 配下の音色 JSON を index 参照（ファイル名昇順）
   3. 倍音 JSON から加算合成（基音 × 各倍音 × 振幅）
   4. ADSR エンベロープで自然な発音
   5. 複数音同時発音（声部 3 並列）

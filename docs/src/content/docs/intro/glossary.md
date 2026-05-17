@@ -41,7 +41,8 @@ sidebar:
 : 拍とテンポを決める役。本プロジェクトでは `node_01` がこれに当たる。
 
 **声部（Voice / Part）**
-: 多声音楽で、各楽器が担当する独立した旋律。本プロジェクトでは 4 声を node_02〜05 に割り当てる予定。
+: 多声音楽で、各楽器が担当する独立した旋律。本プロジェクトの **test_v2 は 3 声**（`node_02〜04`）で輪唱を実装済み。
+  **production 想定は 4 声**（`node_02〜05`）。
 
 **輪唱（Canon / Round）**
 : 同じ旋律を一定拍ずらして重ねる演奏形式。「きらきら星」「かえるのうた」など。
@@ -62,7 +63,8 @@ sidebar:
 
 **倍音 (Harmonics)**
 : 基音の整数倍の周波数成分。楽器の音色を決める主因。
-  本プロジェクトでは `sound_lab/data/*.json` に倍音比を定義する。
+  本プロジェクトでは `pc_app/test_v2/orchestra_resynth/data/*.json` に倍音比を定義する
+  （`sound_lab/` は試作・分析の実験場で、完成後にコピーして使う運用）。
 
 ## 通信・プロトコル
 
@@ -84,10 +86,15 @@ sidebar:
   - **NOTE**: 楽器 → PC、発音情報（MIDI ノート + 楽器番号）
 
 **`partId`**
-: 楽器ノードの識別 ID（`0x02`〜`0x05`）。NOTE パケットに含まれる。
+: 楽器ノードの識別 ID。NOTE パケットに含まれる。test_v2 では `0x02`〜`0x04`、
+  production 想定では `0x02`〜`0x05`。
 
 **`instrumentId`**
-: 音色 ID（0=金管、1=木管、2=弦、…）。PC 側の `sound_lab/data/<id>.json` に対応。
+: 音色 ID。PC 側は `pc_app/test_v2/orchestra_resynth/data/` 内の JSON を
+  **ファイル名昇順で配列化** し、`instrumentId` を **その index** として参照する。
+  ファイル名先頭の `0_`, `1_` は人間が並び順を把握するための慣例で、`<id>.json` 形式ではない。
+  実体（2026-05 時点）: `0_organ.json` / `1_flute.json` / `2_bell.json` / `3_flute_tweaked.json`
+  → `instrumentId = 0, 1, 2, 3` の順に対応。
 
 **`playAtMasterMs`**
 : 指揮者時計で「この時刻に発音せよ」と指示する値。ネットワーク遅延を吸収する仕組み。

@@ -123,9 +123,13 @@ PC 側 Processing アプリ。firmware と同じ 3 段階構成：
 | サブパス | 中身 |
 |---|---|
 | `sound_lab/analyzer/` | Python の FFT 解析スクリプト |
-| `sound_lab/data/` | 音色 JSON 定義（`pc_app/test_v2` が読む） |
-| `sound_lab/processing/instrument_player/` | 単音試聴用 Processing |
+| `sound_lab/processing/instrument_player/` | 単音試聴用 Processing（試作 JSON を確認する場所） |
 | `sound_lab/studio/` | ブラウザ編集 UI（実験中） |
+
+`sound_lab/` は音色を分析・試作する実験場。**実際に `orchestra_resynth.pde` が読む JSON は
+`pc_app/test_v2/orchestra_resynth/data/` 配下**（実体 `0_organ.json` / `1_flute.json` /
+`2_bell.json` / `3_flute_tweaked.json`）。完成した音色 JSON は `sound_lab/` から `pc_app/.../data/`
+にコピーして反映する運用にする。
 
 ### `report/`
 
@@ -223,7 +227,8 @@ CI 設定：
 | マイコンコード | `firmware/test_v2/<node>/` |
 | 共通ライブラリ | `firmware/test_v2/common/lib/<ModuleName>/` |
 | PC アプリ | `pc_app/test_v2/<sketch>/` |
-| 音色 JSON | `sound_lab/data/<id>.json` |
+| 音色 JSON（実行時） | `pc_app/test_v2/orchestra_resynth/data/<n>_<name>.json` |
+| 音色 JSON（試作・分析） | `sound_lab/` 配下で試作 → 完成版を上記にコピー |
 | メモ・個人作業 | `work/<your-name>/` |
 | 報告書 | `report/` または `work/<your-name>/<task>/` |
 | 議事録 | `meetings/<date>_<n>回/` |
