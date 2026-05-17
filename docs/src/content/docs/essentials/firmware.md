@@ -253,14 +253,21 @@ sequenceDiagram
     Cond->>Net: BEAT<br/>{timestampMs:1234,<br/> playAtMasterMs:1284}
     Net->>Inst: 配信 (遅延 ε)
     Note over Inst: 楽器時計 t_local = 5678ms<br/>受信した
-    Inst->>Inst: offset_new = 5678 − 1234<br/>= 4444 ms
-    Inst->>Inst: offset_ema =<br/>0.7·offset_old + 0.3·offset_new
-    Inst->>Inst: 発音目標時刻<br/>= playAtMasterMs + offset_ema<br/>= 1284 + 4444 = 5728 ms
+    Inst->>Inst: offset_new = 1234 − 5678<br/>= −4444 ms<br/>(= 指揮者時計 − 自時計)
+    Inst->>Inst: offset_ema =<br/>0.9·offset_old + 0.1·offset_new<br/>(α = clockSyncEmaAlpha = 0.10)
+    Inst->>Inst: 発音目標時刻 (自時計)<br/>= playAtMasterMs − offset_ema<br/>= 1284 − (−4444) = 5728 ms
     Note over Inst: 自時計が 5728ms に達したら NOTE 発射
 ```
 
-EMA は「指数移動平均」のこと。新しい値ほど重く、古い値も少し残す平均化方式で、
-ネットワーク遅延のジッタを吸収しつつ、長期的なクロックドリフトに追従できる。
+EMA は「指数移動平均」のこと。古い値を 90 %（= `1 − α`）残しつつ、新しい値を
+10 %（= `α = 0.10`）混ぜる平均化方式で、ネットワーク遅延のジッタを吸収しつつ、
+長期的なクロックドリフトに追従できる。
+
+実コード `firmware/test_v2/node_02/lib/OrcReceiverModule/OrcReceiverModule.cpp` は
+`sample = timestampMs − millis()` を計算する。つまり `offsetMs` は
+**「指揮者時計 − 自時計」** で、自時計のほうが進んでいれば負、指揮者時計のほうが
+進んでいれば正の値になる。発音目標時刻の換算は **`playAtMasterMs − offsetMs`**
+（applyPattern.cpp の `targetLocalMs` の式）。
 
 詳細: [時刻同期メカニズム](/deep-dive/time-sync/)
 
