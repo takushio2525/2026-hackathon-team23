@@ -30,7 +30,7 @@
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 2 B | `bpmQ8` | BPM × 8（Q8 固定小数。例: 100.0 BPM → 800、120.5 BPM → 964） |
+| 12 | 2 B | `bpmQ8` | BPM × 8（分解能 0.125 BPM の整数表現。例: 100.0 BPM → 800、120.5 BPM → 964）。フィールド名に `Q8` を含むが、一般的な Q8 固定小数（×256）ではなく ×8 整数である点に注意 |
 | 14 | 1 B | `velocity` | 0–127（強弱。ストレッチ未実装時は固定 64） |
 | 15 | 1 B | `state` | `0=Idle`, `1=Calibrating`, `2=Conducting`, `3=Fallback` |
 | 16 | 4 B | `reserved` | 0 埋め（将来拡張） |
@@ -39,7 +39,7 @@
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 2 B | `beatNo` | 拍番号（0 オリジン、巻き戻しなしの単調増加） |
+| 12 | 2 B | `beatNo` | 拍番号（**1 オリジン**、巻き戻しなしの単調増加）。指揮者は内部の `beatNo` をインクリメントしてから送信するため、最初に飛ぶ BEAT は `beatNo=1`。楽器側は `beatNo - 1 - headRestBeats` を楽譜 index として扱う |
 | 14 | 2 B | `reserved` | 0 埋め |
 | 16 | 4 B | `playAtMasterMs` | 楽器が発音する目標時刻（指揮者時計） |
 
@@ -47,12 +47,12 @@
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 1 B | `partId` | ノード ID（`0x02`〜`0x05`、輪唱のどの声部か） |
+| 12 | 1 B | `partId` | ノード ID。test_v2 は `0x02`〜`0x04`（楽器 3 台）、production 想定は `0x02`〜`0x05`（楽器 4 台）。輪唱のどの声部か |
 | 13 | 1 B | `noteNumber` | MIDI ノート番号（0–127、60=C4） |
 | 14 | 1 B | `velocity` | 0–127 |
 | 15 | 1 B | `gate` | `1=NoteOn`、`0=NoteOff`（test_v2 は常に `1`、消音は PC が `durationMs` から自動） |
 | 16 | 2 B | `durationMs` | 発音時間（ミリ秒） |
-| 18 | 1 B | **`instrumentId`** | 音色 ID（`data/<id>.json` の何番目か）。test_v2 で追加（旧 `reserved` 領域） |
+| 18 | 1 B | **`instrumentId`** | 音色 ID。PC 側 `pc_app/test_v2/orchestra_resynth/data/` 内の JSON をファイル名昇順で配列化し、その index として参照。test_v2 で追加（旧 `reserved` 領域） |
 | 19 | 1 B | `reserved` | 0 埋め |
 
 NOTE は UDP ではなく **USB シリアル（115200 bps）** で楽器ノード → PC に流す。
@@ -76,8 +76,22 @@ struct SystemData {
 };
 ```
 
-楽器ノード（node_02〜04）の `SystemData` は構造が異なる
-（`ScoreData` / `OrcReceiverData` / `NoteEmitterData` 等を持つ）。
+楽器ノード（node_02〜04）の `SystemData` は構造が異なる。実体（`firmware/test_v2/node_02/include/SystemData.h`）は次のフィールドを持つ:
+
+```cpp
+struct SystemData {
+    OrcNetData          orcNet;       // WiFi 接続状態・受信バッファ
+    StatusLedData       led;          // 現在の点滅周期
+    ReceiverLogicData   receiver;     // CTRL/BEAT 受信ロジック内部状態
+    NoteOutData         noteOut;      // 直近に出した NOTE（診断用）
+    NoteSenderData      noteSender;   // NOTE 送信統計
+    SyncLogicData       sync;         // 時刻同期: offsetMs（= master − local）、sampleCount、converged
+    CtrlData            ctrl;         // 受信中の bpm / velocity / state / lastReceivedMs
+    PerformerStateData  performer;    // Idle / WaitStart / Playing
+    ScoreProgressData   score;        // currentEventIndex と細分音符予約スロット
+};
+```
+
 詳細は各ノードの `include/SystemData.h` を直接参照。
 
 ## ProjectConfig（ノード固有設定）
@@ -142,16 +156,31 @@ inline const OrcSenderConfig ORC_SENDER_CONFIG = {
 
 ### 楽器ノードの主な設定
 
+ノード固有値は **すべて構造体リテラル経由** で `ProjectConfig.h` に集約されている。
+`HEAD_REST_BEATS` / `INSTRUMENT_ID` / `PART_ID` といった単独の `UPPER_SNAKE_CASE` 定数は
+**存在しない** ので、grep する場合はフィールド名（`partId`, `headRestBeats`, `instrumentId`）で
+探す。`firmware/test_v2/node_02/include/ProjectConfig.h` の実体は次のとおり:
+
 ```cpp
-// 輪唱の頭ずらし
-constexpr uint16_t HEAD_REST_BEATS = 0;   // node_02=0, node_03=8, node_04=16
+// 輪唱受信ロジック（partId と頭ずらしを含む）
+inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
+    /*partId=*/              0x02,    // node_02=0x02, node_03=0x03, node_04=0x04
+    /*headRestBeats=*/       0,       // node_02=0, node_03=8, node_04=16
+    /*clockSyncEmaAlpha=*/   0.10f,
+    /*clockSyncMinSamples=*/ 5,
+    /*loopIntervalMs=*/      5,
+};
 
-// 楽器番号（NOTE の instrumentId）
-constexpr uint8_t INSTRUMENT_ID = 0;       // node_02=0, node_03=1, node_04=2
-
-// パート ID（NOTE の partId）
-constexpr uint8_t PART_ID = 0x02;          // node_02=0x02, node_03=0x03, node_04=0x04
+// NOTE 送信（instrumentId を含む）
+inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
+    /*baudRate=*/     115200,
+    /*partId=*/       0x02,           // partId は OrcReceiverConfig と同値を入れる
+    /*instrumentId=*/ 0,              // node_02=0, node_03=1, node_04=2
+};
 ```
+
+`clockSyncEmaAlpha`（時刻同期 offset の EMA 平滑化係数）は **0.10**。指揮者側の
+BPM EMA `BPM_EMA_ALPHA = 0.30` とは別の係数なので混同しないこと。
 
 ## score_data フォーマット（楽譜データ）
 
@@ -178,9 +207,14 @@ extern const size_t     kScoreLength;
 **1 拍 = 1 ScoreEvent** で巡回参照。曲長は `kScoreLength` 自体（`SCORE_TOTAL_BEATS` などの
 別変数は存在しない）。実装は配列リテラルで直書き。曲を変える際は 3 ノード分を同時に書き換える。
 
-## 音色定義（`sound_lab/data/*.json`）
+## 音色定義（`pc_app/test_v2/orchestra_resynth/data/*.json`）
 
-NOTE の `instrumentId` から PC 側で参照する。
+NOTE の `instrumentId` から PC 側で参照する。Processing スケッチは
+`pc_app/test_v2/orchestra_resynth/data/` を **ファイル名昇順** にソートしてロードし、
+`instrumentId` を **その配列の index** として扱う。
+ファイル名先頭の数字（`0_`, `1_`, …）は人間が並び順を把握しやすくするための慣例で、
+ファイル名そのものは `<id>.json` 形式ではない。実体は `0_organ.json` / `1_flute.json` /
+`2_bell.json` / `3_flute_tweaked.json` の 4 つ（2026-05 時点）。
 
 ```json
 {
@@ -194,5 +228,8 @@ NOTE の `instrumentId` から PC 側で参照する。
 }
 ```
 
-`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` が `data/<instrumentId>.json` を
-ロードして加算合成する。追加楽器は `sound_lab/data/` に JSON を増やすだけで増設可能。
+`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` がディレクトリ内の `*.json` を
+**ファイル名昇順** にソートして配列化し、`instrumentId` を index として参照する。
+追加楽器は `pc_app/test_v2/orchestra_resynth/data/` に JSON を増やすだけで増設可能。
+`sound_lab/` 配下は音色を分析・試作する実験場であり、完成した JSON を
+`pc_app/test_v2/orchestra_resynth/data/` に **コピーして** 使う運用にする。

@@ -153,11 +153,16 @@ playAtMasterMs = (指揮者時計の現在時刻) + 50 ms
 ### `instrumentId` の役割
 
 test_v2 で追加された 1 バイト（旧 `reserved[0]` に置換）。
-PC 側 `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` が `sound_lab/data/<id>.json`
-を選んで加算合成する。
+PC 側 `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` は
+`pc_app/test_v2/orchestra_resynth/data/` 配下の JSON を **ファイル名昇順** で配列化し、
+`instrumentId` を **その配列の index** として参照して加算合成する。
 
-- 0 = 金管、1 = 木管、2 = 弦（実装側で割当）
-- JSON を追加すれば新しい音色を増やせる
+- 実体（2026-05 時点）: `0_organ.json` / `1_flute.json` / `2_bell.json` / `3_flute_tweaked.json`
+  → `instrumentId = 0,1,2,3` の順に対応
+- 新しい音色を増やすには、`pc_app/test_v2/orchestra_resynth/data/` に JSON を追加する
+  （`sound_lab/` で試作した JSON を完成後にコピーする運用）
+- ファイル名先頭の数字（`0_`, `1_`）は人間が並び順を把握するための慣例で、
+  ファイル名そのものが `<id>.json` の形式というわけではない
 
 ## パケット定義の場所
 

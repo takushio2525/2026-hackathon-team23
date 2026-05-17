@@ -40,7 +40,7 @@ sidebar:
 |---|---|
 | 新しい曲を試す | `test_v2/node_0{2,3,4}/src/score_data.cpp` |
 | 拍検出の閾値調整 | `test_v2/node_01/include/ProjectConfig.h` |
-| 新しい楽器（音色）を追加 | `sound_lab/data/<id>.json` + 該当ノードの `INSTRUMENT_ID` |
+| 新しい楽器（音色）を追加 | `pc_app/test_v2/orchestra_resynth/data/<n>_<name>.json` を追加（`sound_lab/` で試作 → コピー）。楽器ノードの `NoteSenderConfig` の `instrumentId`（構造体リテラル第 3 引数）も更新 |
 | 通信プロトコル拡張 | `test_v2/common/lib/OrcProtocol/` |
 | 新しいモジュール | `test_v2/common/lib/<NewModule>/` or `test_v2/<node>/lib/<NewModule>/` |
 | 本番ハードに移植 | test_v2 で安定 → `production/` に取り込む |

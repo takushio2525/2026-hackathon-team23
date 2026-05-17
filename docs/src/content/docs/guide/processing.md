@@ -55,16 +55,19 @@ int PORT_INDEX = 1;   // ← ここを変える
 
 ## 音色 JSON
 
-スケッチが読む音色定義は `sound_lab/data/*.json`（または `pc_app/test_v2/orchestra_resynth/data/`
-配下の json）：
+スケッチが読む音色定義は `pc_app/test_v2/orchestra_resynth/data/*.json`。
+`sound_lab/` は試作・分析の実験場で、完成した JSON を上記にコピーして使う：
 
-| ファイル | 楽器番号 | 想定楽器 |
+| 実体ファイル（2026-05 時点） | `instrumentId` | 想定楽器 |
 |---|---|---|
-| `0.json` | 0 | 金管 |
-| `1.json` | 1 | 木管 |
-| `2.json` | 2 | 弦 |
+| `0_organ.json` | 0 | オルガン |
+| `1_flute.json` | 1 | フルート |
+| `2_bell.json` | 2 | ベル |
+| `3_flute_tweaked.json` | 3 | フルート（調整版） |
 
-スケッチは NOTE パケットの `instrumentId` を見て、該当する JSON の音色で合成する。
+スケッチは `data/` 内の JSON を **ファイル名昇順** で配列化し、NOTE パケットの
+`instrumentId` を **その配列の index** として参照する。ファイル名先頭の `0_`, `1_` は
+人間が並び順を把握するための慣例で、ファイル名そのものが `<id>.json` 形式というわけではない。
 
 ### JSON の例
 
@@ -86,9 +89,11 @@ int PORT_INDEX = 1;   // ← ここを変える
 
 ### 新しい楽器を増やすには
 
-1. `sound_lab/data/3.json` を作る（または既存をコピー）
+1. `pc_app/test_v2/orchestra_resynth/data/4_<name>.json` を作る（既存ファイルをコピーして編集が早い）
+   - 先頭の数字は **既存の最大値 + 1** にする（昇順ソート時の index がそのまま `instrumentId` になる）
+   - `sound_lab/` で試作する場合は完成後にこのディレクトリへコピーする
 2. `harmonics` を編集して目的の楽器に近づける
-3. 該当の楽器ノードの `ProjectConfig.h` で `INSTRUMENT_ID = 3` に変更
+3. 該当の楽器ノードの `ProjectConfig.h` で `NoteSenderConfig` の `instrumentId`（構造体リテラルの第 3 引数）を新しい index に変更
 4. ノードを書き直して、Processing を再起動
 
 ## 音が出ない・ずれるとき
