@@ -17,7 +17,7 @@ fi
 
 # サーバー起動後にブラウザを自動で開く（3 秒待ってから）
 open_url() {
-    sleep 3
+    sleep 5
     if [ -d "/Applications/Google Chrome.app" ]; then
         open -a "Google Chrome" "http://localhost:4321"
     else
