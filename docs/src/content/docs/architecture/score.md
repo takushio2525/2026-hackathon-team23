@@ -73,7 +73,7 @@ const size_t kScoreLength = sizeof(kScore) / sizeof(kScore[0]);
 3 声輪唱では、各声部が **同じ旋律を一定拍ずらして** 入る。
 本プロジェクトは `ProjectConfig.h` の `headRestBeats` で表現：
 
-| ノード | `headRestBeats` | `INSTRUMENT_ID` | 入りタイミング |
+| ノード | `headRestBeats` | `instrumentId` | 入りタイミング |
 |---|---|---|---|
 | node_02 | 0 | 0（金管） | 拍 0 から開始 |
 | node_03 | 8 | 1（木管） | 拍 8 から開始 |

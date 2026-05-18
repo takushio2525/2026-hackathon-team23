@@ -126,7 +126,10 @@ void loop() {
 | `conductor` | 状態機械（Idle / Calibrating / Conducting / Fallback） | applyPattern | StatusLedModule |
 | `sender` | CTRL/BEAT の送信統計（seq 番号、最終送信時刻） | OrcSenderModule | applyPattern |
 
-楽器ノードの `SystemData` は別物（`OrcReceiverData` `ScoreData` `NoteEmitterData` を持つ）。
+楽器ノードの `SystemData` は別物で、主に `ReceiverLogicData`（CTRL/BEAT 受信ロジック）、
+`SyncLogicData`（指揮者時計との offset と EMA 状態）、`CtrlData`（受信中の BPM / state）、
+`ScoreProgressData`（楽譜進行位置 + 細分音符予約）、`NoteOutData` / `NoteSenderData`
+（直近 NOTE と送信統計）を持つ（実体は `firmware/test_v2/node_02/include/SystemData.h`）。
 
 ## 指揮者ノードが何をしているか
 

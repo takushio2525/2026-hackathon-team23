@@ -73,7 +73,8 @@ flowchart LR
   4. `beatNo` から自パートの楽譜位置を求める（輪唱の頭ずらしも適用）
   5. 該当する `ScoreEvent` から MIDI ノートを取り出す
   6. 発音時刻に **NOTE** を USB Serial で PC に送る
-- 個性: `ProjectConfig.h` の `headRestBeats` と `INSTRUMENT_ID`、`PART_ID` だけが
+- 個性: `ProjectConfig.h` の `OrcReceiverConfig{ partId, headRestBeats, ... }` と
+  `NoteSenderConfig{ partId, instrumentId, ... }` の構造体リテラル引数だけが
   ノード間で異なる（他は同一コード）
 
 ### PC アプリ（`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`）

@@ -21,7 +21,7 @@ sidebar:
 ```python
 result = analyze_file(path_to_wav: str, name: str | None) -> dict
 # 返り値:
-#   { "instrument": {...},  # JSON 化してそのまま data/<id>.json に置く
+#   { "instrument": {...},  # JSON 化して pc_app/test_v2/orchestra_resynth/data/ に置く（ファイル名昇順で index 化）
 #     "preview":    {...} }  # 描画用の生データ（保存はしない）
 ```
 

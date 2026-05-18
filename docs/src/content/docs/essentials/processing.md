@@ -55,7 +55,7 @@ flowchart LR
     end
 
     SP[🔊 スピーカ]
-    JSON[(音色 JSON<br/>data/0.json, 1.json, ...)]
+    JSON[(音色 JSON<br/>data/0_organ.json,<br/>1_flute.json, ...)]
 
     FwOut -- USB Serial 115200<br/>20 B バイナリ --> Serial
     Serial -- 1 パケットずつ --> Queue
@@ -333,7 +333,7 @@ NOTE が来たら `instrumentId` でテーブルを引いて、対応する `Ins
 ```mermaid
 flowchart LR
     subgraph Startup["起動時 (1 回だけ)"]
-        Load["data/0.json, 1.json, 2.json...<br/>を全部読む"]
+        Load["data/0_organ.json,<br/>1_flute.json, 2_bell.json...<br/>をファイル名昇順で全部読む"]
         Models[("InstrModel テーブル<br/>id=0 → 金管<br/>id=1 → 木管<br/>id=2 → 弦")]
         Load --> Models
     end
