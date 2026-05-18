@@ -206,7 +206,11 @@ Instrument parseInstrument(JSONObject json) {
 }
 ```
 
-ファイル名は `data/<instrumentId>.json` の規約。
+配置先は `pc_app/test_v2/orchestra_resynth/data/`。ファイル名そのものが
+`<instrumentId>.json` ではなく、**ディレクトリ内をファイル名昇順でソートした配列の
+index** が `instrumentId` として参照される（`compareToIgnoreCase` 利用）。
+先頭の `0_`, `1_` は人間が並び順を把握するための慣例。実体は
+`0_organ.json` / `1_flute.json` / `2_bell.json` / `3_flute_tweaked.json`。
 
 ## 複数声部の同時発音
 

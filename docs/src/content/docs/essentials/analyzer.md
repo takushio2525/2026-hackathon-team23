@@ -70,7 +70,7 @@ sound_lab/analyzer/
 ```python
 result = analyze_file(path_to_wav, name=None)
 # 戻り値:
-#   { "instrument": {...},  # data/<id>.json に書く
+#   { "instrument": {...},  # pc_app/test_v2/orchestra_resynth/data/ に書く（ファイル名昇順 index）
 #     "preview":    {...} }  # 波形プレビュー用
 ```
 
@@ -360,7 +360,8 @@ flowchart LR
 }
 ```
 
-これを `pc_app/test_v2/orchestra_resynth/data/<id>.json` に置けば、PC アプリ側で
+これを `pc_app/test_v2/orchestra_resynth/data/` に置けば（ファイル名は
+`3_<name>.json` のように先頭に index 順の数字を付ける慣例）、PC アプリ側で
 即座にその音色で鳴らせるようになる。
 
 ## なぜ Python（librosa）を選んだか

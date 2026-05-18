@@ -41,8 +41,8 @@ PC 側で起きていることは、ざっくり 3 段階に分かれる。
 │   → 倍音抽出 (FFT + STFT) → 非調和性フィット                  │
 │   → 残差ノイズ → ビブラート/トレモロ → JSON 出力              │
 └───────────────────────────────────────────────────────────────┘
-                │  data/<id>.json
-                ▼  (orchestra_resynth.pde の data/ にコピー)
+                │  data/0_organ.json などとして配置
+                ▼  (ファイル名昇順ソートで配列化 → instrumentId を index 参照)
         Processing 側で InstrModel として読み込み
 ```
 
