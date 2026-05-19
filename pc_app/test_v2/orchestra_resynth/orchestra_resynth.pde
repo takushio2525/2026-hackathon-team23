@@ -36,12 +36,12 @@
      3  type        uint8   3=NOTE (1=CTRL / 2=BEAT は USB には流れないが来ても無視)
      4  seq         uint32
      8  timestampMs uint32
-     12 partId      uint8   0x02-0x04 (輪唱のどの声部か)
+     12 partId      uint8   test_v2 は 0x02-0x04 / production 想定は 0x02-0x05 (輪唱のどの声部か)
      13 noteNumber  uint8   MIDI ノート番号 (60=C4, 高さ)
      14 velocity    uint8   0-127
      15 gate        uint8   1=NoteOn (0=NoteOff は来ないが来たら一致音を release)
      16 durationMs  uint16  発音予定長 (長さ)
-     18 instrumentId uint8  0..N-1 (楽器番号 — data/ の何番目の楽器定義か)
+     18 instrumentId uint8  0..N-1 (楽器番号 — data/*.json をファイル名昇順ソートしたときの index)
      19 reserved    uint8   0
 
    フォーマット仕様: ../../../sound_lab/library_format.md
