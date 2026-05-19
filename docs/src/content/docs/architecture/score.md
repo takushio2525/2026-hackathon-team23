@@ -75,9 +75,12 @@ const size_t kScoreLength = sizeof(kScore) / sizeof(kScore[0]);
 
 | ノード | `headRestBeats` | `instrumentId` | 入りタイミング |
 |---|---|---|---|
-| node_02 | 0 | 0（金管） | 拍 0 から開始 |
-| node_03 | 8 | 1（木管） | 拍 8 から開始 |
-| node_04 | 16 | 2（弦） | 拍 16 から開始 |
+| node_02 | 0 | 0（オルガン） | 拍 0 から開始 |
+| node_03 | 8 | 1（フルート） | 拍 8 から開始 |
+| node_04 | 16 | 2（ベル） | 拍 16 から開始 |
+
+（楽器名は `pc_app/test_v2/orchestra_resynth/data/*.json` の中身に依存する。
+JSON を増やせば対応関係も増える。下の「楽器番号と音色の対応」表が正典）
 
 楽器ノードのロジック（`firmware/test_v2/node_02/src/applyPattern.cpp` 実装）：
 

@@ -3,7 +3,7 @@
 //   pio run -d firmware/test_v2/node_03 -t upload
 //   pio device monitor -d firmware/test_v2/node_03
 //
-// 輪唱用の楽譜 — 「きらきら星」全曲 (C major)。全声部 (node_03/03/04) で同一。
+// 輪唱用の楽譜 — 「きらきら星」全曲 (C major)。全声部 (node_02/03/04) で同一。
 //
 //   ド ド ソ ソ ラ ラ ソー │ ファ ファ ミ ミ レ レ ドー
 //   ソ ソ ファ ファ ミ ミ レー │ ソ ソ ファ ファ ミ ミ レー
@@ -14,7 +14,7 @@
 // durationQ8=480 (≒1.9 拍) を 1 行に書き、続く 1 拍は休符 (flags bit2) で「タイの続き」
 // を表す。kScoreLength = 48 拍。末尾でループする。
 //
-// 輪唱は ProjectConfig.h の headRestBeats で声部ごとに頭をずらす (node_03=0,
+// 輪唱は ProjectConfig.h の headRestBeats で声部ごとに頭をずらす (node_02=0,
 // node_03=8, node_04=16 拍)。先頭休符は楽譜に直書きせず applyPattern が読み飛ばす。
 //
 // {beatAt(参考値), noteNumber(0=休符), velocity, durationQ8(256=1拍),
