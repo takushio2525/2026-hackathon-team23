@@ -5,6 +5,20 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-21: **結合レポート全面リライト Phase 2（Chapter 2「システムの基本設計」）完了**。①楽器台数を
+  4→5 に変更（ユーザー決定）。最終構成＝指揮者 1（XIAO ESP32-S3）＋楽器 5（金管 4＋ドラム、node\_02〜06、
+  partId 0x02–0x06）＋PC 5（各楽器に 1 対 1）。授業制約「Arduino 人数分−1＝5 台」は楽器用 UNO R4 を 5 台で
+  満たし指揮者 XIAO は別枠、で整理。Ch1 の台数表記 5 箇所（成果物・WBS・資源欄）と作業計画 §9 整合
+  チェックリストも 4→5 へ更新。②システム構成図を draw.io 新規作成（`fig/system-overview.drawio`＋`.png`）。
+  指揮者→楽器 5（WiFi UDP・実線）→PC 5（USB Serial・破線）の 3 列。Block A 行 613 / Block B 行 894 の
+  TikZ 構成図 2 枚を 1 枚に統合。③Ch2 を全執筆（Block B 土台に Block A 固有事実を畳み込み）: §1 機能一覧
+  （要求一覧表＋FBS F1–F6）、§2 システム構成図（全体構成図＋ノード/パート対応表＋役割分担表＋データ
+  フロー＋EMA 方針）、§3 操作 IF（ユーザー操作＋LED 表＋通信メッセージ表）、§4 状態遷移図（指揮者・楽器の
+  TikZ 図＋指揮者/楽器/PC の状態定義表）。Block A の「2 版収録」を解消、Block A 旧楽器状態遷移
+  （SelfRun 含む・Block B 設計と矛盾）は削除。指揮者・楽器の状態遷移は正常レンダリングのため TikZ 据え置き。
+  ④`latexmk -lualatex` 成功・**29 ページ**（Ch2≈8 ページ）・Overfull/Underfull 0 件・未定義参照/引用なし。
+  AGENTS.md・architecture.md の本番想定台数も 4→5 へ追従（別コミット）。api.md（partId 範囲）と ADR-0004
+  は未追従、Phase 3／チーム判断に送り。次は Phase 3（Chapter 3「システムの詳細設計」）
 - 2026-05-20: **結合レポート全面リライト Phase 1（Chapter 1「計画書」）完了**。①draw.io 図 4 点を作成し `fig/` に `.drawio`＋`.png` を両方コミット: `fbs`・`pbs`（`meetings/0429_3回/事前課題共有/PBS/FBS/` の実画像を Read→下敷きに mxGraph XML 直書きで再描画。実画像は計画書旧記述や片岡レビューの記述より整理されていたため実画像準拠で作成）、`arrow`（アローダイアグラム・9 イベント・クリティカルパス約 8 週を赤強調・並行 240/250 を弧で表現）、`gantt`（13 週×12 タスク・5 フェーズ色分け・5/20 計画発表マーカー入り）。書き出しは `draw.io --export --format png --scale 2 --crop --border 14`。②WBS は 51 タスクのツリーが A4 で潰れるため**表化**（要素成果物粒度 13 行の `tabularx`、担当列付き）。③Ch1 を全執筆: 概要（題目/目的/独自性）・スコープ（成果物/対象範囲/FBS/PBS/対応表）・作業計画（WBS 表/アロー図/役割分担表/ガント図）・V&V（MOE 表＋MOP/TPM の 7 小節）・資源調達・リスク管理。片岡レビュー指摘を反映（24G 勢 3 名の役割を WBS の担当列と役割分担表に明示、「齊藤/斎藤」表記を「齋藤」に統一）。④参考文献（`thebibliography` 6 件）を Ch3 と Ch4 の間に追加（Ch1 引用は teru/ninntenndo/ref:douki/ref:onkai の 4 件、ref:chien/ref:beat は Ch2・3 用）。⑤MOE 表は当初 `\multirow{3}{10em}` で長文がセル高さを超え重なったため、WBS 表と同じ「MOE をヘッダ行（`\multicolumn`）にし MOP を字下げ」方式へ作り直して解消。ビルド `latexmk -lualatex` 成功・**21 ページ**（Ch1 は 11 ページ・予算 15 以内）・Overfull \hbox 0 件・Overfull \vbox 0 件・未定義参照なし。次は Phase 2（Chapter 2「システムの基本設計」、Block A/B 重複解消）。Phase 2 着手時に楽器名/音色（金管 vs オルガン/フルート/ベル）をユーザー確認
 - 2026-05-20: **結合レポート全面リライト Phase 0（環境構築・骨格作成）完了**。①draw.io 書き出し環境を `brew install --cask drawio` で構築、CLI（`/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png --scale 2`）で日本語ラベル入り `.drawio` の PNG 書き出し疎通を確認。②ベースライン計測: `23_計画書・設計書_24G1075.tex` を欠損 3 画像（WBS/arrow/ganto）に実在画像を流用してビルド → **97 ページ**（Overfull \hbox 54 件・うち 12 件 20pt 超）。目標 ≤50 に対し約半減が必要と確定。③新本体 `report/計画書_中間発表/23_計画書・設計書.tex`（ファイル名はユーザー確定）を作成。preamble は `23_` 版から移植し graphicx 重複除去・`\usetikzlibrary` 統合・`\graphicspath{{fig/}}` 追加、章立ては `plan_template.tex` 準拠＋Ch4「生成AIの利用」、各 \section 直下に `% TODO(Phase N)` で作業計画 §6・§7 への対応を記入。骨格ビルド成功（11 ページ・Overfull 0）。④`fig/`（`.gitkeep`）作成。判明事項: `.gitignore` の `report/**/*.pdf` により report 配下 PDF は非コミット運用（conventions §4-3 と相違、要確認）。次は Phase 1（Chapter 1「計画書」）
 - 2026-05-20: **結合レポート全面リライトの実行計画を策定**（大規模・複数セッション作業の起点）。先輩が結合した `report/計画書結合/23_計画書・設計書_24G1075.tex`（3077 行・178 KB）が枚数肥大・図表崩れを起こしているため、`report/計画書_中間発表/` 配下に 50 ページ以内の計画書・設計書を再構築する計画を `report/計画書_中間発表/_作業計画.md` に作成。調査で判明した要点: ①肥大の主因は Chapter 2・3 が「音楽/Processing 班マージ版(Block A)」と「Arduino/EMA 班マージ版(Block B)」を各節 2 回ずつ収録していること（重複行マップは計画書 付録 A）、②図参照 5 点中 `WBS.PNG`/`arrow.png`/`ganto.png` の 3 点が実体不在、FBS/PBS も `meetings/` 配下のみ、③`longtable` 30・`table` 11 で列幅オーバーフロー疑い多数。ユーザー確認で方針確定: 図は Claude が `.drawio`(XML) 直書き→draw.io CLI で PNG 書き出し→`\includegraphics`（draw.io MCP は未導入のため不採用）、変換スコープは欠損図＋崩れ図を優先。計画は Phase 0（環境構築・骨格）〜Phase 4（生成 AI 章・整合・最終調整）の 5 フェーズに分割、各フェーズ＝1 `/clear` 単位。今セッションは計画立案のみで実装は未着手
