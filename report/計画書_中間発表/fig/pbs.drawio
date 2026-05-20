@@ -1,0 +1,43 @@
+<mxfile host="Claude">
+  <diagram id="pbs" name="PBS">
+    <mxGraphModel dx="1532" dy="392" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1532" pageHeight="392" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="r" value="Arduinoオーケストラ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7EEF6;strokeColor=#2F4358;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="656" y="24" width="220" height="48" as="geometry"/></mxCell>
+        <mxCell id="a" value="指揮者ノードユニット" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="102" y="150" width="170" height="56" as="geometry"/></mxCell>
+        <mxCell id="b" value="ネットワーク基盤" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="488" y="150" width="170" height="56" as="geometry"/></mxCell>
+        <mxCell id="c" value="楽器演奏ユニット" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="874" y="150" width="170" height="56" as="geometry"/></mxCell>
+        <mxCell id="d" value="音響合成アプリケーション" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1260" y="150" width="170" height="56" as="geometry"/></mxCell>
+        <mxCell id="a1" value="指揮者用Arduino" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="16" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="a2" value="動作解析ファームウェア" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="132" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="a3" value="コマンド送出モジュール" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="248" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="b1" value="共通通信モジュール" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="402" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="b2" value="システム共通定義ファイル" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="518" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="b3" value="共通APIフレームワーク" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="634" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="c1" value="楽器用Arduino" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="788" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="c2" value="演奏進行エンジン" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="904" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="c3" value="楽譜データアセット" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1020" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="d1" value="Processing音響合成エンジン" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1174" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="d2" value="ボイスマネージャー" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1290" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="d3" value="演奏モニタUI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1406" y="300" width="110" height="72" as="geometry"/></mxCell>
+        <mxCell id="er_a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="a"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="er_b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="b"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="er_c" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="c"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="er_d" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="d"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="a1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="a2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="a3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="b" target="b1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="b" target="b2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="b" target="b3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="c" target="c1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="c" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="c" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="d1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="d2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="d3"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -8,47 +8,46 @@
 - **結合レポート全面リライト**（大規模・複数セッション）。`report/計画書_中間発表/` 配下に
   **50 ページ以内** の計画書・設計書を再構築する。実行計画の正典は
   `report/計画書_中間発表/_作業計画.md`。
-- **Phase 0（環境構築・骨格作成）完了**（2026-05-20）。次は **Phase 1（Chapter 1「計画書」）**。
+- **Phase 0・Phase 1 完了**（2026-05-20）。次は **Phase 2（Chapter 2「システムの基本設計」）**。
 
 ## 直近の観点
 
 1. **正典は `report/計画書_中間発表/_作業計画.md`**。セッション再開時は §11 と該当 Phase を読む。
-2. Phase 0 成果: 本体 `report/計画書_中間発表/23_計画書・設計書.tex`（骨格・11 ページ・Overfull 0）。
-   章立ては `plan_template.tex` 準拠＋Ch4。各 \section 直下に `% TODO(Phase N)` あり。
-3. **ベースライン = 97 ページ**（`23_計画書・設計書_24G1075.tex`）。目標 ≤50、約半減が必要。
-   肥大主因は Chapter 2・3 の Block A/B「2 版収録」（重複行マップは計画書 付録 A）。
-4. draw.io 環境構築済み: `brew install --cask drawio`。書き出しは
-   `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png --scale 2 --output 出力.png 入力.drawio`。
-   図ソース `.drawio` と書き出し `.png` は両方 `fig/` に置きコミットする。
+2. 現状: 本体 `report/計画書_中間発表/23_計画書・設計書.tex` は Ch1 執筆済み・Ch2〜4 は骨格のみ。
+   `latexmk -lualatex` 成功・**21 ページ**（Ch1 は 11 頁）・Overfull \hbox 0・未定義参照なし。
+3. **ベースライン = 97 ページ**（`23_計画書・設計書_24G1075.tex`）。目標 ≤50。Ch1 完成時点で 21 頁。
+4. draw.io 図ワークフロー確立済み: Claude が `.drawio` 直書き → 書き出し
+   `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png --scale 2 --crop --border 14
+   --output 出力.png 入力.drawio`。`.drawio` と `.png` は両方 `fig/` に置きコミット。
 5. **編集対象は `report/計画書_中間発表/` 配下のみ**。`計画書結合/` 等は参照専用。
-6. **本体 PDF も同一コミットで管理**。`.gitignore` に例外
-   `!report/計画書_中間発表/23_計画書・設計書.pdf` を追加済み。各 Phase で `.tex`＋PDF＋`fig/` を push。
-7. **ページ予算は柔軟運用**: Phase 1〜3 の途中ビルドは 50 ページ超過可。内容を書き切ってから
-   ユーザーと相談で削減、≤50 は Phase 4 で確定。各 Phase 末にページ数を報告する。
+6. **本体 PDF も同一コミットで管理**（`.gitignore` に例外追加済み）。各 Phase で `.tex`＋PDF＋`fig/` を push。
+7. **ページ予算は柔軟運用**: Phase 2〜3 の途中ビルドは 50 ページ超過可。≤50 確定は Phase 4。
+   各 Phase 末にページ数を報告する。
 
 ## 次の一手
 
-- **Phase 1（Chapter 1「計画書」）に着手**。入力（_作業計画.md §6 Phase 1）:
-  `23_計画書・設計書_24G1075.tex` 行 139–500、`docs/.../team/schedule.md`・`roles.md`、
-  `meetings/0429_3回/事前課題共有/review_プロジェクト見直_片岡.md`。
-- 概要・スコープ・作業計画・V&V・資源・リスクを §7 のページ予算（合計 15 頁）で簡潔化。
-- 図 4〜5 点を draw.io 化: FBS・PBS（元 PNG を下敷きに再描画）、WBS・アローダイアグラム・
-  ガントチャート（欠損のため schedule.md から新規）。WBS は表で足りれば表化も可。
+- **Phase 2（Chapter 2「システムの基本設計」）に着手**。入力（_作業計画.md §6 Phase 2）:
+  `23_計画書・設計書_24G1075.tex` 行 501–1209、`.agent/architecture.md`、`review_arduino_*.md`。
+- Block A（行 506–816）/ Block B（行 817–1209）の「2 版収録」を **Block B 土台に統合**。
+  機能一覧・システム構成図・操作IF・状態遷移を各 1 版へ。重複行マップは _作業計画.md 付録 A。
+- 図: 全体ブロック図・指揮者状態遷移・楽器状態遷移を整理。崩れていれば draw.io 化、正常なら TikZ 据え置き。
+- **Phase 2 着手時に楽器名/音色をユーザー確認**（下記「既知の論点」）。
 
 ## 現フェーズで Read すべき設計書
 
-- **必ず最初に**: `report/計画書_中間発表/_作業計画.md`（§6 Phase 1・§7・§8・§9）
-- Phase 1 実行時: 上記「次の一手」の入力資料のみ Read（全文予防ロード禁止）
-- 設計記述の正典: `.agent/architecture.md` / `.agent/api.md`（Phase 1 では基本不要）
+- **必ず最初に**: `report/計画書_中間発表/_作業計画.md`（§6 Phase 2・§7・§8・§9・付録 A）
+- Phase 2 実行時: `.agent/architecture.md`（基本設計の正典）、`23_` 行 501–1209、`review_arduino_*.md`
 
 ## ユーザーの今回の好み
 
 - **大規模作業は計画を徹底的に作ってから着手**。`/clear` しつつフェーズ単位で順次実行。
 - 設計章は「事細かに書かず大まか、内容が伝われば可」。図は draw.io へ移行。
+- 表が読みやすければ図を表化してよい（WBS は 51 タスクのツリーを避け表化した）。
 
 ## 既知の論点
 
-- **楽器名/音色の不整合**: 結合元（Block A）は「金管/リズム」、実装 test_v2 は
-  「オルガン/フルート/ベル」。Phase 2 着手時にユーザー確認（Phase 0・1 では判断不要）。
+- **楽器名/音色の不整合（Phase 2 で要ユーザー確認）**: 結合元（Block A）は「金管/リズム」、
+  Ch1 も実画像 FBS に従い「金管楽器音」表記。実装 test_v2 は「オルガン/フルート/ベル」。
+  中間発表時点の事実に合わせるか計画上の音色設計（金管系）で通すかを Phase 2 着手時に確認。
 - **partId 範囲・楽器台数**: 本書は production 想定（指揮者 1＋楽器 4）で統一。`0x02–0x05`。
 - **整合チェックリスト**は計画書 §9 に集約。Phase 4 で全消化する。
