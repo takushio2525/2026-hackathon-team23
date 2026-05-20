@@ -7,48 +7,48 @@
 
 - **結合レポート全面リライト**（大規模・複数セッション）。`report/計画書_中間発表/` 配下に
   計画書・設計書を再構築する。実行計画の正典は `report/計画書_中間発表/_作業計画.md`。
-- **Phase 0〜3・Phase 4A・4B 完了**。次は **Phase 4C（Ch1（計画書）へのゲーム反映と図の作り直し）**。
+- **Phase 0〜3・Phase 4A・4B・4C 完了**。次は **Phase 4D（生成 AI 章・全図 draw.io 化・
+  全体整合・最終調整）＝最終フェーズ**。
 
 ## 直近の観点
 
-1. **正典は `report/計画書_中間発表/_作業計画.md`**。再開時は §4-2（ゲーム方針）・§6 Phase 4C・
-   §7・§8・§9 を読む。
-2. 現状: 本体 `23_計画書・設計書.tex` は Ch1〜3 執筆済み・ゲーム機能を Ch2/Ch3 へ織り込み済み・
-   Processing 記述拡充済み・Ch4 は骨格のみ。`latexmk -lualatex` 成功・**47 ページ**・
-   Overfull/Underfull 0・未定義参照なし。
-3. **Phase 4C のスコープ**（_作業計画 §6 Phase 4C）:
-   - Ch1 の目的・成果物・対象範囲・リスク管理にゲームモードを反映。
-   - `fbs.drawio` に「ゲーム進行・採点（F7）」機能群，`pbs.drawio` に「ゲーム UI」を追加し再描画。
-     WBS 表にゲーム実装タスクを追加し，`arrow`・`gantt` を追従。全 PNG を再書き出し。
-4. **Phase 4B の成果**（Phase 4C の前提）: Ch3 §3.3.6 を「PC 側ソフトウェア（Processing）」へ
-   改題・増量（フレーム同期／Serial スレッド分離＋受信キュー／Voice 管理／音色合成／JSON 外部化）。
-   §3.3.7「画面とゲーム UI の設計」新設（ModeWait／Playing／メトロノーム／Result，表 `tab:pc-screens`）。
-   Ch2 `tab:state-pc` を 6 状態（PortSelect/ModeWait/Playing/Result/Muted/Error）へ更新。
-   新ラベル `sec:pc-software`・`sec:pc-ui`・`tab:pc-screens`。CTRL は楽器ノードが専用 PC へ中継。
-5. **Phase 4A の成果**: 2 モード構成を Ch2/Ch3 へ織り込み済み。CTRL ペイロードは `mode`（1B）・
-   `targetBpmQ8`（2B）・`score`（1B・0–100）。指揮者状態に ModeSelect。F7「ゲーム進行・採点」
-   ＝node\_01。メトロノームガイド＝固定フェードスケジュール（強度 1.0→0，通信不要）。
-6. **全図 draw.io 化・TikZ 廃止**（_作業計画 §8）。残る TikZ は 2 図（class-diagram／flow）。
-   Phase 4D で draw.io 化し preamble の `tikz` を除去。Phase 4B では図を新設せず表で対応。
-7. **ページ上限 = 60 未満**（50 以内が望ましいが超過可。2026-05-21 ユーザー指示）。現状 47 頁。
-8. draw.io 書き出し: `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png
+1. **正典は `report/計画書_中間発表/_作業計画.md`**。再開時は §6 Phase 4D・§8・§9・§7 を読む。
+2. 現状: 本体 `23_計画書・設計書.tex` は Ch1〜3 執筆済み・ゲーム機能を Ch1/Ch2/Ch3 へ全章
+   織り込み済み・Ch4 は骨格のみ。`latexmk -lualatex` 成功・**47 ページ**・Overfull/Underfull 0・
+   参照/引用の未定義なし（`undefined` 3 件は Hiragino W6 bold series 警告のみ・実害なし）。
+3. **Phase 4D のスコープ**（_作業計画 §6 Phase 4D）:
+   - Ch4「生成 AI の利用」を簡潔に執筆（予算 1 頁。`23_` 行 3058–3077 を流用・微圧縮）。
+   - **残る TikZ 図 2 点（クラス継承図 `fig:class-diagram`・楽器処理フロー `fig:flow`）を
+     draw.io 化**し，preamble から `tikz`／`\usetikzlibrary` を除去。
+   - §9 整合チェックリストを全消化（同期誤差 20ms の根拠統一／`ref:beat` 未引用／NOTE `gate`／
+     CPU 時間／magic エンディアン／相互参照・用語・数値の総点検／ゲーム整合 3 項）。
+   - 最終ビルドで **総ページ数 60 未満を確認**（50 以内が望ましいが超過可）。
+4. **Phase 4C の成果**（Phase 4D の前提）: Ch1 にゲームモードを反映（目的に 2 モード段落・
+   成果物にゲーム UI・対象範囲に 2 項・FBS 説明を 5 機能群へ・PBS 説明・FBS↔PBS 対応表に
+   ゲーム進行行・リスク管理に追加層の一文）。図 4 点を作り直し: `fbs` に第 5 機能群「ゲーム進行」，
+   `pbs` に「ゲーム進行モジュール」「ゲーム画面 UI」，`arrow` に「260 ゲーム機能」並行アーク，
+   `gantt` に「260 ゲーム機能」行。WBS 表に 260 ゲーム機能行を追加。
+5. **全図 draw.io 化・TikZ 廃止**（_作業計画 §8）。残る TikZ は 2 図（class-diagram／flow）。
+   Phase 4D で draw.io 化し preamble の `tikz` を除去。
+6. **ページ上限 = 60 未満**（50 以内が望ましいが超過可。2026-05-21 ユーザー指示）。現状 47 頁。
+7. draw.io 書き出し: `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png
    --scale 2 --crop --border 14 --output 出力.png 入力.drawio`。`.drawio` と `.png` を両方コミット。
-9. 編集対象は `report/計画書_中間発表/` 配下のみ。ページオフセット: PDF 頁 = 印刷頁 + 6。
+8. 編集対象は `report/計画書_中間発表/` 配下のみ。ページオフセット: PDF 頁 = 印刷頁 + 6。
 
 ## 次の一手
 
-- **Phase 4C に着手**（_作業計画 §6 Phase 4C）。本体 `.tex` の Ch1 全文と `fig/` の各 `.drawio`
-  （`fbs`・`pbs`・`arrow`・`gantt`）を Read。
-- Ch1: 目的・成果物・対象範囲・リスク管理にゲームモードを反映。
-- 図: `fbs.drawio` に「ゲーム進行・採点（F7）」を追加，`pbs.drawio` に「ゲーム UI」を追加して
-  再描画。WBS 表にゲーム実装タスクを追加し，`arrow`・`gantt` を追従。全 PNG を再書き出し。
-- ビルド成功確認 → コミット → push → activeContext/progress 更新。
+- **Phase 4D に着手**（_作業計画 §6 Phase 4D）。本体 `.tex` の Ch3 クラス図節・楽器処理フロー節と
+  Ch4 骨格，preamble の `tikz` 行を Read。`report/計画書結合/23_計画書・設計書_24G1075.tex` 行
+  3058–3077（生成 AI 章）を参照。
+- Ch4「生成 AI の利用」を執筆 → TikZ 2 図を draw.io 化し preamble から `tikz` 除去 →
+  §9 整合チェックリスト全消化。
+- ビルド成功・60 頁未満確認 → コミット → push → activeContext/progress 更新。
 
 ## 現フェーズで Read すべき設計書
 
-- **必ず最初に**: `report/計画書_中間発表/_作業計画.md`（§4-2・§6 Phase 4C・§7・§8・§9）
-- Phase 4C 実行時: 本体 `23_計画書・設計書.tex` の Ch1 全文，`fig/fbs.drawio`・`pbs.drawio`・
-  `arrow.drawio`・`gantt.drawio`
+- **必ず最初に**: `report/計画書_中間発表/_作業計画.md`（§6 Phase 4D・§8・§9・§7）
+- Phase 4D 実行時: 本体 `23_計画書・設計書.tex` の preamble・Ch3 クラス図節・楽器処理フロー節・
+  Ch4 骨格（残る TikZ 2 ブロックを `\includegraphics` へ置換）
 
 ## ユーザーの今回の好み
 
@@ -58,8 +58,10 @@
 
 ## 既知の論点
 
-- ゲームモードの設計骨子は _作業計画 §4-2，Phase 4A・4B の成果は progress.md に確定記録。
+- ゲームモードの設計骨子は _作業計画 §4-2，Phase 4A〜4C の成果は progress.md に確定記録。
 - 前回レビューで判明した本体 `.tex` の不整合 6 件（同期誤差の根拠／`ref:beat` 未引用／NOTE
   `gate`／CPU 時間／magic エンディアン／相互参照・用語・数値）は _作業計画 §9 に集約。Phase 4D で消化。
+- FBS は 5 機能群化で横長になり `\linewidth` 配置で葉の文字がやや小さい。図は崩れず据え置き。
+  気になるなら横向き 1 ページ配置か縦レイアウト再設計（Phase 4D で要否判断可）。
 - `.agent/api.md` の CTRL 予約 4B は未修正（現行ファームの事実）。ゲーム拡張は報告書側の将来設計。
 - ADR-0004（5 台構成）は当時の記録なので書き換えない。

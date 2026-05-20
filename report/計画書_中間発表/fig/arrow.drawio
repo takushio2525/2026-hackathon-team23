@@ -1,6 +1,6 @@
 <mxfile host="Claude">
   <diagram id="arrow" name="ArrowDiagram">
-    <mxGraphModel dx="1860" dy="430" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1860" pageHeight="430" math="0" shadow="0">
+    <mxGraphModel dx="1860" dy="470" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1860" pageHeight="470" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
@@ -25,6 +25,7 @@
         <mxCell id="ce8" value="510 発表準備&#10;1.0週" style="html=1;rounded=0;endArrow=block;startArrow=none;strokeColor=#C0392B;strokeWidth=3;fontSize=12;fontStyle=1;fontColor=#202020;exitX=1;exitY=0.5;entryX=0;entryY=0.5;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="E8" target="E9"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="pe1" value="240 楽譜準備（1.0週）" style="html=1;rounded=1;endArrow=block;startArrow=none;strokeColor=#3A6B8A;strokeWidth=2;fontSize=11;fontColor=#202020;exitX=0.5;exitY=0;entryX=0.5;entryY=0;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="E3" target="E6"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="476" y="108"/><mxPoint x="1148" y="108"/></Array></mxGeometry></mxCell>
         <mxCell id="pe2" value="250 Processing実装（1.5週）" style="html=1;rounded=1;endArrow=block;startArrow=none;strokeColor=#3A6B8A;strokeWidth=2;fontSize=11;fontColor=#202020;exitX=0.5;exitY=1;entryX=0.5;entryY=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="E3" target="E6"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="476" y="372"/><mxPoint x="1148" y="372"/></Array></mxGeometry></mxCell>
+        <mxCell id="pe3" value="260 ゲーム機能（1.5週）" style="html=1;rounded=1;endArrow=block;startArrow=none;strokeColor=#3A6B8A;strokeWidth=2;fontSize=11;fontColor=#202020;exitX=0.65;exitY=1;entryX=0.65;entryY=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="E3" target="E6"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="484" y="430"/><mxPoint x="1156" y="430"/></Array></mxGeometry></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
