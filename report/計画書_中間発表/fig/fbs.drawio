@@ -1,14 +1,15 @@
 <mxfile host="Claude">
   <diagram id="fbs" name="FBS">
-    <mxGraphModel dx="1478" dy="360" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1478" pageHeight="360" math="0" shadow="0">
+    <mxGraphModel dx="1830" dy="360" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1830" pageHeight="360" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="r" value="Arduinoオーケストラ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7EEF6;strokeColor=#2F4358;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="629" y="24" width="220" height="48" as="geometry"/></mxCell>
+        <mxCell id="r" value="Arduinoオーケストラ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7EEF6;strokeColor=#2F4358;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="828" y="24" width="220" height="48" as="geometry"/></mxCell>
         <mxCell id="a" value="指揮解析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="137" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="b" value="同期・通信" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="536" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="c" value="楽譜進行" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="884" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="d" value="音響合成" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1232" y="140" width="160" height="50" as="geometry"/></mxCell>
+        <mxCell id="e" value="ゲーム進行" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1580" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="a1" value="指揮動作の認識" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="16" y="270" width="96" height="72" as="geometry"/></mxCell>
         <mxCell id="a2" value="演奏速度の決定" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="118" y="270" width="96" height="72" as="geometry"/></mxCell>
         <mxCell id="a3" value="演奏の開始・停止" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="220" y="270" width="96" height="72" as="geometry"/></mxCell>
@@ -22,10 +23,14 @@
         <mxCell id="d1" value="金管楽器音の再現" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1162" y="270" width="96" height="72" as="geometry"/></mxCell>
         <mxCell id="d2" value="多重音のリアルタイム発音" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1264" y="270" width="96" height="72" as="geometry"/></mxCell>
         <mxCell id="d3" value="演奏状態の可視化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1366" y="270" width="96" height="72" as="geometry"/></mxCell>
+        <mxCell id="e1" value="モード選択" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1510" y="270" width="96" height="72" as="geometry"/></mxCell>
+        <mxCell id="e2" value="目標テンポの提示" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1612" y="270" width="96" height="72" as="geometry"/></mxCell>
+        <mxCell id="e3" value="テンポ維持の採点" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2F4358;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1714" y="270" width="96" height="72" as="geometry"/></mxCell>
         <mxCell id="er_a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="a"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="er_b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="b"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="er_c" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="c"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="er_d" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="d"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="er_e" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="e"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="ea1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="a1"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="ea2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="a2"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="ea3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="a3"><mxGeometry relative="1" as="geometry"/></mxCell>
@@ -39,6 +44,9 @@
         <mxCell id="ed1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="d1"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="ed2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="d2"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="ed3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="d3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e" target="e1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e" target="e2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#2F4358;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e" target="e3"><mxGeometry relative="1" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
