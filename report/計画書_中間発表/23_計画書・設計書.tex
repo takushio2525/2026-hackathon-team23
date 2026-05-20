@@ -1,0 +1,189 @@
+% !TEX program = lualatex
+%================================================================
+% 中間発表 計画書・設計書 — チーム23
+%
+% 編集規約・工程表: report/計画書_中間発表/_作業計画.md
+%   - 図は fig/*.drawio を draw.io CLI で PNG 化し \includegraphics で挿入
+%   - 完成目標: PDF 50 ページ以内（本文 47 ページ目標）
+%   - 各 \section 直下の「TODO(Phase N)」は作業計画 §6・§7 への対応
+%================================================================
+\documentclass[lualatex,book,paper=a4paper,jafontsize=11.5pt,jafontscale=1.05]{jlreq}
+
+% --- フォント・表紙（hack-*.sty を流用）---
+\usepackage{luatexja-fontspec}
+\usepackage{hack-fonts}
+\usepackage{hack-cover}
+
+% --- 図・表 ---
+\usepackage{graphicx}
+\graphicspath{{fig/}}
+\usepackage{float}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+
+% --- コード・整形 ---
+\usepackage{listings}
+\usepackage{fancyvrb}
+\usepackage[most,breakable]{tcolorbox}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{url}
+\usepackage{needspace}
+\usepackage{placeins}
+\usepackage{xcolor}
+
+% --- 作図（TikZ：正常な既存図は据え置くため残す）---
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+% --- リンク ---
+\usepackage[hidelinks]{hyperref}
+
+% --- ユーザ定義 ---
+\newcommand{\code}[1]{\texttt{#1}}
+\definecolor{lightgray}{HTML}{F2F3F4}
+\definecolor{codebg}{HTML}{F7F9FB}
+
+\lstdefinestyle{textdiagram}{
+  basicstyle=\ttfamily\small, numbers=none, breaklines=true,
+  frame=single, tabsize=2, showstringspaces=false
+}
+\lstdefinestyle{pseudo}{
+  basicstyle=\ttfamily\small, numbers=left, numberstyle=\tiny,
+  breaklines=true, frame=single, tabsize=2, showstringspaces=false
+}
+
+% 改ページ制御（孤立行・寡婦行の抑制）
+\widowpenalty=10000
+\clubpenalty=10000
+\predisplaypenalty=10000
+
+% --- 表紙メタ情報 ---
+\title{ハッカソン}
+\subtitle{～計画書と設計書～}
+\team{チーム23}
+\author{
+  24G1038 : 片岡 聖\\
+  24G1175 : 地曵 賢人\\
+  24G1131 : 御代川 稜\\
+  25G1021 : 梅澤 颯太\\
+  25G1053 : 齋藤 翔太\\
+  25G1065 : 塩澤 匠生
+}
+\date{\today}
+\version{1.0}
+
+%================================================================
+\begin{document}
+\maketitle
+
+\setcounter{tocdepth}{2}
+\tableofcontents \thispagestyle{empty}
+
+%================================================================
+% Chapter 1 — 計画書           ［Phase 1］
+%   入力: 23_ 行 139–500 / docs team/schedule.md・roles.md /
+%         review_プロジェクト見直_片岡.md
+%================================================================
+\chapter{プロジェクトの計画書}\label{chap:project-plan}\setcounter{page}{1}
+
+\section{プロジェクトの概要}\label{sec:overview}
+\subsection{プロジェクトの題目}
+% TODO(Phase 1): 議事録 9–10 章準拠。散文で簡潔に（予算 2 頁）
+\subsection{プロジェクトの目的}
+% TODO(Phase 1): 解決すべき課題と最終ゴール
+\subsection{既存の技術とプロジェクトの独自性}
+% TODO(Phase 1): 既存技術との差分
+
+\section{スコープ・マネジメント}\label{sec:scope}
+\subsection{成果物}
+% TODO(Phase 1): 成果物一覧（予算 4 頁：本節〜FBS/PBS 対応まで）
+\subsection{プロジェクトの対象範囲と非対象範囲}
+\subsection{機能分解構造FBS}
+% TODO(Phase 1): fig/fbs.png（draw.io 再作成）
+\subsection{製品分解構造PBS}
+% TODO(Phase 1): fig/pbs.png（draw.io 再作成）
+\subsection{FBSとPBSの対応関係}
+% TODO(Phase 1): 小さな対応表 1 つ
+
+\section{作業計画}\label{sec:workplan}
+\subsection{作業分解構造WBSと管理番号}
+% TODO(Phase 1): fig/wbs.png（draw.io 新規。表で足りれば表化可。予算 5 頁）
+\subsection{アローダイアグラムとクリティカルパス}
+% TODO(Phase 1): fig/arrow.png（draw.io 新規。クリティカルパス強調）
+\subsection{役割分担}
+% TODO(Phase 1): 役割分担表 1 つ
+\subsection{ガントチャート}
+% TODO(Phase 1): fig/gantt.png（draw.io 新規。4 フェーズ・WBS 番号対応）
+
+\section{検証と妥当性確認: V\&V計画}\label{sec:vv}
+% TODO(Phase 1): 予算 2 頁・表中心。MOP 階層は 1 表に集約
+\subsection{プロジェクトの成果物に対する有効指標MOE}
+\subsection{有効指標MOEに対応する性能指標MOP}
+\subsection{システムテストで評価する性能指標MOP}
+\subsection{結合テストで評価する性能指標MOP}
+\subsection{単体テストで評価する性能指標MOP}
+\subsection{プロジェクト中に監視する技術性能指標TPM}
+\subsection{プロジェクト中に監視する指標TPM}
+
+\section{資源・調達管理}\label{sec:resource}
+% TODO(Phase 1): 1 頁目安
+
+\section{リスク管理}\label{sec:risk}
+% TODO(Phase 1): 1 頁目安
+
+%================================================================
+% Chapter 2 — システムの基本設計   ［Phase 2：Block A/B 重複解消］
+%   入力: 23_ 行 501–1209 / .agent/architecture.md / review_arduino_*.md
+%   方針: Block B（\label 付き）を土台に Block A 固有事実を畳み込む
+%================================================================
+\chapter{システムの基本設計}\label{chap:basic-design}
+
+\section{機能一覧}\label{sec:basic-functions}
+% TODO(Phase 2): 23_ 行 506(A)/817(B) を 1 版へ。要求一覧＋FBS（予算 3 頁）
+
+\section{システム構成図}\label{sec:basic-architecture}
+% TODO(Phase 2): 23_ 行 569(A)/881(B)。全体ブロック図 1 枚＋短い説明（予算 3 頁）
+
+\section{操作インターフェース設計}\label{sec:basic-ui}
+% TODO(Phase 2): 23_ 行 672(A)/993(B)。LED 表示・ユーザー操作を各 1 表（予算 2 頁）
+
+\section{状態遷移図}\label{sec:basic-state}
+% TODO(Phase 2): 23_ 行 721(A)/1122(B)。指揮者・楽器の状態遷移図＋定義表（予算 4 頁）
+
+%================================================================
+% Chapter 3 — システムの詳細設計   ［Phase 3：重複解消＋最大の削減対象］
+%   入力: 23_ 行 1210–3056 / .agent/api.md / architecture.md
+%   方針: 長い API 表・コード例は要点の散文＋小図表に置換
+%================================================================
+\chapter{システムの詳細設計}\label{chap:detail-design}
+
+\section{部品一覧}\label{sec:parts-list}
+% TODO(Phase 3): 23_ 行 1214(A)/1873(B)。PBS 要素を 1–2 表（予算 2 頁）
+
+\section{ハードウェア設計}\label{sec:hw-design}
+% TODO(Phase 3): 23_ 行 1219(A)/1932(B)。配線・ピン表＋接続図 1 枚（予算 3 頁）
+
+\section{ソフトウェア設計}\label{sec:sw-design}
+% TODO(Phase 3): 23_ 行 1308(A)/1997(B)。クラス図＋パケット定義＋楽譜形式（予算 6 頁）
+\subsection{ファイル構成}
+\subsection{オブジェクト設計(クラス図)}
+\subsection{関数設計}
+
+\section{処理フローの設計}\label{sec:proc-flow}
+% TODO(Phase 3): 23_ 行 1716(A)/2467(B)。3 フェーズモデル＋処理フロー図（予算 3 頁）
+
+\section{テストの設計}\label{sec:test-design}
+% TODO(Phase 3): 23_ 行 1834(A)/2959(B)。設計目標値表＋検証方針（予算 2 頁）
+
+%================================================================
+% Chapter 4 — 生成 AI の利用        ［Phase 4］
+%   入力: 23_ 行 3058–3077（流用・微圧縮）
+%================================================================
+\chapter{生成AIの利用}\label{chap:genai}
+% TODO(Phase 4): 既存記述を流用・微圧縮（予算 1 頁）
+
+\end{document}
