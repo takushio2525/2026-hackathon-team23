@@ -52,6 +52,8 @@ build/
 *.ist
 # 生成 PDF（手元で latexmk / Docker コンパイルして確認する運用）
 report/**/*.pdf
+# 例外: 結合レポートリライト本体は .tex と PDF を同一コミットで管理する（2026-05-20 ユーザー指示）
+!report/計画書_中間発表/23_計画書・設計書.pdf
 
 # ===== Processing =====
 *.pde.bak
