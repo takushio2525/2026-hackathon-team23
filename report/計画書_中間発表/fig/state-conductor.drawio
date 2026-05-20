@@ -1,0 +1,20 @@
+<mxfile host="Claude">
+  <diagram id="state-conductor" name="指揮者状態遷移">
+    <mxGraphModel dx="1000" dy="400" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="980" pageHeight="360" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="idle" value="Idle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=14;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="30" y="120" width="150" height="58" as="geometry"/></mxCell>
+        <mxCell id="mode" value="ModeSelect" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=14;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="250" y="120" width="160" height="58" as="geometry"/></mxCell>
+        <mxCell id="cal" value="Calibrating" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=14;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="480" y="120" width="160" height="58" as="geometry"/></mxCell>
+        <mxCell id="cond" value="Conducting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=14;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="710" y="120" width="200" height="58" as="geometry"/></mxCell>
+        <mxCell id="fb" value="Fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=14;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="710" y="270" width="200" height="58" as="geometry"/></mxCell>
+        <mxCell id="e1" value="SoftAP 起動完了" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="idle" target="mode"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="モード確定" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="mode" target="cal"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="2 秒経過" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cal" target="cond"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="IMU／WiFi エラー" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#B85450;strokeWidth=1.5;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="cond" target="fb"><mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint x="-66" y="0" as="offset"/></mxGeometry></mxCell>
+        <mxCell id="e5" value="復旧" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=0.7;exitY=0;entryX=0.7;entryY=1;" edge="1" parent="1" source="fb" target="cond"><mxGeometry x="0.1" relative="1" as="geometry"><mxPoint x="34" y="0" as="offset"/></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
