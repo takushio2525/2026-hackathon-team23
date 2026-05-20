@@ -5,6 +5,21 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-21: **結合レポート全面リライト Phase 4B（Processing 記述拡充・ゲーム UI 節新設）完了**。
+  Ch3 §3.3.6 を「音色合成（PC 側）」→「PC 側ソフトウェア（Processing）」へ改題・約 0.5 頁→約 2 頁へ
+  増量し，`orchestra_resynth.pde` 実体準拠で フレーム同期（magic 走査・type 振り分け・ポート別
+  同期状態）／Serial スレッド分離と受信キュー（発音処理を描画スレッドへ集約）／Voice 管理
+  （durationMs 自動消音・同時発音上限 24・最古強制リリース）／音色合成（倍音加算＋非調和性＋
+  ビブラート/トレモロ＋整形ノイズ）／音色定義の JSON 外部化（instrumentId＝ファイル名昇順 index）
+  を `\textbf` 小節化。§3.3.7「画面とゲーム UI の設計」を新設し，モード待機画面（ModeWait）・
+  演奏画面（Playing，共通＋ゲーム）・メトロノーム表示・結果画面（Result）を小節化，画面と表示
+  要素を表 `tab:pc-screens` に集約。CTRL 中継（楽器ノード→専用 PC へ転送，PC が mode/targetBpmQ8/
+  score を読む，新パケット種別不要）を明記。Ch2 PC 状態定義表 `tab:state-pc` をモード対応へ更新
+  （Ready→ModeWait に改め Result を追加，PortSelect/ModeWait/Playing/Result/Muted/Error の 6 状態）。
+  整合: §3.3.2 クラス図節の PC 記述末尾を `sec:pc-software`/`sec:pc-ui` 参照へ，Ch2 F5 を
+  `\ref{sec:pc-ui}節` へ精緻化。新ラベル 3 件（`sec:pc-software`・`sec:pc-ui`・`tab:pc-screens`）。
+  図は §8 方針に従い新設せず表で対応。ビルド `latexmk -lualatex` 成功・**47 ページ**・
+  Overfull/Underfull 0・未定義参照/引用なし。次は Phase 4C（Ch1 へのゲーム反映・図の作り直し）
 - 2026-05-21: **結合レポート全面リライト Phase 4A（ゲーム機能を Ch2・Ch3 へ織り込み）完了**。Ch2 に
   ①章冒頭の 2 モード宣言（自由演奏／ゲーム），②要求 R-5（モード選択）・R-6（テンポ維持の採点），
   ③機能分解 F7「ゲーム進行・採点」（node\_01）と F5 を「音響合成・演奏画面（PC）」へ改名・加筆，
