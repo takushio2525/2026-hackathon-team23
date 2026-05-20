@@ -21,7 +21,10 @@
    `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png --scale 2 --output 出力.png 入力.drawio`。
    図ソース `.drawio` と書き出し `.png` は両方 `fig/` に置きコミットする。
 5. **編集対象は `report/計画書_中間発表/` 配下のみ**。`計画書結合/` 等は参照専用。
-6. **report 配下 PDF は `.gitignore`（`report/**/*.pdf`）対象** → コミットは `.tex`＋`fig/` のみ。
+6. **本体 PDF も同一コミットで管理**。`.gitignore` に例外
+   `!report/計画書_中間発表/23_計画書・設計書.pdf` を追加済み。各 Phase で `.tex`＋PDF＋`fig/` を push。
+7. **ページ予算は柔軟運用**: Phase 1〜3 の途中ビルドは 50 ページ超過可。内容を書き切ってから
+   ユーザーと相談で削減、≤50 は Phase 4 で確定。各 Phase 末にページ数を報告する。
 
 ## 次の一手
 
@@ -49,5 +52,3 @@
   「オルガン/フルート/ベル」。Phase 2 着手時にユーザー確認（Phase 0・1 では判断不要）。
 - **partId 範囲・楽器台数**: 本書は production 想定（指揮者 1＋楽器 4）で統一。`0x02–0x05`。
 - **整合チェックリスト**は計画書 §9 に集約。Phase 4 で全消化する。
-- **conventions §4-3 と `.gitignore` の相違**: §4-3 は「生成 PDF も同一コミット」だが
-  `.gitignore` は `report/**/*.pdf` を除外。実態（非コミット）に従う。要・運用確認。
