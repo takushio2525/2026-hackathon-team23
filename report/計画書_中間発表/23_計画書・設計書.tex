@@ -712,23 +712,465 @@ USB Serialポートを選んで接続し，NOTEを受信すると発音を始め
 %================================================================
 \chapter{システムの詳細設計}\label{chap:detail-design}
 
+本章では，第\ref{chap:basic-design}章の基本設計を，実装に着手できる水準まで具体化する。
+部品構成・ハードウェア配線・ソフトウェア構造・処理フロー・テスト設計を順に示す。
+記述の粒度は「実装方針が伝わること」を主眼とし，全関数・全設定値の網羅ではなく，
+設計判断の要点と代表値の提示にとどめる。コードのフル実装は本書の対象外とする。
+
+%--------------------------------------------------------
 \section{部品一覧}\label{sec:parts-list}
-% TODO(Phase 3): 23_ 行 1214(A)/1873(B)。PBS 要素を 1–2 表（予算 2 頁）
 
+第\ref{chap:project-plan}章の図\ref{fig:pbs}で示した製品分解構造（PBS）を，実体の機材と
+ソフトウェア要素の単位へ具体化する。ハードウェア構成を表\ref{tab:hw-parts}に，ソフトウェアの
+技術スタックを表\ref{tab:sw-stack}に示す。PC（Processing）とスピーカーは本書のスコープ外だが，
+NOTEパケットの受信境界として参考に併記する。
+
+\begin{table}[H]\centering
+  \caption{ハードウェア部品一覧}\label{tab:hw-parts}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{1.9cm} >{\raggedright\arraybackslash}p{3.4cm} c X}
+    \toprule
+    区分 & 要素 & 数量 & 備考 \\
+    \midrule
+    指揮者 & XIAO ESP32-S3 Sense & 1 & ESP32-S3（Xtensa LX7デュアルコア）。内蔵WiFiでSoftAPとUDPを直接制御する \\
+    指揮者 & MPU6050（GY-521） & 1 & 6軸IMU。本案件は$\pm$4\,g／$\pm$2000\,dpsで使用，I2Cアドレスは0x68 \\
+    指揮者 & 状態LED & 1 & 基板内蔵のLED\_BUILTINを流用する \\
+    楽器 & Arduino UNO R4 WiFi & 5 & node\_02〜06（金管4＋ドラム）。同一ハードウェアでSoftAPにSTA接続する \\
+    楽器 & 状態LED & 5 & 基板内蔵のLED\_BUILTINを流用する \\
+    ネットワーク & node\_01のSoftAPで兼用 & 0 & 外部ルータ・テザリングは使わない \\
+    給電・通信 & USB Type-Cケーブル & 6 & 楽器5本は各PCへ1対1直結（給電とSerialを兼用），指揮者1本は給電のみ \\
+    境界（参考） & PC（Processing） & 5 & 本書スコープ外。各楽器からNOTEを受信し音色を合成する \\
+    境界（参考） & スピーカー & 5 & 本書スコープ外。PC1台あたり1系統 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[H]\centering
+  \caption{ソフトウェア技術スタック}\label{tab:sw-stack}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.9cm} >{\raggedright\arraybackslash}p{3.8cm} X}
+    \toprule
+    レイヤ & 採用技術 & 備考 \\
+    \midrule
+    MCU（指揮者） & XIAO ESP32-S3 Sense & ESP32-S3R8（Xtensa LX7 240\,MHz×2） \\
+    MCU（楽器） & Arduino UNO R4 WiFi & Renesas RA4M1にWiFi担当のESP32-S3を組み合わせた構成 \\
+    フレームワーク・言語 & Arduino framework／C++ & PlatformIO経由でビルドする \\
+    WiFiスタック & WiFi.h（指揮者）／WiFiS3（楽器） & SoftAPとUDPマルチキャストを使う \\
+    設計パターン & EMA（ADR-0005） & 全ノードのファームウェアに適用する \\
+    共通層 & ModuleCore・OrcProtocol・OrcNetModule ほか & firmware/common/lib に集約し全ノードで共有する \\
+    PC側 & Processing 4 & NOTEの受信と音色合成（本書スコープ外） \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+%--------------------------------------------------------
 \section{ハードウェア設計}\label{sec:hw-design}
-% TODO(Phase 3): 23_ 行 1219(A)/1932(B)。配線・ピン表＋接続図 1 枚（予算 3 頁）
 
+\subsection{配線・ピンアサイン}
+指揮者ノードnode\_01（XIAO ESP32-S3 Sense）は外付けのMPU6050をI2Cで接続する。XIAOの
+I2C既定ピンはSDA=D4（GPIO5），SCL=D5（GPIO6）である。3.3\,V／GNDをMPU6050へ給電し，
+\texttt{AD0}をGNDに落としてI2Cアドレスを0x68に固定する。楽器ノードnode\_02〜06
+（UNO R4 WiFi）は内蔵LED以外に外部配線を要しない。各ノードの配線を表\ref{tab:pin-assign}に示す。
+\begin{table}[H]\centering
+  \caption{配線・ピンアサイン}\label{tab:pin-assign}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{3.6cm} X}
+    \toprule
+    ノード & 用途 & ピン・接続 \\
+    \midrule
+    node\_01 & I2C SDA（MPU6050） & D4（GPIO5） \\
+    node\_01 & I2C SCL（MPU6050） & D5（GPIO6） \\
+    node\_01 & MPU6050の電源 & 3.3\,V・GND。AD0をGNDに落としI2Cアドレスを0x68に固定する \\
+    node\_01 & 状態LED & LED\_BUILTIN（XIAOのユーザーLED） \\
+    node\_01 & 給電 & USB Type-C（給電のみ。開発・試験時のみデバッグSerialを読む） \\
+    node\_02〜06 & 状態LED & LED\_BUILTIN \\
+    node\_02〜06 & 給電＋NOTE送信 & USB Type-C（各楽器が専用PCへ1対1直結。Serial.writeでNOTEを出力する） \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{ネットワーク構成}
+通信は二系統に分離する。\textbf{Arduino同士}はWiFi UDP（node\_01が立てるSoftAP配下）で，
+\textbf{ArduinoとPC}はUSB Serialの直結で通信する。node\_01は
+\texttt{WiFi.softAP("OrchestraAP", "orchestra2026")}でアクセスポイントを起動し，
+node\_02〜06は\texttt{WiFiS3}で同じSSIDへSTAとして接続する。SoftAPの既定アドレスは
+192.168.4.1，楽器側は内蔵DHCPで192.168.4.2以降を取得する。node\_01はCTRL／BEATを
+\textbf{UDPマルチキャスト}（239.0.0.1:5001）で全楽器ノードへ一斉配信し，各楽器ノードは
+発音情報NOTEを\textbf{専用PCのシリアルポート}へ書き込む。接続トポロジは第\ref{chap:basic-design}章の
+図\ref{fig:system-overview}に示したとおりである。
+
+指揮者ノードだけをXIAO ESP32-S3としたのは，ESP32-S3を直接制御すると\texttt{WiFi.softAP()}と
+UDPマルチキャストがネイティブにサポートされ，内蔵WiFiを別チップ越しに扱うUNO R4 WiFiよりも
+SoftAPの制御自由度が高いためである。外部ルータやテザリングが不要なため，会場LANの
+セキュリティ制限や電波混雑の影響を受けない利点もある。
+
+なお，WiFiの省電力モードが有効なSTAが接続していると，マルチキャストフレームの配送が
+ビーコン周期ぶん遅れる。これを避けるため楽器ノードのWiFi省電力モードは無効化して運用する。
+無効化できない場合の代替策は，テスト設計（\ref{sec:test-design}節）の未確定事項として扱う。
+
+%--------------------------------------------------------
 \section{ソフトウェア設計}\label{sec:sw-design}
-% TODO(Phase 3): 23_ 行 1308(A)/1997(B)。クラス図＋パケット定義＋楽譜形式（予算 6 頁）
+
 \subsection{ファイル構成}
-\subsection{オブジェクト設計(クラス図)}
-\subsection{関数設計}
+\texttt{firmware/}配下は，全ノードで共有する\textbf{共通層}と，\textbf{ノード別プロジェクト}の
+2段構造とする。EMAに準拠し，PlatformIOの\texttt{lib\_extra\_dirs}設定で共通層を全ノードから
+参照する。ディレクトリ構成の抜粋を次に示す。
+\begin{Verbatim}[frame=single,fontsize=\footnotesize,xleftmargin=4pt]
+firmware/
+|-- common/lib/            # 全ノード共通（lib_extra_dirs で参照）
+|   |-- ModuleCore/        #   IModule + ModuleTimer
+|   |-- OrcProtocol/       #   CTRL/BEAT/NOTE パケット定義
+|   |-- OrcNetModule/      #   WiFi 接続維持 + UDP 送受信
+|   |-- StatusLedModule/   #   状態 LED 出力
+|   `-- SerialDebug/       #   SERIAL_DEBUG 切替のデバッグ出力
+|-- node_01/               # 指揮者ノード
+|   |-- include/           #   SystemData.h, ProjectConfig.h
+|   |-- src/               #   main.cpp, applyPattern.cpp
+|   `-- lib/               #   ImuModule, OrcSenderModule
+`-- node_02 〜 node_06/    # 楽器ノード（金管4＋ドラム。5台とも同構造）
+    |-- include/           #   SystemData.h, ProjectConfig.h, score_data.h
+    |-- src/               #   main.cpp, applyPattern.cpp, score_data.cpp
+    `-- lib/               #   OrcReceiverModule, NoteSenderModule
+\end{Verbatim}
+楽器ノード5台は同一コードで動作し，ノード間の差分は\texttt{ProjectConfig.h}（partId・入り拍）と
+\texttt{score\_data.*}（楽譜配列）にのみ閉じ込める。ビルド時の\texttt{SERIAL\_DEBUG}フラグで，
+本番動作（NOTEのバイナリ送信）と開発時（テキストログ出力）を切り替える。
 
+\subsection{オブジェクト設計（クラス図）}
+すべてのハードウェアモジュールは，EMAの抽象基底\texttt{IModule}（\texttt{init}／
+\texttt{updateInput}／\texttt{updateOutput}／\texttt{deinit}の4メソッド）を継承する。
+WiFi UDPを扱う\texttt{OrcNetModule}は共通層に置き，指揮者・楽器の両ノード種で共有する
+（図\ref{fig:class-diagram}）。各モジュールの責務を表\ref{tab:module-list}に示す。
+\begin{figure}[H]\centering
+\begin{tikzpicture}[
+  node distance=6mm and 7mm,
+  abstract/.style={draw=black, thick, fill=lightgray, rounded corners=2pt, minimum width=44mm, minimum height=9mm, align=center, font=\small\bfseries},
+  conc/.style    ={draw=black, fill=codebg, rounded corners=2pt, minimum width=38mm, minimum height=8mm, align=center, font=\scriptsize},
+  inh/.style     ={-{Triangle[length=3mm,open]}, thick, black},
+]
+  \node[abstract] (im) {IModule（抽象基底）};
+  \node[conc, below left=12mm and 8mm of im] (imu)    {ImuModule\\（node\_01・入力）};
+  \node[conc, below=of imu]                  (sender) {OrcSenderModule\\（node\_01・出力）};
+  \node[conc, below=of sender]               (led1)   {StatusLedModule\\（全ノード・出力）};
+  \node[conc, below=12mm of im]              (orcnet) {OrcNetModule\\（共通・入出力）};
+  \node[conc, below right=12mm and 8mm of im] (recv)  {OrcReceiverModule\\（node\_02〜06・入力）};
+  \node[conc, below=of recv]                 (note)   {NoteSenderModule\\（node\_02〜06・出力）};
+  \draw[inh] (imu)    -- (im);
+  \draw[inh] (sender) -- (im);
+  \draw[inh] (led1)   -- (im);
+  \draw[inh] (orcnet) -- (im);
+  \draw[inh] (recv)   -- (im);
+  \draw[inh] (note)   -- (im);
+\end{tikzpicture}
+\caption{モジュールのクラス継承関係}\label{fig:class-diagram}
+\end{figure}
+\begin{table}[H]\centering
+  \caption{モジュール一覧と責務}\label{tab:module-list}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{1.2cm} X}
+    \toprule
+    モジュール & ノード & 分類 & 責務 \\
+    \midrule
+    ImuModule & node\_01 & 入力 & MPU6050（I2C）の6軸を読み取る \\
+    OrcSenderModule & node\_01 & 出力 & CTRL／BEATの送信内容を組み立てる \\
+    OrcReceiverModule & node\_02〜06 & 入力 & 受信したCTRL／BEATを整形する \\
+    NoteSenderModule & node\_02〜06 & 出力 & NOTEをUSB SerialでPCへ送信する \\
+    OrcNetModule & 全ノード & 入出力 & WiFi接続の維持とUDPの送受信 \\
+    StatusLedModule & 全ノード & 出力 & 状態に応じたLEDの点滅表示 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+PC側のProcessingは，シリアル入力をフレーム同期して20バイトのNOTEを切り出す受信部，
+Serialスレッドと描画スレッドを分離する受信キュー，発音単位（Voice）の生成と消音を管理する
+発音管理部，および操作画面の描画部から成る。詳細はPC側担当（梅澤）の設計に委ねる。
+
+\subsection{通信パケット設計}
+ノード間およびPCとの通信に用いる3種類のパケット（CTRL／BEAT／NOTE）は，いずれも
+\textbf{20バイト固定長}とする。先頭12バイトが全パケット共通のヘッダ（表\ref{tab:packet-header}），
+後続8バイトが型ごとのペイロード（表\ref{tab:packet-payload}）である。多バイト値は
+リトルエンディアンで配置する。先頭の\texttt{magic}はWiFi UDP上ではプロトコル識別子，
+USB Serial上では\textbf{フレーム同期マーク}を兼ねる。PC側はバイト列を走査し，\texttt{magic}が
+現れた位置をフレーム先頭とみなして固定20バイトを1パケットとして読む。
+\begin{table}[H]\centering
+  \caption{通信パケットの共通ヘッダ（先頭12バイト）}\label{tab:packet-header}
+  \small
+  \begin{tabularx}{\linewidth}{c c >{\raggedright\arraybackslash}p{2.2cm} X}
+    \toprule
+    オフセット & サイズ & フィールド & 内容 \\
+    \midrule
+    0 & 2\,B & magic & 固定値0x4F52（ASCII "OR"）。プロトコル識別子兼フレーム同期マーク \\
+    2 & 1\,B & version & プロトコルバージョン（現行0x01） \\
+    3 & 1\,B & type & パケット種別（1=CTRL，2=BEAT，3=NOTE） \\
+    4 & 4\,B & seq & 送信側で単調増加させる連番。パケットロスの検出に使える \\
+    8 & 4\,B & timestampMs & 送信時のマスタ時刻（指揮者のmillis()）。楽器側の時計同期に使う \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+\begin{table}[H]\centering
+  \caption{型別ペイロード（共通ヘッダに続く8バイト）}\label{tab:packet-payload}
+  \small
+  \begin{tabularx}{\linewidth}{c c >{\raggedright\arraybackslash}p{2.2cm} X}
+    \toprule
+    オフセット & サイズ & フィールド & 内容 \\
+    \midrule
+    \multicolumn{4}{l}{\textbf{CTRL（type=1）：指揮者→楽器，20\,Hzで定期配信}} \\
+    12 & 2\,B & bpmQ8 & BPMを8倍した整数（分解能0.125\,BPM。例：120.5\,BPM→964） \\
+    14 & 1\,B & velocity & 強弱（0--127）。ストレッチ未実装時は固定値64 \\
+    15 & 1\,B & state & 指揮者の状態（0=Idle，1=Calibrating，2=Conducting，3=Fallback） \\
+    16 & 4\,B & 予約 & ゼロ埋め（将来拡張用） \\
+    \addlinespace
+    \multicolumn{4}{l}{\textbf{BEAT（type=2）：指揮者→楽器，拍検出時に2連送}} \\
+    12 & 2\,B & beatNo & 曲頭からの拍番号（巻き戻さず単調増加させる） \\
+    14 & 2\,B & 予約 & ゼロ埋め \\
+    16 & 4\,B & playAtMasterMs & この拍をマスタ時刻の何msに発音するかの指定 \\
+    \addlinespace
+    \multicolumn{4}{l}{\textbf{NOTE（type=3）：楽器→PC，楽譜イベント発火時にUSB Serialで送信}} \\
+    12 & 1\,B & partId & 発音元パート（0x02〜0x06。金管0x02〜0x05，ドラム0x06） \\
+    13 & 1\,B & noteNumber & MIDIノート番号（60=C4）。ドラムはGMドラムマップとして解釈する \\
+    14 & 1\,B & velocity & 強弱（0--127）。楽譜値とCTRL値を合成した後の値 \\
+    15 & 1\,B & gate & 1=NoteOn，0=NoteOff \\
+    16 & 2\,B & durationMs & 発音予定の長さ。PC側の自動消音に使う \\
+    18 & 2\,B & 予約 & ゼロ埋め \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{楽譜データ形式}
+楽譜は\texttt{ScoreEvent}構造体の配列\texttt{kScore[]}としてプログラムメモリに埋め込み，
+SDカード等の外部ストレージは使わない。1イベントが1拍に対応し，曲頭から休符込みで時系列順に
+並べる。各フィールドを表\ref{tab:score-event}に示す。テンポは楽譜に持たせず，CTRLで届く
+BPMから実時間へ変換する。
+\begin{table}[H]\centering
+  \caption{ScoreEvent（楽譜1イベント）のフィールド}\label{tab:score-event}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{2.3cm} X}
+    \toprule
+    フィールド & 型 & 意味 \\
+    \midrule
+    beatAt & uint16 & 何拍目かを示す参考値。発火条件には使わず，楽譜を読みやすくするための冗長情報 \\
+    noteNumber & uint8 & MIDIノート番号。0は休符 \\
+    velocity & uint8 & 楽譜上の強さ（0--127）。CTRLのvelocityと乗算合成する \\
+    durationQ8 & uint16 & 発音長。1拍の1/256単位で表す（256=1拍，128=8分音符） \\
+    flags & uint8 & bit0=NoteOn／bit1=NoteOff（拡張用）／bit2=休符 \\
+    sub系 & uint8／uint16 & 細分音符（拍頭からずれて鳴る2音目）の音高・強さ・オフセット・長さ。8分音符などの表現に使う \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+発音長は，CTRLで届くBPMから
+$\text{durationMs} = (60000 / \text{BPM}) \times (\text{durationQ8} / 256)$ で実時間に換算する。
+楽譜は拍単位で記録するため，テンポが変わっても配列を書き換える必要はない。
+
+楽譜上の発火位置は，受信したBEATの\texttt{beatNo}から
+$\text{idx} = (\text{beatNo} - \text{startBeatNo}) \bmod \text{kScoreLength}$ で算出する
+（\texttt{startBeatNo}はそのパートの入り拍）。剰余演算により曲末から曲頭へ自動でループ再生される。
+各楽器ノードのpartIdと入り拍は第\ref{chap:basic-design}章の表\ref{tab:part-map}に示したとおりで，
+ファームウェアはこれらと楽譜配列だけを差し替える。NoteOffパケットは送らず，PC側が
+\texttt{durationMs}を読み取って自動消音する。これは，Arduino側からNoteOffを送る方式では
+USB CDCのバッファリングにより「音が鳴りっぱなし」になりやすいためである。
+
+\subsection{時刻同期方式}
+WiFi UDPマルチキャストの到達時刻には数\,ms〜十数\,msのばらつき（ジッタ）が乗る。これを
+そのまま発音に使うと楽器間の同期が運任せになる。本設計では，このジッタを\textbf{時計同期の
+誤差に押し付ける}ことで，楽器間の相対的な発音タイミングを小さく抑える。
+
+中核となる考え方は，指揮者ノード（SoftAP）の\texttt{millis()}を\textbf{マスタ時刻}として
+全ノードで共有することである。BEATは「マスタ時刻\texttt{playAtMasterMs}に発音せよ」という
+\textbf{未来時刻の指定}として送る。楽器は自分の時計をマスタ時刻に変換するオフセットを学習し，
+変換後の時刻が指定時刻に達した瞬間に発音する。WiFiの到達時刻がばらついても，全楽器が
+共通のマスタ時刻に揃うため発音タイミングは合致する。
+
+オフセットの推定には，共通ヘッダの\texttt{timestampMs}を用いる。楽器はCTRL／BEATを受信する
+たびに「送信時のマスタ時刻と自時計の差」を1サンプルとして取り出し，係数0.10の指数移動平均
+（EMA）で平滑化する。CTRLが20\,Hzで常時流れるため，数発でオフセットは収束する。
+
+指揮者はBEAT送出時に\texttt{playAtMasterMs = masterNow + beatLookaheadMs}（仮値50\,ms）を
+載せる。楽器は，指定時刻が未来なら到達まで待機し，受信が遅れて指定時刻を過ぎていても
+\textbf{捨てずに即発音する}。指定時刻を過ぎたものを捨てる方式は，通信のリトライや起動直後に
+「音が鳴らない」原因になりやすいためである。代わりにBEATを2連送し，どれか1発が指定時刻前に
+届けば発音が揃う構成とする。\texttt{beatLookaheadMs}は振り下ろしから発音までの固定遅延として
+そのまま乗るが，映像に対し音が遅れる方向のずれは許容されやすく，本用途では受け入れる。
+
+\subsection{音色合成（PC側）}
+PC側のProcessingは，NOTEの\texttt{noteNumber}を周波数へ変換し，倍音を重ねた波形にADSR
+エンベロープを掛けて音色を合成する。金管音色の合成パラメータの初期値を表\ref{tab:timbre}に
+示す。音色定義はJSONファイルとして外部化し，楽器の追加・調整をファイル追加だけで行える
+構成とする。本節はPC側担当（梅澤）の設計範囲であり，要点のみを示す。
+\begin{table}[H]\centering
+  \caption{金管音色の合成パラメータ（初期値）}\label{tab:timbre}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.0cm} X}
+    \toprule
+    要素 & 初期値と方針 \\
+    \midrule
+    倍音構成 & 基音から第7倍音までを重ねる。振幅比は1.00／0.70／0.50／0.30／0.20／0.10／0.05 \\
+    ADSRエンベロープ & Attack 20\,ms／Decay 40\,ms／Sustain 0.75／Release 60\,ms。Sustainはvelocityでスケールする \\
+    ドラム音色 & 金管とは別に短い減衰音として合成し，noteNumberでKick／Snare／Hi-hat風に切り替える \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+%--------------------------------------------------------
 \section{処理フローの設計}\label{sec:proc-flow}
-% TODO(Phase 3): 23_ 行 1716(A)/2467(B)。3 フェーズモデル＋処理フロー図（予算 3 頁）
 
+\subsection{3フェーズ実行モデル}
+全ノード共通で，\texttt{loop()}は「入力→ロジック→出力」の3フェーズを毎周期この順で実行する
+（表\ref{tab:loop-phases}）。入力モジュールは\texttt{SystemData}へ書き込み，出力モジュールは
+これを読み取る。モジュール同士の直接呼び出しは禁止し，結合は\texttt{SystemData}の一点に閉じる。
+\texttt{OrcNetModule}は入力・出力の両配列に登録し，「入力フェーズで先に受信し，出力フェーズの
+最後で送信する」よう配列順で制御する。
+\begin{table}[H]\centering
+  \caption{loop()の3フェーズ実行順序}\label{tab:loop-phases}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.0cm} X}
+    \toprule
+    フェーズ & 処理内容 \\
+    \midrule
+    1. 入力 & 入力モジュールを順にupdateInput()で呼ぶ。センサ値やUDP受信結果がSystemDataに書き込まれる \\
+    2. ロジック & applyPattern()を1度呼ぶ。フィルタ・拍検出・状態遷移・楽譜進行はすべてここに集約する \\
+    3. 出力 & 出力モジュールを順にupdateOutput()で呼ぶ。LED表示・UDP送信・Serial送出が反映される \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{指揮者ノードの処理フロー}
+指揮者ノードのロジック\texttt{applyPattern()}は，毎周期おおむね次の順で処理する。
+\begin{enumerate}[leftmargin=2.0em, itemsep=2pt]
+  \item \textbf{信号前処理}：IMUの加速度を一次ローパスフィルタ（係数0.10）で平滑化し，
+        ノルムを計算する。キャリブレーション中に採った静止時ノルムを差し引き，振りの強さを
+        表す動加速度を得る。
+  \item \textbf{拍検出}：動加速度から振り下ろしを検出する（次段落）。
+  \item \textbf{テンポ推定}：拍間隔から瞬時BPMを求め，EMA（係数0.30）で平滑化する。
+        40〜240\,BPMの範囲にクランプする。
+  \item \textbf{状態遷移}：Idle→Calibrating→Conductingと進み，IMUまたはWiFiの異常で
+        Fallbackへ落ちる。
+  \item \textbf{出力反映}：状態に応じてLEDの点滅を設定し，CTRL／BEATの送信内容を組み立てる。
+\end{enumerate}
+拍検出では，単純なピーク閾値判定だと「ピーク後の発火で振りと音がずれる」「振り戻しを2拍目に
+拾う」「軽い揺れで誤発火する」といった問題が出る。これを構造的に避けるため，
+\textbf{ゲート式ステートマシン}（Idle／Armedの2状態）を用いる。動加速度ノルムが閾値（1.20\,g）を
+超えるとArmedに入り，Armed中だけ動加速度を時間積分して擬似的な振りの経路長を求める。
+経路長が0.20\,mに達した瞬間に拍を発火するため，ピークを待たず早期に発火でき，振りと音の
+ずれが小さい。発火後は350\,msの不応期を設け，振り戻しの誤検出を防ぐ。判定をスカラーの
+動加速度ノルムで行うため，振る向き（縦・横・斜め）にほとんど依存しない。
+
+出力では，拍を検出した周期にBEATを送信予約し，\texttt{playAtMasterMs}に発音指定時刻を
+載せる。CTRLは20\,Hzの周期で常時送信予約する。実際のUDP送信は，出力フェーズ後段の
+\texttt{OrcNetModule}が担当する。
+
+\subsection{楽器ノードの処理フロー}
+楽器ノードは，受信したBEATごとに「時計同期→発音判定→楽譜進行→NOTE送出」を行う
+（図\ref{fig:flow}）。ロジック\texttt{applyPattern()}の処理は次のとおりである。
+\begin{enumerate}[leftmargin=2.0em, itemsep=2pt]
+  \item \textbf{時計同期}：受信したCTRL／BEATの\texttt{timestampMs}と自時計の差を，EMA
+        （係数0.10）で平滑化し，マスタ時刻へのオフセットを更新し続ける。
+  \item \textbf{状態遷移}：WiFi接続でWaitStartへ，最初のBEAT受信でPlayingへ遷移する。
+  \item \textbf{発音判定}：保留中のBEATについて，発音指定時刻\texttt{playAtMasterMs}を
+        マスタ時刻が過ぎたら発火する。受信が遅れて指定時刻を過ぎていても捨てずに即発火する。
+  \item \textbf{楽譜進行}：発火したBEATの\texttt{beatNo}から楽譜位置を算出する。入り拍に
+        達していなければ何も鳴らさない（輪唱の入り待ち）。BEATを取りこぼしても，次のBEATの
+        \texttt{beatNo}から算出される位置が正しいため自己修復する。
+  \item \textbf{音符生成}：その位置が休符でなければ，楽譜velocityとCTRL velocityを乗算合成し，
+        NOTEの発音情報を組み立てる。
+  \item \textbf{出力反映}：状態に応じてLEDを更新する。NOTEは出力フェーズで
+        \texttt{NoteSenderModule}が20バイトのバイナリとしてSerialへ送出する。
+\end{enumerate}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[
+  node distance=7mm and 13mm,
+  proc/.style={draw=black, fill=codebg, rounded corners=2pt, minimum width=54mm, minimum height=9mm, align=center, font=\small},
+  dec/.style ={draw=black, fill=lightgray, diamond, aspect=2.4, align=center, font=\scriptsize, inner sep=1pt},
+  side/.style={draw=black, fill=codebg, rounded corners=2pt, minimum width=30mm, minimum height=9mm, align=center, font=\scriptsize},
+  arr/.style ={-{Stealth[length=2.4mm]}, thick},
+  lbl/.style ={font=\scriptsize, fill=white, inner sep=1pt},
+]
+  \node[proc] (recv) {BEATを受信（beatNo・playAtMasterMs）};
+  \node[proc, below=of recv] (sync) {時計オフセットをEMAで更新};
+  \node[dec,  below=of sync] (wait) {マスタ時刻\\到達?};
+  \node[dec,  below=11mm of wait] (enter) {beatNo $\ge$\\startBeatNo?};
+  \node[proc, below=11mm of enter] (idx) {楽譜位置 idx を算出\\（剰余でループ）};
+  \node[dec,  below=10mm of idx] (rest) {kScore[idx]\\は休符?};
+  \node[proc, below=11mm of rest] (note) {NOTE生成（gate=1）→ Serial.write};
+  \node[proc, below=of note] (next) {次のBEATを待つ};
+  \node[side, right=of wait]  (w1) {未到達：次ループで再判定};
+  \node[side, right=of enter] (e1) {入り待ち：鳴らさない};
+  \node[side, right=of rest]  (r1) {休符：NOTE送信なし\\拍だけ進む};
+  \draw[arr] (recv) -- (sync);
+  \draw[arr] (sync) -- (wait);
+  \draw[arr] (wait)  -- node[lbl,right]{到達} (enter);
+  \draw[arr] (enter) -- node[lbl,right]{はい} (idx);
+  \draw[arr] (idx)   -- (rest);
+  \draw[arr] (rest)  -- node[lbl,right]{いいえ} (note);
+  \draw[arr] (note)  -- (next);
+  \draw[arr] (wait)  -- node[lbl,above]{未到達} (w1);
+  \draw[arr] (enter) -- node[lbl,above]{いいえ} (e1);
+  \draw[arr] (rest)  -- node[lbl,above]{はい} (r1);
+  \draw[arr] (next.west) -- ++(-32mm,0) |- (recv.west);
+\end{tikzpicture}
+\caption{楽器ノードの楽譜進行とNOTE送信の処理フロー}\label{fig:flow}
+\end{figure}
+
+%--------------------------------------------------------
 \section{テストの設計}\label{sec:test-design}
-% TODO(Phase 3): 23_ 行 1834(A)/2959(B)。設計目標値表＋検証方針（予算 2 頁）
+
+本節では，設計が満たすべき数値目標と，それを段階的に確認する検証の方向性，および実機検証で
+詰める仮値を示す。具体的な試験ケースや計測手順は実装フェーズで確定する。
+
+\subsection{設計目標値}
+本システムの設計が狙う数値目標を表\ref{tab:design-targets}に示す。これらは「テストの合否基準」
+ではなく，設計判断の前提として置いた値であり，実機計測で再調整する想定である。
+\begin{table}[H]\centering
+  \caption{設計目標値}\label{tab:design-targets}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{2.1cm} X}
+    \toprule
+    項目 & 目標値 & 根拠・位置づけ \\
+    \midrule
+    楽器間の同期誤差 & $\le$ 20\,ms & ADR-0006でチーム合意した有効性指標。数十\,ms程度のずれは聴き手にほぼ気づかれないという知見から安全側に設定した \\
+    拍検出の正解率 & $\ge$ 90\,\% & 定速指揮時に演奏が破綻しない実用水準として置いた \\
+    テンポ追従の遅延 & $\le$ 2拍 & 人間の演奏者がBPM変化に追従するのと同等を最低水準とした \\
+    入力フェーズのCPU時間 & $\le$ 2\,ms & IMUを200\,Hz（周期5\,ms）で読むため，3フェーズが各1.7\,ms程度に収まる必要がある \\
+    起動時間 & $\le$ 5\,s & WiFi接続・DHCPに2〜3秒，キャリブレーションに2秒を見込む \\
+    強弱制御（ストレッチ） & 3段階以上 & p／mf／fの3段階で初級〜中級曲のダイナミクスを再現する \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{検証の方向性}
+設計の妥当性は，実装後に「単体→結合→実機」の3段階で確認していく方針とする。
+\begin{itemize}[leftmargin=1.4em, itemsep=2pt]
+  \item \textbf{単体}：判断ロジックを\texttt{IModule}派生ではなく\texttt{applyPattern()}関数に
+        書くため，\texttt{SystemData}をテスト側で組み立てて関数を呼ぶだけで，拍検出・テンポ推定・
+        楽譜進行・時計同期のロジックを切り出して確認できる。パケットのシリアライズも
+        バイト列のラウンドトリップで確認する。
+  \item \textbf{結合}：指揮者ノード単体→指揮者＋楽器1台→指揮者＋楽器5台，と接続規模を
+        段階的に広げ，BEAT受信からNOTE出力までの経路と，5台の発音タイミング差を確認する。
+  \item \textbf{実機}：全ノードとPCで実音を再生し，指揮の速度・振幅を変えたときのテンポ追従と
+        強弱の挙動を，聴感と計測の両面で確認する。BEATを意図的に一部破棄した条件での演奏継続も
+        この段階で確認する。PC側のProcessingは，ビルド確認・NOTE復号・自動消音・同時発音数の
+        上限などを個別に確認する。
+\end{itemize}
+
+\subsection{実機検証で確定する仮値}
+設計値のうち，実機での段階的な結合確認で詰めるもの，および楽譜・音色の仕様確定を待って
+実装するものを表\ref{tab:tbd}に示す。
+\begin{table}[H]\centering
+  \caption{実機検証で確定する主な仮値・未確定事項}\label{tab:tbd}
+  \small
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.0cm} X}
+    \toprule
+    項目 & 現状と確定の見極め \\
+    \midrule
+    BEATの連送回数 & 仮値2連送。結合確認でパケットロスと同期誤差を見て1〜3連送で調整する \\
+    lookahead時間 & 仮値50\,ms。振り→音の体感遅延と，遠い楽器の到達率を見て30〜80\,msで調整する \\
+    時計同期のEMA係数 & 仮値0.10。オフセットの収束時間と定常ジッタを見て0.05〜0.20で調整する \\
+    片道遅延の系統差 & 5台でほぼ同程度と仮定し補正なし。系統差が無視できなければ往復測定で各台を較正する \\
+    WiFiのSTA省電力モード & 無効化して運用する。無効化できない場合はlookaheadを拡大して配送遅延を吸収する \\
+    WiFiチャネル & 仮値6。会場の電波状況を調査して空きチャネルへ変更する \\
+    強弱推定（ストレッチ） & 現状はvelocity固定64のスタブ。必達機能の完成後に振り幅→velocityの写像を実装する \\
+    ドラムパート（node\_06） & 金管と同じScoreEventで実装する。noteNumberはGMドラムマップに固定する \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 %================================================================
 % 参考文献
