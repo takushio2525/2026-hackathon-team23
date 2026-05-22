@@ -26,7 +26,7 @@
         <mxCell id="eu5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;strokeColor=#B85450;strokeWidth=1.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="i5" target="p5"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="eu6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;strokeColor=#B85450;strokeWidth=1.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="i6" target="p6"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="lw" value="WiFi UDP&lt;br&gt;マルチキャスト&lt;br&gt;CTRL／BEAT" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#888888;fontSize=11;" vertex="1" parent="1"><mxGeometry x="361" y="191" width="108" height="56" as="geometry"/></mxCell>
-        <mxCell id="lu" value="USB Serial&lt;br&gt;（UART）&lt;br&gt;NOTE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#888888;fontSize=11;" vertex="1" parent="1"><mxGeometry x="751" y="191" width="108" height="56" as="geometry"/></mxCell>
+        <mxCell id="lu" value="USB Serial&lt;br&gt;NOTE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#888888;fontSize=11;" vertex="1" parent="1"><mxGeometry x="751" y="191" width="108" height="56" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

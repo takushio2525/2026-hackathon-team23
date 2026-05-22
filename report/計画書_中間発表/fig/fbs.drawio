@@ -6,7 +6,7 @@
         <mxCell id="1" parent="0"/>
         <mxCell id="r" value="Arduinoオーケストラ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7EEF6;strokeColor=#2F4358;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="828" y="24" width="220" height="48" as="geometry"/></mxCell>
         <mxCell id="a" value="指揮解析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="137" y="140" width="160" height="50" as="geometry"/></mxCell>
-        <mxCell id="b" value="同期・通信" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="536" y="140" width="160" height="50" as="geometry"/></mxCell>
+        <mxCell id="b" value="同期通信" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="536" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="c" value="楽譜進行" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="884" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="d" value="音響合成" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1232" y="140" width="160" height="50" as="geometry"/></mxCell>
         <mxCell id="e" value="ゲーム進行" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F8;strokeColor=#2F4358;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1580" y="140" width="160" height="50" as="geometry"/></mxCell>
