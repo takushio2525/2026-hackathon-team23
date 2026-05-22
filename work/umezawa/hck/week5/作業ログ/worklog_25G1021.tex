@@ -1,0 +1,143 @@
+% !TEX program = lualatex
+\documentclass[a4paper,11pt]{ltjsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{longtable}
+\usepackage{xcolor}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0.35em}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\emergencystretch}{3em}
+
+\newcommand{\blankline}{\rule{0pt}{1.8em}\hrulefill}
+\newcommand{\gcplaceholder}[1]{%
+  \begin{center}
+    \fbox{%
+      \begin{minipage}[c][0.33\textheight][c]{0.92\linewidth}
+        \centering
+        \large #1\\[1em]
+        \normalsize
+        後でガントチャートをここに貼り付ける
+      \end{minipage}
+    }
+  \end{center}
+}
+
+\title{個人の作業ログ}
+\author{25G1021\quad 梅澤 颯太}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{作業ログ}
+
+本資料は，ハッカソン課題における個人の作業内容を記録するための作業ログである．
+担当箇所の計画，現在の進捗，日ごとの作業時間，次回までに実施する内容を整理する．
+
+\begin{longtable}{p{0.22\linewidth}p{0.68\linewidth}}
+\caption{基本情報}\\
+\toprule
+項目 & 内容 \\
+\midrule
+\endfirsthead
+\toprule
+項目 & 内容 \\
+\midrule
+\endhead
+氏名 & 梅澤 颯太 \\
+学籍番号 & 25G1021 \\
+チーム & チーム23 \\
+担当箇所 & \blankline \\
+記録対象期間 & \blankline \\
+\bottomrule
+\end{longtable}
+
+\subsection{担当箇所の概要}
+
+担当箇所の目的，現在の状態，課題になっている点を簡潔に記入する．
+
+\begin{itemize}
+  \item 担当箇所の目的：\blankline
+  \item 現在できていること：\blankline
+  \item 現在の課題：\blankline
+\end{itemize}
+
+\section{担当箇所の計画前のGCと現在のGC}
+
+この節には，担当箇所の計画前のガントチャートと，現在のガントチャートを貼り付ける．
+画像として貼り付ける場合は，以下の空枠を図に差し替える．
+
+\subsection{計画前のGC}
+
+\gcplaceholder{計画前のGC}
+
+\subsection{現在のGC}
+
+\gcplaceholder{現在のGC}
+
+\section{日ごとの作業時間と作業内容}
+
+日ごとの作業時間と作業内容を表\ref{tab:daily-log}に記録する．
+
+\begin{longtable}{@{}p{0.15\linewidth}p{0.12\linewidth}p{0.39\linewidth}p{0.20\linewidth}@{}}
+\caption{日ごとの作業時間と作業内容}\label{tab:daily-log}\\
+\toprule
+日付 & 作業時間 & 作業内容 & 成果・メモ \\
+\midrule
+\endfirsthead
+\toprule
+日付 & 作業時間 & 作業内容 & 成果・メモ \\
+\midrule
+\endhead
+ &  &  &  \\
+\addlinespace[1.4em]
+ &  &  &  \\
+\addlinespace[1.4em]
+ &  &  &  \\
+\addlinespace[1.4em]
+ &  &  &  \\
+\addlinespace[1.4em]
+ &  &  &  \\
+\addlinespace[1.4em]
+ &  &  &  \\
+\addlinespace[1.4em]
+ &  &  &  \\
+\bottomrule
+\end{longtable}
+
+\section{次回までに実施する内容}
+
+次回までに実施する内容を，優先度が高いものから記入する．
+
+\begin{longtable}{p{0.12\linewidth}p{0.50\linewidth}p{0.22\linewidth}}
+\caption{次回までの実施予定}\\
+\toprule
+優先度 & 実施内容 & 期限・確認方法 \\
+\midrule
+\endfirsthead
+\toprule
+優先度 & 実施内容 & 期限・確認方法 \\
+\midrule
+\endhead
+高 &  &  \\
+\addlinespace[1.4em]
+中 &  &  \\
+\addlinespace[1.4em]
+低 &  &  \\
+\bottomrule
+\end{longtable}
+
+\section{生成AIの利用について}
+
+本テンプレートの作成にあたり，生成AIを利用した．生成された内容を確認し，課題の提出形式に合わせて調整した．
+
+\end{document}

@@ -67,6 +67,7 @@ venv/
 
 # ===== Node / 一般 =====
 node_modules/
+docs/.astro/
 
 # ===== エディタ / IDE =====
 .idea/
