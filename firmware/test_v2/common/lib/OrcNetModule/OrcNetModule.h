@@ -35,6 +35,10 @@ struct OrcNetConfig {
     uint16_t    udpPort;
     uint8_t     channel;              // SoftAp 時のみ参照
     uint32_t    reconnectIntervalMs;  // 切断検出後の再接続間隔
+    uint8_t     beatGapMs;            // BEAT 連送 (redundancy>1) の各回送信の間に挟む delay [ms]。
+                                      // 0 はタイトループ連送 (旧挙動)。1-5ms 推奨。
+                                      // 連送間に radio 状態を変化させる時間を与えてロス減らす。
+                                      // Sta 側ノードでは 0 のままで OK (受信側は無関係)。
 };
 
 struct OrcNetData {
