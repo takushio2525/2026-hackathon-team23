@@ -52,6 +52,11 @@ build/
 *.ist
 # 生成 PDF（手元で latexmk / Docker コンパイルして確認する運用）
 report/**/*.pdf
+# 例外: 結合レポートリライト本体は .tex と PDF を同一コミットで管理する（2026-05-20 ユーザー指示）
+!report/計画書_中間発表/23_計画書・設計書.pdf
+# 例外: 作業ログテンプレートは配布原本PDFと生成PDFを共にリポジトリに含める
+!report/作業ログテンプレート/作業ログ_配布.pdf
+!report/作業ログテンプレート/作業ログテンプレート.pdf
 
 # ===== Processing =====
 *.pde.bak
@@ -67,6 +72,11 @@ venv/
 
 # ===== Node / 一般 =====
 node_modules/
+
+# ===== Astro Starlight (docs/) =====
+docs/dist/
+docs/.astro/
+docs/node_modules/
 
 # ===== エディタ / IDE =====
 .idea/
@@ -87,5 +97,16 @@ desktop.ini
 *.bak
 *.kicad_prl
 
+# ===== sound_lab =====
+# 解析にかける音源(任意・コミット不要)
+sound_lab/analyzer/samples/*
+!sound_lab/analyzer/samples/.gitkeep
+# 解析結果の JSON(各自がここに置いて Processing で読む。サンプルの example_organ.json は残す)
+sound_lab/processing/instrument_player/data/*.json
+!sound_lab/processing/instrument_player/data/example_organ.json
+
 # ===== その他 =====
 *.tmp
+
+# Playwright MCP の一時成果物
+.playwright-mcp/
