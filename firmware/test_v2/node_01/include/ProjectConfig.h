@@ -33,11 +33,12 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,
     /*reconnectIntervalMs=*/ 2000,
+    /*beatGapMs=*/           0,    // 0 = タイトループ連送 (旧挙動)。一時的に切り分け用
 };
 
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
-    /*beatRedundancy=*/  2,    // 同一 BEAT を 2 連送
+    /*beatRedundancy=*/  4,    // 同一 BEAT を 4 連送 (旧 2 だが ESP32-S3 SoftAP の radio ロス対策。連送間隔は OrcNetModule の beatGapMs で設定)
     /*beatLookaheadMs=*/ 50,   // playAtMasterMs = masterNow + 50 ms
 };
 

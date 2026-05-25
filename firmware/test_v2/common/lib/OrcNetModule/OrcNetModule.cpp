@@ -132,6 +132,12 @@ void OrcNetModule::flushSend(OrcNetData& net) {
             udp_.write(reinterpret_cast<const uint8_t*>(&net.pendingBeat),
                        sizeof(net.pendingBeat));
             udp_.endPacket();
+            // 連送はタイトループだと同じ radio 状態で全滅しやすいので、
+            // 各回の間に短い delay を挟んで radio 状態が変化する余地を作る。
+            // beatGapMs=0 なら旧来のタイトループ連送。
+            if (cfg_.beatGapMs > 0 && (i + 1) < reps) {
+                delay(cfg_.beatGapMs);
+            }
         }
         net.hasPendingBeat = false;
     }

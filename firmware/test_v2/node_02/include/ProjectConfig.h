@@ -25,6 +25,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,
     /*reconnectIntervalMs=*/ 2000,
+    /*beatGapMs=*/           0,    // Sta 側は送信しないので未使用 (送信側 node_01 のみ意味を持つ)
 };
 
 inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
