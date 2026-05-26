@@ -1,0 +1,258 @@
+%================================================================
+% 作業ログ 2026-05-25（test_v1 まで）
+%   GW から続けてきた IMU モーション取得・WiFi 通信・回路まわりの作業を
+%   test_v1（最初の同期検証版）完了時点でまとめたもの。
+%
+%   ビルド:
+%     cd work/shiozawa/work-0525/作業ログ0525
+%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログ0525.tex
+%================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：塩澤 拓未
+
+報告日：2026年5月25日
+
+プロジェクト名：千葉工業大学 情報変革科学部 情報工学科 ハッカソン チーム23 \\
+\hspace*{6em}Arduino オーケストラ（test\_v1 まで）
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：40\%（基礎技術検証フェーズが完了）
+  \item マイルストーン達成状況：達成（test\_v1 として 4 ノード同期発音を実機で確認）
+  \item 主要成果：
+    \begin{itemize}
+      \item 指揮者ノード（XIAO ESP32-S3 Sense + GY-521 IMU）で振り下ろしによる拍検出を実装
+      \item 自前プロトコル（CTRL／BEAT／NOTE の3種パケット）を WiFi UDP マルチキャストで配信
+      \item 楽器ノード3台（Arduino UNO R4 WiFi）が同期して C メジャー系の和音を発音
+    \end{itemize}
+  \item 重大課題（影響度：高）：
+    \begin{itemize}
+      \item {}[WiFi 到達ばらつきによる発音ズレ ／ マスタクロック方式と EMA 時計同期で吸収済み]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 2. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{6.5em}p{5em}p{5em}p{4em}p{3em}Xp{8em}@{}}
+\toprule
+作業項目 & 開始日 & 予定完了日 & 状態 & 進捗 & 依存関係・ブロッカー & コメント \\
+\midrule
+IMU モーション取得 & 2026-04-29 & 2026-05-05 & 完了 & 100\% & なし & GY-521 を I2C 接続し加速度ピークから振り下ろしを検出 \\
+回路結線・動作確認 & 2026-04-29 & 2026-05-06 & 完了 & 100\% & 部材調達 & XIAO の D4／D5 を SDA／SCL に割当、AD0=GND で I2C アドレスを 0x68 固定 \\
+WiFi UDP 通信 & 2026-05-03 & 2026-05-10 & 完了 & 100\% & IMU 完了 & SoftAP 起動、239.0.0.1:5001 マルチキャストで CTRL／BEAT／NOTE を配信 \\
+4 ノード同期試験 & 2026-05-10 & 2026-05-18 & 完了 & 100\% & WiFi 完了 & マスタクロック方式＋EMA で楽器間のズレを実用範囲に収束 \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 3. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{8em}Xp{2.5em}p{2.5em}Xp{5em}p{3em}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 期限 & 状態 \\
+\midrule
+WiFi 到達ばらつきによる発音ズレ & 無線到達時刻が数十 ms 単位でばらつくため、楽器ごとに発音が前後して聞こえる & 高 & 高 & マスタクロック方式（指揮者の millis() を共有）と EMA 時計同期で吸収。BEAT に発音目標時刻を載せて送出 & 2026-05-18 & 解決 \\
+XIAO 内蔵 LED の極性 & GPIO21 が active LOW であり、HIGH 書き込みで消灯する & 中 & 中 & 設定で \texttt{activeLow=true} を指定し、コード側は論理レベルで扱う & 2026-05-10 & 解決 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト
+
+※優先度＝対応の緊急性
+
+\sectionrule
+
+%================================================================
+% 4. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証（再現性重視）}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：設計検討、コードレビュー、参考文献の探索
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}[UDP プロトコルの選択肢比較（独自バイナリ／OSC／MIDI over UDP）と判断材料の整理]
+      \item {}[拍検出ロジックのレビュー（加速度ピーク検出と動的しきい値、ヒステリシス）]
+      \item {}[時計同期係数（EMA）の妥当な初期値と、同期誤差の許容範囲に関する根拠調査]
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item {}[独自バイナリ採用の根拠（軽量／実装容易／用途特化）を整理し ADR-0002 として記録]
+      \item {}[誤検出抑止のためのヒステリシス追加・しきい値の経緯コメントの提案]
+      \item {}[同期誤差の心理物理的目安に関する文献候補の提示]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+※第三者が再現できるレベルで記述
+
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item {}[実機での動作確認（4 ノード構成）と参考文献との突き合わせ]
+    \end{itemize}
+  \item 参照資料：
+    \begin{itemize}
+      \item {}[ADR-0002（プロトコル選定）、ADR-0003（IMU 採用）、ADR-0006（同期誤差 20 ms の根拠）]
+      \item {}[河瀬 2014 ほか、合奏における同期誤差の知覚しきい値に関する文献]
+      \item {}[XIAO ESP32-S3 Sense／Arduino UNO R4 WiFi／GY-521 各データシート]
+    \end{itemize}
+  \item 検証手順：
+    \begin{enumerate}
+      \item node\_01 をシリアル監視し、IMU の加速度・拍検出フラグ・送出パケットの時系列を取得
+      \item node\_02／03／04 を順に起動し、CTRL／BEAT パケットの受信状況と発音タイミングを確認
+      \item Mac 上の Processing（pc\_app/test\_v1）に NOTE を流し、和音としての発音ズレを体感評価
+      \item 各楽器ノードに USB 直結したシリアルログから、EMA で学習された offset の収束過程を確認
+    \end{enumerate}
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+  \item 一致点：
+    \begin{itemize}
+      \item {}[マスタクロック＋EMA による相対同期の収束は、合奏研究で示される時刻同期方式と整合]
+      \item {}[同期誤差 20 ms という設計目標値は、文献が示す知覚しきい値の範囲に収まる]
+    \end{itemize}
+  \item 不一致・疑義：
+    \begin{itemize}
+      \item {}[AI 出力には単純な移動平均でも十分との示唆があったが、初期収束が遅く演奏開始時に違和感が出るため EMA を採用]
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用（マスタクロック方式＋EMA、係数は実機調整値）
+    \end{itemize}
+  \item 根拠：
+    \begin{itemize}
+      \item {}[実機検証で発音ズレが知覚されない範囲に収まることを確認。ADR-0006 に根拠と数値を明文化]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 5. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item {}[楽器ごとに異なる声部を割り当てる「輪唱」演奏の検証（test\_v2）]
+      \item {}[Processing 側を単純な MIDI 風発音から、加算合成を用いた音色合成へ拡張]
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item {}[3 声部で 0.5 拍ずらしの輪唱が破綻なく演奏でき、声部の分離が体感できる]
+      \item {}[楽器ノード追加時の設計負荷が増えないこと（共通モジュールの再利用で吸収）]
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item {}[2026年5月末を目安に動作確認、6月以降は本番想定構成（楽器5台）の準備に移行]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item {}[楽器ノードのシリアルは NOTE バイナリパケットを PC 側 Processing へ流すため、SERIAL\_DEBUG=0 を既定とする]
+  \item {}[実機未テストのファームウェアに対する机上修正は同期挙動を逆転させるリスクがあるため、必ず実機書き込みでの確認を経て取り込む]
+  \item {}[部材調達と回路結線の所要時間は当初想定より短く、ノード追加時の再設計負荷は低い見込み]
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. 付録
+%================================================================
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item ソースコード：\texttt{firmware/test\_v1/}（node\_01〜node\_04 と共通ライブラリ \texttt{common/}）
+      \item PC 側アプリ：\texttt{pc\_app/test\_v1/orchestra\_player/}（Processing スケッチ）
+      \item 回路図・配線資料：\texttt{hardware/}（XIAO ESP32-S3 Sense + GY-521、Arduino UNO R4 WiFi）
+      \item 設計判断記録：ADR-0002（プロトコル選定）、ADR-0003（IMU 採用）、ADR-0006（同期誤差 20 ms）
+    \end{itemize}
+  \item 添付範囲：
+    \begin{itemize}
+      \item 差分（test\_v1 として最初に同期動作を確認した時点のスナップショット）
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\end{document}
