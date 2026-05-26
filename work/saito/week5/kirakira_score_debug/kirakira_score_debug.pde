@@ -25,13 +25,26 @@ class ScoreEvent {
   int velocity;
   int durationQ8;
   int flags;
+  int subNote;
+  int subVelocity;
+  int subOffsetQ8;
+  int subDurationQ8;
 
   ScoreEvent(int beatAt, int noteNumber, int velocity, int durationQ8, int flags) {
+    this(beatAt, noteNumber, velocity, durationQ8, flags, 0, 0, 0, 0);
+  }
+
+  ScoreEvent(int beatAt, int noteNumber, int velocity, int durationQ8, int flags,
+             int subNote, int subVelocity, int subOffsetQ8, int subDurationQ8) {
     this.beatAt = beatAt;
     this.noteNumber = noteNumber;
     this.velocity = velocity;
     this.durationQ8 = durationQ8;
     this.flags = flags;
+    this.subNote = subNote;
+    this.subVelocity = subVelocity;
+    this.subOffsetQ8 = subOffsetQ8;
+    this.subDurationQ8 = subDurationQ8;
   }
 
   boolean isRest() {
@@ -159,8 +172,8 @@ void draw() {
   fill(34);
   text(currentMode, 28, 338);
   textSize(13);
-  text("Arduino transfer target: { beatAt, noteNumber, velocity, durationQ8, flags }", 28, 377);
-  text("A two-beat note is followed by a REST slot so beatAt remains aligned.", 28, 398);
+  text("Arduino target: { beatAt, noteNumber, velocity, durationQ8, flags, sub... }", 28, 377);
+  text("sub fields are available for in-beat notes; this score leaves them at zero.", 28, 398);
 }
 
 void keyPressed() {
@@ -199,6 +212,14 @@ void schedulePart(int part) {
     float velocityScale = event.velocity / 127.0f;
     float amplitude = PART_AMPLITUDES[part] * velocityScale;
     out.playNote(startBeat, durationBeats, new BrassNote(frequency, amplitude));
+    if (event.subNote != 0) {
+      float subStartBeat = startBeat + event.subOffsetQ8 / 256.0f;
+      float subDurationBeats = event.subDurationQ8 / 256.0f;
+      float subFrequency = midiToFrequency(event.subNote);
+      float subVelocityScale = event.subVelocity / 127.0f;
+      float subAmplitude = PART_AMPLITUDES[part] * subVelocityScale;
+      out.playNote(subStartBeat, subDurationBeats, new BrassNote(subFrequency, subAmplitude));
+    }
   }
 }
 
