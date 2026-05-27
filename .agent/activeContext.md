@@ -5,6 +5,34 @@
 
 ## 現在の対象
 
+- **test_v2 のジッタ削減と多重受信処理の改善**（2026-05-27、ユーザー指示）。
+  応答性が悪い・連送 BEAT の 2 個目以降が消されている雰囲気、という指摘への対応。
+  挑戦的変更のため `shiozawa-test_v2-jitter` ブランチを切って作業。`shiozawa-work` には未マージ。
+  実機書き込みは未実施（AGENTS.md「実機未テスト .ino/.cpp に Claude 起点で追加変更を
+  入れない」ルール準拠でユーザーに委ねる）。
+  - 変更ファイル (3 ノード × 2 種類 + 3 ノードの ProjectConfig = 9 ファイル):
+    - `firmware/test_v2/node_02/03/04/lib/OrcReceiverModule/OrcReceiverModule.h`
+    - `firmware/test_v2/node_02/03/04/lib/OrcReceiverModule/OrcReceiverModule.cpp`
+    - `firmware/test_v2/node_02/03/04/include/ProjectConfig.h`
+  - 変更内容:
+    1. **ループ周期 5 ms → 2 ms** (`loopIntervalMs`): 発火判定ジッタを最大 5 ms → 2 ms に。
+    2. **`clockSyncEmaAlpha` 0.10 → 0.20**: 初回サンプル吸込みを倍速化。時定数 ≈0.5 s → ≈0.25 s。
+    3. **`clockSyncEmaAlphaDup` 新設 = 0.05**: 同一 beatNo の連送 2 個目以降に使う EMA 係数。
+       旧実装は連送 4 個を全て α=0.10 で吸って同じサンプルに 4 回追従していた
+       (= 強相関を独立サンプル扱いして過剰反映)。新実装は初回 0.20 + 重複 0.05×3 で
+       4 連送合計影響 ≈ 0.32 (初回 α 単独に近い吸い方)。
+    4. **重複時の updateClockOffset 呼び出しを継続**: 元から呼ばれていたが意図が曖昧
+       だったのでコメントで「sync 用には 4 連送ぶん全部使う・ただし α を分ける」を明記。
+    5. **pending (発音予約) は初到着 1 個固定**を維持: 連送 payload は同一なので
+       2 個目以降で上書きする意味がなく、むしろ「発火後の後着で再キューして二重発音」
+       事故を避けるため初回のみ。
+  - ビルド: 3 ノードとも `pio run` SUCCESS (Flash 20.9% / RAM 20.6%、変化なし)。
+  - 次の一手: ユーザーが node_02 (SER=34B7DA64482C) / node_03 (SER=F412FAA08558) に
+    `pio run -d firmware/test_v2/node_02 -t upload --upload-port /dev/cu.usbmodem34B7DA64482C2`
+    のように書き込んで Processing 経由で応答性と多重受信時の挙動を確認。
+    node_04 は未接続のため書き込み不要 (2 声輪唱で評価)。
+    rollback したい場合は `git checkout shiozawa-work` で元ファームに戻れる。
+
 - **test_v2 の楽曲を「きらきら星」→「かえるのうた」に差し替え済み**（2026-05-27、
   ユーザー指示）。`firmware/test_v2/node_02/03/04/src/score_data.cpp` の 3 ファイル。
   きらきら星は構造が複雑で輪唱の聞き分けが難しい (≒同型反復で 8 拍ずれが分かりに
@@ -29,14 +57,17 @@
 
 ## 次の一手
 
-- ユーザー側で Processing (`pc_app/test_v2/orchestra_resynth/`) を再起動し、
-  「かえるのうた」が 2 声輪唱 (node_02=声部 1、node_03=声部 2) で鳴るか確認。
-  8 拍ずれなので、第 1 声「ドレミファ…」が始まって 8 拍後に第 2 声が「ドレミ
-  ファ…」で入る。3 声目 (node_04) は未接続なので位相 16 拍の声部は鳴らない。
-- node_04 (声部 3) を接続して書き込むと 3 声フル輪唱になる
-  (`~/.platformio/penv/bin/pio run -d firmware/test_v2/node_04 -t upload`)。
-- パケロス観察も継続 (DevKitC 移行で改善されたか)。
-- 鳴り方が安定したら ADR-0007（パケロス対策方針＝DevKitC 移行）を起票。
+- `shiozawa-test_v2-jitter` ブランチで楽器 2 台 (node_02/03) を書き込み、応答性と
+  多重受信時の挙動を耳とログで評価する (ユーザー作業)。改善体感があれば
+  `shiozawa-work` (= main 代替) へマージ、駄目なら別 α/loopInterval 値で再試行。
+- 評価観点:
+  - 振り → 発音までの遅延感が下がっているか (loopInterval 5→2 ms + EMA α 倍速の効果)
+  - 連続スイング時の発音タイミングが滑らかか (重複 α 分離による offset 安定化の効果)
+  - パケロス時の挙動が変わっていないか (pending 初回固定は維持しているので原理的に同じ)
+- 後続候補 (このブランチで評価成功後):
+  - lookahead 50 → 30 ms 短縮 (`OrcSenderConfig.beatLookaheadMs`)
+  - 発火直前マイクロ待機 (micros() スピン) で 2 ms ループ粒度を更に削る
+- パケロス観察と ADR-0007 (パケロス対策方針＝DevKitC 移行) 起票は継続案件。
 
 ## 現フェーズで Read すべき設計書
 

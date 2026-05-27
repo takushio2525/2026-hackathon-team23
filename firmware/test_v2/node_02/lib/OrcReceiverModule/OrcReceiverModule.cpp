@@ -39,16 +39,25 @@ void OrcReceiverModule::updateInput(SystemData& data) {
         data.ctrl.lastReceivedMs = millis();
     }
 
-    // 2. BEAT を受信していれば時計同期 + 重複排除のうえ保留キューに積む
+    // 2. BEAT 受信:
+    //   - 連送 (beatRedundancy 回) で同一 beatNo が複数届くが、payload は完全同一。
+    //     違うのは header.timestampMs (各送信時刻) と header.seq。
+    //   - pending (発音予約) は初到着の 1 個だけ採用。同 beatNo の発火後に
+    //     後着が再キューされて「同じ拍を二度発音」する事故を避ける。
+    //   - clock sync は連送 4 個ぶん全部サンプルとして使う。ただし重複は数 ms
+    //     以内の強相関なので α を小さくし、初回サンプルが過剰反映されないようにする
+    //     (旧実装は全 4 個を α=0.10 で吸って同じサンプルに 4 回追従していた)。
     if (data.orcNet.hasNewBeat) {
-        updateClockOffset(data,
-                          data.orcNet.lastBeat.header.timestampMs,
-                          cfg_.clockSyncEmaAlpha,
-                          cfg_.clockSyncMinSamples);
-
         const uint16_t bn = data.orcNet.lastBeat.payload.beatNo;
         const bool isDuplicate = data.receiver.hasFirstBeat &&
                                  (bn == data.receiver.lastBeatNo);
+
+        updateClockOffset(data,
+                          data.orcNet.lastBeat.header.timestampMs,
+                          isDuplicate ? cfg_.clockSyncEmaAlphaDup
+                                      : cfg_.clockSyncEmaAlpha,
+                          cfg_.clockSyncMinSamples);
+
         if (!isDuplicate) {
             data.receiver.pending.valid = true;
             data.receiver.pending.beatNo = bn;

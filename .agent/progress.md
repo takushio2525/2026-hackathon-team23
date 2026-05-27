@@ -5,6 +5,19 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **test_v2 楽器側のジッタ削減と多重受信処理を改善** (ユーザー指示、挑戦的変更のため
+  `shiozawa-test_v2-jitter` ブランチを新規作成)。node_02/03/04 の OrcReceiverModule と
+  ProjectConfig を改修。①`loopIntervalMs` 5 → 2 ms (発火判定ジッタ最大 5 ms → 2 ms)、
+  ②`clockSyncEmaAlpha` 0.10 → 0.20 (初回サンプル吸込み倍速化、時定数 ≈0.25 s)、
+  ③`OrcReceiverConfig` に `clockSyncEmaAlphaDup` フィールド新設 (= 0.05) して、同一 beatNo の
+  連送 2 個目以降は別 α で EMA 更新するよう OrcReceiverModule.cpp の duplicate 判定箇所を
+  書き換え。旧実装は連送 4 個を全て α=0.10 で吸って同じサンプルに 4 回追従していた問題
+  (= 強相関サンプルの過剰反映) を、初回 0.20 + 重複 0.05×3 で合計影響 ≈0.32 (初回 α 単独に
+  近い吸い方) に補正。pending (発音予約) は初到着 1 個固定を維持 (連送 payload は同一・
+  発火後後着の再キューによる二重発音事故を避けるため)。3 ノードとも `pio run` SUCCESS
+  (Flash 20.9% / RAM 20.6% 不変)。実機書き込みは AGENTS.md の「実機未テスト .ino/.cpp に
+  Claude 起点で追加変更を入れない」ルール準拠でユーザー作業に委ねる。
+
 - 2026-05-27: **かえるのうた版を node_02/03 に実機書き込み** (ユーザー指示)。
   接続中の Arduino UNO R4 WiFi 2 台を `pio device list` でシリアル番号判定:
   node_02 (SER=34B7DA64482C, `/dev/cu.usbmodem34B7DA64482C2`, bossac 3.43 秒,
