@@ -255,7 +255,7 @@ class UiView {
     strokeWeight(1);
     fill(28, 54, 80);
     textSize(14);
-    text("キー: 1-4 パート選択  |  a 全パート受信  |  t テスト音  |  g 疑似NOTE  |  m ミュート  |  r ポート再選択  |  d 切断", 50, 511);
+    text("キー: 1-4 パート選択  |  a 全パート受信  |  t テスト音  |  g 疑似NOTE  |  m ミュート  |  r ポート再選択", 50, 511);
   }
 
   void drawNotice(String message, int x, int y) {
