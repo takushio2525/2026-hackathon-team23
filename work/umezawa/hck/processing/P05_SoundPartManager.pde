@@ -80,7 +80,7 @@ class PartManager {
     if (muted) muted = false;
     int note = partId == PART_RHYTHM ? 36 : 60 + (partId - PART_BRASS_1) * 4;
     noteOn(partId, note, 100, DEFAULT_TEST_DURATION_MS);
-    lastWarning = "test note: " + partName(partId);
+    lastWarning = "テスト音: " + partName(partId);
   }
 
   float velocityToAmp(int velocity) {

@@ -31,7 +31,7 @@ int lastNoteAtMs = 0;
 
 void setup() {
   size(1000, 560);
-  surface.setTitle("orchestra_processing_final");
+  surface.setTitle("processing");
 
   minim = new Minim(this);
   out = minim.getLineOut(Minim.STEREO, 1024);
@@ -46,7 +46,7 @@ void setup() {
 }
 
 void draw() {
-  background(18);
+  background(244, 247, 250);
   drainPackets();
   partManager.update();
   updateAppState();
@@ -81,32 +81,32 @@ void updateAppState() {
 
 void handlePacket(NotePacket packet) {
   if (packet.version != PROTOCOL_VERSION) {
-    dropPacket("version error: " + packet.version, packet);
+    dropPacket("バージョンエラー: " + packet.version, packet);
     return;
   }
   if (packet.type != TYPE_NOTE) {
-    dropPacket("non NOTE type: " + packet.type, packet);
+    dropPacket("NOTE以外のtype: " + packet.type, packet);
     return;
   }
   if (packet.gate != 0 && packet.gate != 1) {
-    dropPacket("gate error: " + packet.gate, packet);
+    dropPacket("gateエラー: " + packet.gate, packet);
     return;
   }
   if (!isKnownPart(packet.partId)) {
-    dropPacket("unknown part: 0x" + hex(packet.partId, 2), packet);
+    dropPacket("不明なpartId: 0x" + hex(packet.partId, 2), packet);
     return;
   }
   if (!acceptAllParts && packet.partId != expectedPartId) {
     wrongPartPackets++;
     droppedPackets++;
-    lastWarning = "wrong partId 0x" + hex(packet.partId, 2);
+    lastWarning = "パート違い: 0x" + hex(packet.partId, 2);
     logger.logPacket("wrong_part", packet);
     return;
   }
   long partLastSeq = lastSeqByPart[packet.partId & 0xff];
   if (partLastSeq >= 0) {
     if (packet.seq == partLastSeq) {
-      dropPacket("duplicate seq: " + packet.seq, packet);
+      dropPacket("重複seq: " + packet.seq, packet);
       return;
     }
     if (packet.seq > partLastSeq + 1) {
@@ -131,12 +131,12 @@ void dropPacket(String reason, NotePacket packet) {
 void refreshSerialPorts() {
   serialPorts = Serial.list();
   appState = "PortSelect";
-  lastWarning = "click serial port, or press t to test sound";
+  lastWarning = "シリアルポートをクリック、または t キーでテスト音";
 }
 
 void connectSerial(int index) {
   if (index < 0 || index >= serialPorts.length) {
-    lastWarning = "serial index out of range";
+    lastWarning = "シリアル番号が範囲外です";
     return;
   }
   closeSerial();
@@ -146,11 +146,11 @@ void connectSerial(int index) {
     serialPort.buffer(1);
     serialPort.clear();
     appState = "Ready";
-    lastWarning = "connected: " + serialPortName;
+    lastWarning = "接続しました: " + serialPortName;
     logger.logEvent("serial_connected," + serialPortName);
   } catch (Exception e) {
     appState = "Error";
-    lastWarning = "serial open failed: " + e.getMessage();
+    lastWarning = "シリアル接続に失敗: " + e.getMessage();
     logger.logEvent("serial_error," + e.getMessage());
   }
 }
@@ -181,18 +181,18 @@ void keyPressed() {
   else if (key == '4') setExpectedPart(PART_RHYTHM);
   else if (key == 'a' || key == 'A') {
     acceptAllParts = !acceptAllParts;
-    lastWarning = acceptAllParts ? "accept all parts" : "single part mode";
+    lastWarning = acceptAllParts ? "全パートを受信します" : "選択中のパートだけ受信します";
   } else if (key == 'm' || key == 'M') {
     muted = !muted;
     if (muted) partManager.releaseAll();
-    lastWarning = muted ? "muted" : "unmuted";
+    lastWarning = muted ? "ミュート中" : "ミュート解除";
   } else if (key == 'r' || key == 'R') {
     closeSerial();
     refreshSerialPorts();
   } else if (key == 'd' || key == 'D') {
     closeSerial();
     appState = "PortSelect";
-    lastWarning = "disconnected";
+    lastWarning = "切断しました";
   } else if (key == 't' || key == 'T') {
     partManager.playTestNote(expectedPartId);
   } else if (key == 'g' || key == 'G') {
@@ -203,7 +203,7 @@ void keyPressed() {
 void setExpectedPart(int partId) {
   expectedPartId = partId;
   acceptAllParts = false;
-  lastWarning = "expected partId 0x" + hex(partId, 2) + " " + partName(partId);
+  lastWarning = "受信パート: 0x" + hex(partId, 2) + " " + partName(partId);
 }
 
 void injectTestFrame(int partId) {
