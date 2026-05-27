@@ -1,0 +1,1506 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>processing 解説</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f6f9;
+      --paper: #ffffff;
+      --ink: #18222d;
+      --muted: #596779;
+      --line: #d7dee8;
+      --line-strong: #b9c6d4;
+      --blue: #176d8d;
+      --blue-soft: #e7f4f8;
+      --green: #2f7d61;
+      --green-soft: #e8f6ef;
+      --amber: #a66413;
+      --amber-soft: #fff1d8;
+      --red: #a94448;
+      --red-soft: #fde9ea;
+      --violet: #6653a7;
+      --violet-soft: #efecfb;
+      --code-bg: #eef2f6;
+      --shadow: 0 18px 45px rgba(23, 39, 55, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, #edf5f7 0, var(--bg) 360px);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "YuGothic", "Noto Sans JP", sans-serif;
+      line-height: 1.9;
+      font-size: 16px;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      gap: 24px;
+      width: min(1320px, calc(100% - 32px));
+      margin: 28px auto 64px;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 18px;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 10px 26px rgba(23, 39, 55, 0.08);
+    }
+
+    .toc-title {
+      margin: 0 0 10px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .toc a {
+      display: block;
+      padding: 7px 8px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .toc a:hover {
+      background: var(--blue-soft);
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .page {
+      min-width: 0;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 38px 42px 34px;
+      background:
+        linear-gradient(135deg, rgba(23, 109, 141, 0.12), rgba(47, 125, 97, 0.08)),
+        #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .content {
+      padding: 34px 42px 44px;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.35;
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 760px;
+      font-size: 34px;
+      margin-bottom: 12px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      scroll-margin-top: 24px;
+      font-size: 23px;
+      margin-top: 48px;
+      padding: 0 0 10px;
+      border-bottom: 2px solid var(--line);
+    }
+
+    h3 {
+      font-size: 18px;
+      margin-top: 28px;
+    }
+
+    p {
+      margin: 12px 0;
+    }
+
+    strong {
+      font-weight: 700;
+    }
+
+    ul, ol {
+      padding-left: 1.5em;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      font-family: Menlo, Consolas, "SFMono-Regular", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 14px 16px;
+      border-radius: 6px;
+      background: #202a35;
+      color: #eef6ff;
+      line-height: 1.6;
+      border: 1px solid #14202a;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 15px;
+      background: #fff;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--blue-soft);
+      text-align: left;
+    }
+
+    .lead {
+      color: var(--muted);
+      max-width: 780px;
+      font-size: 17px;
+      margin-bottom: 22px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 20px 0 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 3px 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.74);
+      color: #304052;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .note {
+      border: 1px solid #bfdfeb;
+      border-left: 5px solid var(--blue);
+      background: var(--blue-soft);
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin: 18px 0;
+    }
+
+    .warning {
+      border: 1px solid #edc98d;
+      border-left: 5px solid var(--amber);
+      background: var(--amber-soft);
+      color: #4a330f;
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin: 18px 0;
+    }
+
+    .plain-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+      padding: 16px;
+      margin: 18px 0;
+    }
+
+    .concept-grid,
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .concept-card,
+    .card,
+    .mini-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 16px;
+      box-shadow: 0 8px 18px rgba(23, 39, 55, 0.05);
+    }
+
+    .concept-card strong,
+    .card strong,
+    .mini-card strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+
+    .concept-card p,
+    .card p,
+    .mini-card p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    .card.blue {
+      border-top: 4px solid var(--blue);
+    }
+
+    .card.green {
+      border-top: 4px solid var(--green);
+    }
+
+    .card.amber {
+      border-top: 4px solid var(--amber);
+    }
+
+    .card.violet {
+      border-top: 4px solid var(--violet);
+    }
+
+    .term-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .term {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+      padding: 12px 14px;
+    }
+
+    .term dt {
+      margin: 0 0 4px;
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    .term dd {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin: 18px 0;
+      counter-reset: flow;
+    }
+
+    .flow div {
+      min-height: 88px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: #fbfcfd;
+      position: relative;
+    }
+
+    .flow strong {
+      display: block;
+      color: var(--blue);
+      margin-bottom: 4px;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0;
+      counter-reset: steps;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+      padding: 14px;
+    }
+
+    .step::before {
+      counter-increment: steps;
+      content: counter(steps);
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: white;
+      font-weight: 800;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .byte-map {
+      display: grid;
+      grid-template-columns: repeat(20, 54px);
+      gap: 4px;
+      margin: 18px 0 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .byte {
+      min-width: 54px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .byte b {
+      display: block;
+      background: #eef2f6;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .byte span {
+      display: block;
+      min-height: 46px;
+      padding: 6px 2px;
+      color: var(--ink);
+      font-size: 11px;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .byte.magic span { background: var(--blue-soft); }
+    .byte.meta span { background: var(--violet-soft); }
+    .byte.seq span { background: var(--green-soft); }
+    .byte.note-byte span { background: var(--amber-soft); }
+    .byte.empty span { background: #f8f9fb; color: var(--muted); }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .compare .mini-card:first-child {
+      border-top: 4px solid var(--green);
+    }
+
+    .compare .mini-card:last-child {
+      border-top: 4px solid var(--red);
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .kbd {
+      display: inline-block;
+      min-width: 1.8em;
+      padding: 1px 7px;
+      border: 1px solid #b9c1cc;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: #fff;
+      text-align: center;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 860px) {
+      .shell {
+        display: block;
+        width: min(100% - 20px, 1000px);
+        margin-top: 10px;
+      }
+
+      .toc {
+        position: static;
+        max-height: none;
+        margin-bottom: 14px;
+      }
+
+      .page {
+        border-radius: 8px;
+      }
+
+      .hero,
+      .content {
+        padding: 24px 18px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .concept-grid,
+      .card-grid,
+      .term-list,
+      .compare {
+        grid-template-columns: 1fr;
+      }
+
+      .flow {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+<div class="toc" role="navigation" aria-label="目次">
+  <p class="toc-title">読む順番</p>
+  <a href="#starter">0. 先に知る基礎知識</a>
+  <a href="#overview">1. 全体像</a>
+  <a href="#files">2. ファイル構成</a>
+  <a href="#main-loop">3. メイン処理</a>
+  <a href="#serial">4. シリアル通信</a>
+  <a href="#frame">5. NOTEフレーム</a>
+  <a href="#validation">6. 受信チェック</a>
+  <a href="#parts">7. パートID</a>
+  <a href="#sound">8. 音が鳴る仕組み</a>
+  <a href="#debug">16. デバッグ</a>
+  <a href="#reading-order">18. 読む順番</a>
+</div>
+<div class="page">
+<div class="hero">
+  <h1>processing プログラム解説</h1>
+  <p class="lead">
+    Processing を触り始めた人でも追えるように、
+    「前提知識」「データの流れ」「各ファイルの役割」「音が鳴る理由」を順番に説明します。
+    まず全体をつかみ、そのあとコードの細部に入る構成です。
+  </p>
+  <div class="badge-row" aria-label="この資料で扱う内容">
+    <span class="badge">Processing / Java モード</span>
+    <span class="badge">Serial 通信</span>
+    <span class="badge">20 byte NOTE フレーム</span>
+    <span class="badge">Minim 音源</span>
+    <span class="badge">初学者向け</span>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="note">
+    <strong>一言でいうと</strong><br>
+    このプログラムは、Arduino などの外部機器から届く「20バイトの NOTE データ」を Processing で受け取り、
+    Minim という音声ライブラリを使って、金管パートやリズム音として鳴らすための受信・音源プログラムです。
+  </div>
+
+  <div class="card-grid" aria-label="最初に押さえるポイント">
+    <div class="card blue">
+      <strong>目的</strong>
+      <p>外部機器から届いた音符データを、Processing 側で安全に読み取り、音に変換します。</p>
+    </div>
+    <div class="card green">
+      <strong>中心になる考え方</strong>
+      <p>通信で届くただの数字の列を、<code>NotePacket</code> という意味のあるデータに直してから使います。</p>
+    </div>
+    <div class="card amber">
+      <strong>読むときのコツ</strong>
+      <p>最初から全部の文法を理解しようとせず、「入力、変換、確認、音」の流れで見ると楽です。</p>
+    </div>
+  </div>
+
+  <h2 id="starter">0. 先に知っておく基礎知識</h2>
+  <p>
+    このプログラムは、Processing、シリアル通信、音声合成が一緒に出てくるので、
+    いきなりコードから読むと難しく感じやすいです。
+    先に下の言葉をざっくり押さえておくと、後半の説明がかなり読みやすくなります。
+  </p>
+
+  <dl class="term-list">
+    <div class="term">
+      <dt>Processing</dt>
+      <dd>絵、音、センサー連携などを作りやすくしたプログラミング環境です。Java に近い書き方をします。</dd>
+    </div>
+    <div class="term">
+      <dt>スケッチ</dt>
+      <dd>Processing のプロジェクト単位です。このフォルダ全体が1つのスケッチとして扱われます。</dd>
+    </div>
+    <div class="term">
+      <dt><code>.pde</code> ファイル</dt>
+      <dd>Processing のソースコードです。同じフォルダ内の複数の <code>.pde</code> はまとめて1つのプログラムになります。</dd>
+    </div>
+    <div class="term">
+      <dt><code>setup()</code></dt>
+      <dd>プログラム開始時に1回だけ動く関数です。画面、音声、通信などの準備を書きます。</dd>
+    </div>
+    <div class="term">
+      <dt><code>draw()</code></dt>
+      <dd>実行中に何度も繰り返し動く関数です。画面更新や状態更新をここで行います。</dd>
+    </div>
+    <div class="term">
+      <dt>シリアル通信</dt>
+      <dd>Arduino と PC のように、機器同士でデータを1バイトずつ送る通信方法です。</dd>
+    </div>
+    <div class="term">
+      <dt>バイト</dt>
+      <dd>小さな数字の入れ物です。1バイトは通常 0 から 255 までの値を表せます。</dd>
+    </div>
+    <div class="term">
+      <dt>フレーム</dt>
+      <dd>通信で送るデータの1セットです。このプログラムでは「20バイトで1つの音符情報」です。</dd>
+    </div>
+    <div class="term">
+      <dt>プロトコル</dt>
+      <dd>送る側と受け取る側の約束です。「何バイト目に何を入れるか」を決めています。</dd>
+    </div>
+    <div class="term">
+      <dt>MIDI ノート番号</dt>
+      <dd>音の高さを数字で表す方法です。例として <code>60</code> は中央のド、<code>69</code> はラ 440Hz です。</dd>
+    </div>
+    <div class="term">
+      <dt>velocity</dt>
+      <dd>音の強さです。MIDI ではよく 0 から 127 の範囲で表します。</dd>
+    </div>
+    <div class="term">
+      <dt>gate</dt>
+      <dd>音を鳴らすか止めるかの信号です。このコードでは <code>1</code> が音を出す、<code>0</code> が音を止める意味です。</dd>
+    </div>
+  </dl>
+
+  <div class="plain-box">
+    <strong>この資料で一番大事な見方</strong>
+    <p>
+      送られてくるデータは、最初はただの数字の列です。
+      プログラムはそれを「これはパート番号」「これは音の高さ」「これは音量」と読み替え、
+      最後に音源へ渡しています。
+      つまりこのプログラムの本質は、<strong>数字の列を音楽の命令に翻訳すること</strong>です。
+    </p>
+  </div>
+
+  <h2 id="overview">1. 全体像</h2>
+  <p>
+    このスケッチは、外部機器からシリアル通信で届いた音符情報を読み取り、画面に状態を表示しながら音を鳴らします。
+    音符情報には、パート番号、音の高さ、強さ、鳴らす時間などが入っています。
+  </p>
+
+  <div class="flow" aria-label="処理の流れ">
+    <div>
+      <strong>1. 外部機器</strong>
+      Arduino などが NOTE フレームを送る
+    </div>
+    <div>
+      <strong>2. Serial</strong>
+      Processing が1バイトずつ受信する
+    </div>
+    <div>
+      <strong>3. Decode</strong>
+      20バイトを <code>NotePacket</code> に変換する
+    </div>
+    <div>
+      <strong>4. Validate</strong>
+      version、type、partId、seq を確認する
+    </div>
+    <div>
+      <strong>5. Sound</strong>
+      <code>PartManager</code> と <code>Voice</code> が音を鳴らす
+    </div>
+  </div>
+
+  <div class="step-list" aria-label="処理をやさしく言い換えた流れ">
+    <div class="step">
+      <div>
+        <strong>Arduino 側は「音符の命令」を数字にして送る</strong>
+        <p>たとえば「Brass 1で、ドを、少し強めに、500ms鳴らす」という情報を、20個のバイトに分けて送ります。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div>
+        <strong>Processing 側は、まず正しいまとまりを探す</strong>
+        <p>通信は1バイトずつ届くので、先頭の目印 <code>magic</code> を探して「ここから20バイトが1命令」と判断します。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div>
+        <strong>20バイトを、名前つきのデータへ直す</strong>
+        <p>ただの数字列のままだと扱いにくいので、<code>partId</code>、<code>noteNumber</code>、<code>velocity</code> などに分解します。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div>
+        <strong>変な命令を捨てて、正しい命令だけ音源へ渡す</strong>
+        <p>バージョン違い、知らないパート、重複した番号などはここで止めます。音を鳴らす前の安全確認です。</p>
+      </div>
+    </div>
+  </div>
+
+  <p>
+    Processing では、同じフォルダ内にある複数の <code>.pde</code> ファイルは、1つのスケッチとしてまとめて扱われます。
+    つまり、<code>P02_ConstantsAndParts.pde</code> や <code>P06_SoundVoices.pde</code> に書かれた関数やクラスも、
+    メインファイル <code>processing.pde</code> からそのまま使えます。
+  </p>
+
+  <div class="compare">
+    <div class="mini-card">
+      <strong>読みやすい見方</strong>
+      <p>「このファイルは何係か」「この関数は入力を何に変えるか」を追います。細かい文法はあとからで大丈夫です。</p>
+    </div>
+    <div class="mini-card">
+      <strong>つまずきやすい見方</strong>
+      <p>最初から <code>byte</code>、<code>ConcurrentLinkedQueue</code>、<code>Waveform</code> を全部暗記しようとすると、全体像を見失いやすいです。</p>
+    </div>
+  </div>
+
+  <h3>Processing の複数ファイルは「分担表」として見る</h3>
+  <p>
+    このフォルダには <code>.pde</code> がたくさんありますが、別々のアプリではありません。
+    1つの大きなプログラムを、役割ごとにファイル分けしているだけです。
+    初めて読むときは「どのファイルが何係か」を先に押さえると、コードの場所を探しやすくなります。
+  </p>
+
+  <h2 id="files">2. ファイル構成</h2>
+  <p>
+    全ファイルを同じ重さで読む必要はありません。
+    まずは下の4つを押さえると、このプログラムの骨格が見えます。
+  </p>
+  <div class="card-grid">
+    <div class="card blue">
+      <strong>入口</strong>
+      <p><code>processing.pde</code><br>プログラム全体を動かす中心です。</p>
+    </div>
+    <div class="card green">
+      <strong>通信の翻訳</strong>
+      <p><code>P04_SerialNoteFrameReader.pde</code> と <code>P03_NoteProtocol.pde</code><br>バイト列を意味のあるデータにします。</p>
+    </div>
+    <div class="card amber">
+      <strong>音の管理</strong>
+      <p><code>P05_SoundPartManager.pde</code> と <code>P06_SoundVoices.pde</code><br>どの音を、どの音色で、いつ止めるかを決めます。</p>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ファイル</th>
+        <th>役割</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>processing.pde</code></td>
+        <td>メイン処理です。画面の初期化、シリアル受信、受信データの処理、キー操作、終了処理を担当します。</td>
+      </tr>
+      <tr>
+        <td><code>P02_ConstantsAndParts.pde</code></td>
+        <td>通信速度、プロトコル番号、パートID、最大同時発音数など、全体で使う定数をまとめています。</td>
+      </tr>
+      <tr>
+        <td><code>P03_NoteProtocol.pde</code></td>
+        <td>20バイトの NOTE フレームを <code>NotePacket</code> に変換する処理と、テスト用フレームを作る処理があります。</td>
+      </tr>
+      <tr>
+        <td><code>P04_SerialNoteFrameReader.pde</code></td>
+        <td>シリアル通信で1バイトずつ届くデータをためて、正しい20バイトのまとまりとして取り出します。</td>
+      </tr>
+      <tr>
+        <td><code>P05_SoundPartManager.pde</code></td>
+        <td>受け取った音符をどの音源で鳴らすか決め、同時に鳴る音の数も管理します。</td>
+      </tr>
+      <tr>
+        <td><code>P06_SoundVoices.pde</code></td>
+        <td>実際に音を鳴らすクラス群です。金管音の <code>BrassVoice</code> とリズム音の <code>RhythmVoice</code> があります。</td>
+      </tr>
+      <tr>
+        <td><code>P07_ScreenView.pde</code></td>
+        <td>画面表示を担当します。シリアルポート一覧、状態、波形、キー操作の説明を描画します。</td>
+      </tr>
+      <tr>
+        <td><code>P08_EventLogger.pde</code></td>
+        <td>受信したパケットやイベントを CSV ファイルに記録します。デバッグや実験後の確認に使えます。</td>
+      </tr>
+      <tr>
+        <td><code>README.md</code></td>
+        <td>実行方法、キー操作、NOTE 仕様を簡単にまとめた説明ファイルです。</td>
+      </tr>
+      <tr>
+        <td><code>sketch.properties</code></td>
+        <td>Processing の Java モード用設定です。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="main-loop">3. メイン処理の流れ</h2>
+  <p>
+    Processing のプログラムは、基本的に <code>setup()</code> と <code>draw()</code> を中心に動きます。
+    このスケッチでは、そこにシリアル受信用の <code>serialEvent()</code> が加わります。
+    まずは次の3つを「いつ動くか」で分けて考えると理解しやすいです。
+  </p>
+
+  <div class="concept-grid">
+    <div class="concept-card">
+      <strong><code>setup()</code></strong>
+      <p>起動時に1回だけ。道具を机に並べる準備のような役割です。</p>
+    </div>
+    <div class="concept-card">
+      <strong><code>draw()</code></strong>
+      <p>実行中ずっと繰り返し。状態更新と画面描画を続けます。</p>
+    </div>
+    <div class="concept-card">
+      <strong><code>serialEvent()</code></strong>
+      <p>シリアルデータが届いたとき。届いたバイトを読み取り係へ渡します。</p>
+    </div>
+  </div>
+
+  <h3><code>setup()</code>: 最初に1回だけ実行される</h3>
+  <p>
+    <code>setup()</code> では、画面サイズを決め、音声出力を準備し、必要な管理クラスを作ります。
+    また、接続可能なシリアルポート一覧を取得します。
+  </p>
+  <pre><code>void setup() {
+  size(1000, 560);
+  minim = new Minim(this);
+  out = minim.getLineOut(Minim.STEREO, 1024);
+
+  frameReader = new SerialFrameReader();
+  partManager = new PartManager();
+  ui = new UiView();
+  logger = new Logger();
+
+  refreshSerialPorts();
+}</code></pre>
+  <p>
+    <code>Minim</code> は Processing で音を鳴らすためのライブラリです。
+    <code>out</code> はスピーカーにつながる出口のようなもので、あとで作った音をここに流します。
+  </p>
+
+  <h3><code>draw()</code>: 毎フレーム繰り返し実行される</h3>
+  <p>
+    Processing では、<code>draw()</code> が1秒間に何十回も呼ばれます。
+    このプログラムでは、受信済みのデータを処理し、音の状態を更新し、画面を描画しています。
+  </p>
+  <pre><code>void draw() {
+  background(18);
+  drainPackets();
+  partManager.update();
+  updateAppState();
+  ui.draw();
+}</code></pre>
+  <p>
+    ここで大切なのは、シリアル受信そのものは <code>serialEvent()</code> で行い、
+    実際の処理は <code>draw()</code> 側の <code>drainPackets()</code> で行っている点です。
+    受信と処理を分けることで、データが連続して届いても扱いやすくなっています。
+  </p>
+
+  <h2 id="serial">4. シリアル通信の受け取り方</h2>
+  <h3><code>serialEvent()</code>: バイト列を受け取る</h3>
+  <p>
+    <code>serialEvent(Serial p)</code> は、シリアルポートにデータが来たときに呼ばれます。
+    ここでは届いたデータを1バイトずつ <code>SerialFrameReader</code> に渡しています。
+  </p>
+  <pre><code>void serialEvent(Serial p) {
+  while (p.available() &gt; 0) {
+    frameReader.pushByte(p.read());
+    NotePacket packet = frameReader.pollPacket();
+    while (packet != null) {
+      packetQueue.offer(packet);
+      packet = frameReader.pollPacket();
+    }
+  }
+}</code></pre>
+  <p>
+    <code>packetQueue</code> は、受信できた <code>NotePacket</code> を一時的に置いておくキューです。
+    キューとは「順番待ちの列」のようなものです。先に入れたものから順番に取り出されます。
+  </p>
+
+  <div class="note">
+    <strong>なぜすぐ音を鳴らさず、キューに入れるのか</strong><br>
+    <code>serialEvent()</code> は通信データが届いた瞬間に呼ばれる処理です。
+    ここで音源処理や画面更新まで全部やると、処理が混み合ったときに受信が不安定になることがあります。
+    そこで、受信側では「読めたパケットをキューに入れる」だけにして、
+    メインの <code>draw()</code> 側で落ち着いて処理しています。
+  </div>
+
+  <h3><code>SerialFrameReader</code>: 20バイトのまとまりを探す</h3>
+  <p>
+    シリアル通信では、データがいつもきれいに20バイトずつ届くとは限りません。
+    そのため <code>SerialFrameReader</code> は、受け取ったバイトを一度 <code>buffer</code> にためます。
+  </p>
+  <p>
+    NOTE フレームの先頭には、<code>magic = 0x4F52</code> が入っています。
+    little-endian で送られるため、実際の先頭2バイトは <code>0x52</code>、<code>0x4F</code> です。
+    <code>pollPacket()</code> はこの2バイトを探し、そこから20バイトを取り出してデコードします。
+  </p>
+
+  <div class="warning">
+    <strong>初学者向けポイント</strong><br>
+    <code>magic</code> は「ここから正しいデータが始まる」という目印です。
+    通信途中で余計なバイトが混ざっても、この目印を探すことで正しい位置に戻れます。
+  </div>
+
+  <h2 id="frame">5. NOTE フレームの中身</h2>
+  <p>
+    このプログラムが受け取る NOTE フレームは、固定長の20バイトです。
+    <code>P03_NoteProtocol.pde</code> の <code>decodeNote()</code> が、この20バイトを読み取って
+    <code>NotePacket</code> という扱いやすい形に変換します。
+  </p>
+
+  <div class="byte-map" aria-label="20バイトNOTEフレームの配置">
+    <div class="byte magic"><b>0</b><span>magic</span></div>
+    <div class="byte magic"><b>1</b><span>magic</span></div>
+    <div class="byte meta"><b>2</b><span>version</span></div>
+    <div class="byte meta"><b>3</b><span>type</span></div>
+    <div class="byte seq"><b>4</b><span>seq</span></div>
+    <div class="byte seq"><b>5</b><span>seq</span></div>
+    <div class="byte seq"><b>6</b><span>seq</span></div>
+    <div class="byte seq"><b>7</b><span>seq</span></div>
+    <div class="byte seq"><b>8</b><span>time</span></div>
+    <div class="byte seq"><b>9</b><span>time</span></div>
+    <div class="byte seq"><b>10</b><span>time</span></div>
+    <div class="byte seq"><b>11</b><span>time</span></div>
+    <div class="byte note-byte"><b>12</b><span>part</span></div>
+    <div class="byte note-byte"><b>13</b><span>note</span></div>
+    <div class="byte note-byte"><b>14</b><span>velocity</span></div>
+    <div class="byte note-byte"><b>15</b><span>gate</span></div>
+    <div class="byte note-byte"><b>16</b><span>duration</span></div>
+    <div class="byte note-byte"><b>17</b><span>duration</span></div>
+    <div class="byte empty"><b>18</b><span>reserved</span></div>
+    <div class="byte empty"><b>19</b><span>reserved</span></div>
+  </div>
+  <p class="small">
+    上の図は「何バイト目に何が入っているか」を表しています。
+    <code>seq</code> や <code>timestampMs</code> のように複数バイトを使う値は、あとで1つの数値に組み立てます。
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>位置</th>
+        <th>名前</th>
+        <th>意味</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>0-1</td>
+        <td><code>magic</code></td>
+        <td>フレーム開始の目印です。値は <code>0x4F52</code> です。</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><code>version</code></td>
+        <td>通信仕様のバージョンです。このプログラムでは <code>1</code> を期待します。</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><code>type</code></td>
+        <td>データの種類です。NOTE は <code>3</code> です。</td>
+      </tr>
+      <tr>
+        <td>4-7</td>
+        <td><code>seq</code></td>
+        <td>通し番号です。重複や抜けを検出するために使います。</td>
+      </tr>
+      <tr>
+        <td>8-11</td>
+        <td><code>timestampMs</code></td>
+        <td>送信側の時刻情報です。ログに記録されます。</td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td><code>partId</code></td>
+        <td>どのパートの音かを表します。<code>0x02</code> から <code>0x05</code> までを使います。</td>
+      </tr>
+      <tr>
+        <td>13</td>
+        <td><code>noteNumber</code></td>
+        <td>MIDI ノート番号です。例: <code>60</code> は中央のドです。</td>
+      </tr>
+      <tr>
+        <td>14</td>
+        <td><code>velocity</code></td>
+        <td>音の強さです。通常は <code>0</code> から <code>127</code> です。</td>
+      </tr>
+      <tr>
+        <td>15</td>
+        <td><code>gate</code></td>
+        <td><code>1</code> なら音を鳴らす、<code>0</code> なら音を止めるという意味です。</td>
+      </tr>
+      <tr>
+        <td>16-17</td>
+        <td><code>durationMs</code></td>
+        <td>何ミリ秒鳴らすかを表します。</td>
+      </tr>
+      <tr>
+        <td>18-19</td>
+        <td>予約領域</td>
+        <td>今は使っていません。将来の拡張用です。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>little-endian とは</h3>
+  <p>
+    <code>seq</code> や <code>durationMs</code> のように複数バイトで表す値は、バイトの並び方を決める必要があります。
+    このプログラムでは little-endian、つまり「小さい桁のバイトから先に並べる」方式を使っています。
+  </p>
+  <pre><code>int u16le(byte[] b, int off) {
+  return (b[off] &amp; 0xff) | ((b[off + 1] &amp; 0xff) &lt;&lt; 8);
+}</code></pre>
+  <p>
+    <code>&amp; 0xff</code> は、Java の <code>byte</code> を 0 から 255 の値として扱うための書き方です。
+  </p>
+
+  <h3><code>decodeNote()</code> を日本語にすると</h3>
+  <p>
+    <code>decodeNote()</code> は難しそうに見えますが、やっていることはかなり素直です。
+    20バイトの箱から、決まった位置の値を取り出して <code>NotePacket</code> に入れています。
+  </p>
+  <div class="step-list">
+    <div class="step">
+      <div>
+        <strong>長さを確認する</strong>
+        <p><code>frame.length != NOTE_FRAME_SIZE</code> なら、20バイトではないので失敗として扱います。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div>
+        <strong>先頭の目印を確認する</strong>
+        <p><code>u16le(frame, 0) != MAGIC</code> なら、正しい NOTE フレームの始まりではありません。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div>
+        <strong>各位置から値を取り出す</strong>
+        <p><code>frame[12]</code> は <code>partId</code>、<code>frame[13]</code> は <code>noteNumber</code> のように、表の通りに読んでいきます。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div>
+        <strong>扱いやすい形で返す</strong>
+        <p>最後に <code>NotePacket</code> を返します。ここから先の処理は、バイト位置ではなく名前で値を扱えます。</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="validation">6. 受信パケットのチェック</h2>
+  <p>
+    <code>handlePacket()</code> は、届いた <code>NotePacket</code> が正しいか確認してから音源へ渡します。
+    主に次のようなチェックをしています。
+  </p>
+  <ul>
+    <li><code>version</code> が <code>1</code> か</li>
+    <li><code>type</code> が NOTE を表す <code>3</code> か</li>
+    <li><code>gate</code> が <code>0</code> または <code>1</code> か</li>
+    <li><code>partId</code> が知っているパートか</li>
+    <li>現在受け付ける設定のパートか</li>
+    <li><code>seq</code> が重複していないか、抜けていないか</li>
+  </ul>
+  <p>
+    問題があるパケットは <code>dropPacket()</code> で破棄され、理由が画面とログに残ります。
+    これにより、通信ミスや設定違いに気づきやすくなっています。
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>チェック</th>
+        <th>なぜ必要か</th>
+        <th>失敗するとどうなるか</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>version</code></td>
+        <td>送信側と受信側が同じ通信仕様を使っているか確かめるためです。</td>
+        <td>古い仕様や別仕様のデータを、間違って音符として読んでしまう可能性があります。</td>
+      </tr>
+      <tr>
+        <td><code>type</code></td>
+        <td>NOTE 以外のデータが混ざったときに区別するためです。</td>
+        <td>音符ではないデータで音を鳴らそうとしてしまいます。</td>
+      </tr>
+      <tr>
+        <td><code>gate</code></td>
+        <td>音を出すか止めるかの値が正しい範囲か確認するためです。</td>
+        <td><code>2</code> や <code>255</code> のような意味不明な値を処理してしまいます。</td>
+      </tr>
+      <tr>
+        <td><code>partId</code></td>
+        <td>このプログラムが知っているパートか確認するためです。</td>
+        <td>存在しないパートの音を鳴らそうとして、管理が分かりにくくなります。</td>
+      </tr>
+      <tr>
+        <td><code>seq</code></td>
+        <td>同じデータの重複や、途中で抜けたデータを見つけるためです。</td>
+        <td>通信の不安定さに気づけません。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="parts">7. パートID</h2>
+  <p>
+    <code>P02_ConstantsAndParts.pde</code> では、使うパートIDが次のように定義されています。
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>定数</th>
+        <th>値</th>
+        <th>表示名</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>PART_BRASS_1</code></td>
+        <td><code>0x02</code></td>
+        <td>Brass 1</td>
+      </tr>
+      <tr>
+        <td><code>PART_BRASS_2</code></td>
+        <td><code>0x03</code></td>
+        <td>Brass 2</td>
+      </tr>
+      <tr>
+        <td><code>PART_BRASS_3</code></td>
+        <td><code>0x04</code></td>
+        <td>Brass 3</td>
+      </tr>
+      <tr>
+        <td><code>PART_RHYTHM</code></td>
+        <td><code>0x05</code></td>
+        <td>Rhythm</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    通常は、キー <span class="kbd">1</span> から <span class="kbd">4</span> で受け取りたいパートを選びます。
+    <span class="kbd">a</span> を押すと、すべてのパートを受け付ける検証モードになります。
+  </p>
+
+  <h2 id="sound">8. 音が鳴る仕組み</h2>
+  <p>
+    音を鳴らす部分は、初学者には少し難しく見えます。
+    でも大きく見ると、やっていることは「音の高さを周波数に変える」「音量を決める」「音の形を決める」「時間が来たら消す」の4つです。
+  </p>
+  <div class="card-grid">
+    <div class="card blue">
+      <strong>高さ</strong>
+      <p><code>noteNumber</code> を <code>midiToHz()</code> で Hz に変換します。Hz は1秒間に何回振動するかです。</p>
+    </div>
+    <div class="card green">
+      <strong>強さ</strong>
+      <p><code>velocity</code> を 0.0 から 1.0 の音量に変換し、<code>MASTER_GAIN</code> で全体音量を調整します。</p>
+    </div>
+    <div class="card amber">
+      <strong>長さ</strong>
+      <p><code>durationMs</code> の時間が過ぎたら <code>release()</code> を呼び、音を止める方向へ動かします。</p>
+    </div>
+  </div>
+
+  <h3><code>PartManager</code>: 音を作る係を選ぶ</h3>
+  <p>
+    <code>PartManager.handleNote()</code> は、パケットの <code>gate</code>、<code>velocity</code>、
+    <code>noteNumber</code> を見て、音を鳴らすか止めるかを判断します。
+  </p>
+  <pre><code>if (packet.gate == 0 || packet.velocity == 0 || packet.noteNumber == 0) {
+  noteOff(packet.partId, packet.noteNumber);
+  return;
+}
+noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</code></pre>
+  <p>
+    <code>gate</code> が <code>0</code>、または <code>velocity</code> が <code>0</code> のときは「音を止める」と解釈しています。
+    それ以外なら <code>noteOn()</code> で新しい音を作ります。
+  </p>
+
+  <h3>金管パートとリズムパート</h3>
+  <p>
+    <code>partId</code> が <code>PART_RHYTHM</code> なら <code>RhythmVoice</code>、
+    それ以外なら <code>BrassVoice</code> が作られます。
+  </p>
+  <pre><code>if (partId == PART_RHYTHM) {
+  voice = new RhythmVoice(partId, noteNumber, amp, dur);
+} else {
+  voice = new BrassVoice(partId, noteNumber, amp, dur, brassWaveform);
+}</code></pre>
+  <p>
+    <code>velocity</code> は <code>0</code> から <code>127</code> の値なので、
+    <code>velocityToAmp()</code> で 0.0 から 1.0 の音量に変換されます。
+    さらに <code>MASTER_GAIN</code> を掛けて、全体の音量を少し下げています。
+  </p>
+
+  <h3><code>Voice</code>: 1つの音を表す基本クラス</h3>
+  <p>
+    <code>Voice</code> は「いま鳴っている1音」を表すクラスです。
+    パート、ノート番号、音量、鳴らす時間、開始時刻などを持っています。
+  </p>
+  <p>
+    <code>update()</code> では、指定された <code>durationMs</code> を過ぎたら <code>release()</code> して音を止め始めます。
+    <code>finished()</code> が true になると、<code>PartManager</code> によってリストから削除されます。
+  </p>
+
+  <h3><code>BrassVoice</code>: 金管らしい音</h3>
+  <p>
+    <code>BrassVoice</code> は、<code>midiToHz()</code> で MIDI ノート番号を周波数に変換し、
+    <code>Oscil</code> で波形を鳴らします。
+    金管音らしくするため、倍音を含む波形を <code>PartManager</code> のコンストラクタで作っています。
+  </p>
+  <div class="plain-box">
+    <strong>MIDI ノート番号から周波数への変換</strong>
+    <p>
+      <code>midiToHz(69)</code> は <code>440Hz</code> になります。
+      これは音楽でよく基準にされる「ラ」の音です。
+      ノート番号が1増えると半音上がり、12増えると1オクターブ上がります。
+      コード中の <code>pow(2.0f, (noteNumber - 69) / 12.0f)</code> は、この半音とオクターブの関係を計算しています。
+    </p>
+  </div>
+  <pre><code>brassWaveform = WavetableGenerator.gen10(
+  4096,
+  new float[] { 1.00, 0.70, 0.50, 0.30, 0.20, 0.10, 0.05 }
+);</code></pre>
+  <p>
+    また、音量は急に最大になって急に消えるのではなく、
+    <code>attack</code>、<code>decay</code>、<code>sustain</code>、<code>release</code> の段階を持っています。
+    これにより、少し自然な鳴り方になります。
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>段階</th>
+        <th>このコードでの意味</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>attackMs</code></td>
+        <td>音が0から指定音量まで立ち上がる時間です。このコードでは20msです。</td>
+      </tr>
+      <tr>
+        <td><code>decayMs</code></td>
+        <td>最大音量から少し落ち着いた音量へ下がる時間です。このコードでは40msです。</td>
+      </tr>
+      <tr>
+        <td><code>sustain</code></td>
+        <td>鳴っている間に保つ音量の割合です。ここでは最大音量の75%です。</td>
+      </tr>
+      <tr>
+        <td><code>releaseMs</code></td>
+        <td>音を止めるとき、急に切らずに0へ下げる時間です。このコードでは60msです。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3><code>RhythmVoice</code>: 短く減衰するリズム音</h3>
+  <p>
+    <code>RhythmVoice</code> は、ノート番号によって減衰時間、周波数、波形を変えます。
+    低いノート番号は低い周波数で長めに鳴り、高いノート番号は短く鋭い音になります。
+  </p>
+  <p>
+    リズム音は鳴り始めた直後から音量が0へ向かうため、<code>start()</code> の中で
+    <code>releasing = true</code> にしています。
+  </p>
+
+  <h2>9. 同時発音数の制限</h2>
+  <p>
+    <code>MAX_VOICES_PER_PART</code> は <code>4</code> です。
+    つまり、1つのパートで同時に鳴らせる音は最大4つまでです。
+  </p>
+  <p>
+    新しい音を鳴らす前に <code>enforceVoiceLimit()</code> が呼ばれます。
+    すでに4音以上鳴っている場合は、そのパートで一番古い音を <code>release()</code> してから新しい音を追加します。
+    これにより、音が増えすぎて重くなったり、音量が大きくなりすぎたりするのを防いでいます。
+  </p>
+
+  <h2>10. 画面表示</h2>
+  <p>
+    <code>P07_ScreenView.pde</code> は、画面に見える部分をまとめて担当しています。
+    <code>draw()</code> の中で、次の5つを描いています。
+  </p>
+  <ul>
+    <li><code>drawHeader()</code>: タイトルと簡単な説明</li>
+    <li><code>drawPorts()</code>: シリアルポート一覧</li>
+    <li><code>drawStatus()</code>: 現在の状態、受信数、破棄数など</li>
+    <li><code>drawWaveform()</code>: 実際に出ている音の波形</li>
+    <li><code>drawHelp()</code>: キー操作の案内</li>
+  </ul>
+  <p>
+    <code>drawWaveform()</code> では、<code>out.left</code> の音声バッファを線で描いています。
+    これは「いまスピーカーへ送られている音の形」を簡易的に表示しているものです。
+  </p>
+
+  <h2>11. ログ出力</h2>
+  <p>
+    <code>Logger</code> は起動時に CSV ファイルを作ります。
+    ファイル名は <code>processing_log_年月日_時分秒.csv</code> のような形式です。
+  </p>
+  <p>
+    ログには、受信したパケット、破棄された理由、シリアル接続、音の開始・停止などが記録されます。
+    通信がうまくいかないときは、画面の <code>lastWarning</code> とあわせて CSV を確認すると原因を探しやすくなります。
+  </p>
+
+  <h2>12. キー操作</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>キー</th>
+        <th>動作</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="kbd">1</span> から <span class="kbd">4</span></td>
+        <td>受け取りたいパートを <code>Brass 1</code>、<code>Brass 2</code>、<code>Brass 3</code>、<code>Rhythm</code> に切り替えます。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">a</span></td>
+        <td>すべてのパートを受け付けるモードと、選択中パートだけ受け付けるモードを切り替えます。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">m</span></td>
+        <td>ミュートを切り替えます。ミュート時は現在の音も止めます。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">t</span></td>
+        <td>選択中パートのテスト音を鳴らします。シリアル接続なしでも音の確認ができます。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">g</span></td>
+        <td>疑似 NOTE フレームを内部で作って注入します。受信処理のテストに使えます。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">r</span></td>
+        <td>シリアルポート一覧を再取得します。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">d</span></td>
+        <td>現在のシリアル接続を切断します。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>13. 実行手順</h2>
+  <ol>
+    <li>Processing 4 を開きます。</li>
+    <li><code>processing.pde</code> を開きます。</li>
+    <li>Minim ライブラリが入っていない場合は、Processing の Library Manager から <code>Minim</code> を追加します。</li>
+    <li>実行ボタンを押します。</li>
+    <li>タイトル画面でNodeを選び、ポート選択画面で Arduino などのポートをクリックします。</li>
+    <li>接続後、正しい NOTE フレームが届くと音が鳴ります。</li>
+  </ol>
+
+  <h2>14. よく見るべき変数</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>変数</th>
+        <th>意味</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>appState</code></td>
+        <td>画面上の状態です。<code>PortSelect</code>、<code>Ready</code>、<code>Playing</code>、<code>Error</code> などになります。</td>
+      </tr>
+      <tr>
+        <td><code>expectedPartId</code></td>
+        <td>現在受け付けるパートIDです。</td>
+      </tr>
+      <tr>
+        <td><code>acceptAllParts</code></td>
+        <td>true のとき、どのパートIDも受け付けます。</td>
+      </tr>
+      <tr>
+        <td><code>muted</code></td>
+        <td>true のとき、音を鳴らしません。</td>
+      </tr>
+      <tr>
+        <td><code>lastSeqByPart</code></td>
+        <td>パートごとに最後に受け取った <code>seq</code> を覚えます。</td>
+      </tr>
+      <tr>
+        <td><code>receivedPackets</code></td>
+        <td>正常に受け取ったパケット数です。</td>
+      </tr>
+      <tr>
+        <td><code>droppedPackets</code></td>
+        <td>不正などの理由で破棄したパケット数です。</td>
+      </tr>
+      <tr>
+        <td><code>missingPackets</code></td>
+        <td><code>seq</code> の番号飛びから推定した、抜けたパケット数です。</td>
+      </tr>
+      <tr>
+        <td><code>lastWarning</code></td>
+        <td>最後に起きた注意メッセージです。画面にも表示されます。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>15. 改造するときの考え方</h2>
+  <h3>受け付けるパートを増やしたい</h3>
+  <p>
+    <code>P02_ConstantsAndParts.pde</code> に新しい <code>PART_...</code> 定数を追加し、
+    <code>partName()</code> と <code>isKnownPart()</code> にも追加します。
+    そのうえで <code>PartManager.noteOn()</code> で、どの <code>Voice</code> を使うか決めます。
+  </p>
+
+  <h3>音色を変えたい</h3>
+  <p>
+    金管音は <code>PartManager</code> の <code>brassWaveform</code> と、
+    <code>BrassVoice</code> の <code>attackMs</code>、<code>decayMs</code>、<code>sustain</code>、<code>releaseMs</code>
+    を調整すると変わります。
+    リズム音は <code>RhythmVoice</code> の <code>rhythmDecay()</code>、<code>rhythmFreq()</code>、
+    <code>rhythmWave()</code> を変更します。
+  </p>
+
+  <h3>通信仕様を変えたい</h3>
+  <p>
+    20バイトの中身を変える場合は、送信側と受信側の両方を同じ仕様にする必要があります。
+    受信側では <code>NOTE_FRAME_SIZE</code>、<code>decodeNote()</code>、
+    必要なら <code>makeNoteFrame()</code> を変更します。
+  </p>
+
+  <div class="warning">
+    <strong>注意</strong><br>
+    送信側だけ、または Processing 側だけを変更すると、バイトの位置がずれて正しく読めなくなります。
+    通信フォーマットを変えるときは、必ず表を書き直してから両方のコードを合わせるのがおすすめです。
+  </div>
+
+  <h2 id="debug">16. デバッグの見方</h2>
+  <p>
+    デバッグでは、いきなり全部を疑うより「音源」「受信」「データの中身」の順番で切り分けると楽です。
+    まず <span class="kbd">t</span> で音源が生きているか確認し、次に <span class="kbd">g</span> で受信処理を確認し、
+    最後に本物のシリアル通信を見ます。
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>症状</th>
+        <th>最初に見る場所</th>
+        <th>考えられる原因</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="kbd">t</span> でも音が鳴らない</td>
+        <td>Minim、PCの音量、ミュート状態</td>
+        <td>音源準備、ライブラリ、出力先の問題かもしれません。</td>
+      </tr>
+      <tr>
+        <td><span class="kbd">t</span> は鳴るが、実機では鳴らない</td>
+        <td>シリアル接続、送信側のフレーム</td>
+        <td>ポート違い、通信速度違い、フレーム形式違いが疑われます。</td>
+      </tr>
+      <tr>
+        <td><code>wrong part</code> が増える</td>
+        <td><code>expectedPartId</code> と送信側 <code>partId</code></td>
+        <td>Processing 側が待っているパートと、送信側のパートが違います。</td>
+      </tr>
+      <tr>
+        <td><code>missing</code> が増える</td>
+        <td><code>seq</code> の増え方</td>
+        <td>通信抜け、送信側の番号飛び、受信処理の遅れが考えられます。</td>
+      </tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>音が鳴らないときは、まず <span class="kbd">t</span> でテスト音が鳴るか確認します。</li>
+    <li><span class="kbd">t</span> で鳴るなら、音源側は動いています。次にシリアル接続と NOTE フレームを確認します。</li>
+    <li><span class="kbd">g</span> で疑似 NOTE フレームを注入すると、受信処理から音源までの流れをテストできます。</li>
+    <li><code>wrong part</code> が増える場合は、送信側の <code>partId</code> と Processing 側の選択パートが違います。</li>
+    <li><code>dropped</code> が増える場合は、<code>version</code>、<code>type</code>、<code>gate</code>、<code>partId</code> などの値をログで確認します。</li>
+    <li><code>missing</code> が増える場合は、送信側の <code>seq</code> が飛んでいるか、通信途中でデータが抜けています。</li>
+  </ul>
+
+  <h2>17. このプログラムの良い分け方</h2>
+  <p>
+    初学者が読みやすいポイントは、役割ごとにファイルが分かれているところです。
+  </p>
+  <ul>
+    <li>通信のまとまりを探す処理は <code>SerialFrameReader</code></li>
+    <li>バイト列を意味のあるデータに変換する処理は <code>Protocol</code></li>
+    <li>正しいデータかチェックする処理はメインの <code>handlePacket()</code></li>
+    <li>音を鳴らす判断は <code>PartManager</code></li>
+    <li>1音ずつの鳴り方は <code>Voice</code></li>
+    <li>画面表示は <code>UiView</code></li>
+    <li>記録は <code>Logger</code></li>
+  </ul>
+  <p>
+    このように「通信」「変換」「検証」「音源」「画面」「ログ」が分かれていると、
+    不具合が起きたときにどこを見ればよいか判断しやすくなります。
+  </p>
+
+  <h2 id="reading-order">18. 読む順番のおすすめ</h2>
+  <ol>
+    <li><code>README.md</code> で実行方法とキー操作を確認する。</li>
+    <li><code>P02_ConstantsAndParts.pde</code> で定数とパートIDを見る。</li>
+    <li><code>processing.pde</code> の <code>setup()</code>、<code>draw()</code>、<code>handlePacket()</code> を読む。</li>
+    <li><code>P03_NoteProtocol.pde</code> で20バイトの読み取り方を見る。</li>
+    <li><code>P04_SerialNoteFrameReader.pde</code> でフレームの探し方を見る。</li>
+    <li><code>P05_SoundPartManager.pde</code> と <code>P06_SoundVoices.pde</code> で音が鳴る仕組みを見る。</li>
+    <li><code>P07_ScreenView.pde</code> と <code>P08_EventLogger.pde</code> で表示と記録を見る。</li>
+  </ol>
+
+  <p class="small">
+    作成対象: <code>umezawa_work</code> ブランチの
+    <code>work/umezawa/hck/processing</code>
+  </p>
+</div>
+</div>
+</div>
+</body>
+</html>
