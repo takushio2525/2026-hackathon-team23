@@ -283,11 +283,6 @@ void keyPressed() {
     closeSerial();
     refreshSerialPorts();
     screenState = SCREEN_PORT_SELECT;
-  } else if (key == 'd' || key == 'D') {
-    closeSerial();
-    appState = "PortSelect";
-    screenState = SCREEN_PORT_SELECT;
-    lastWarning = "切断しました";
   } else if (key == 't' || key == 'T') {
     partManager.playTestNote(expectedPartId);
   } else if (key == 'g' || key == 'G') {
