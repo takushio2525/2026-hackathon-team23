@@ -5,19 +5,34 @@
 
 ## 現在の対象
 
-- **パケロス原因切り分け用に DevKitC 派生ファームを追加**（2026-05-27、
-  `firmware/test_v1/node_01_devkitc/`）。test_v1 で 5/11 以降パケロス多発。
-  原因切り分け（コード起因 vs ハード起因）の調査結果:
-  - 5/11 以降 `firmware/test_v1/` への変更は `fd7eb18 [設定] シリアルデバッグ出力を無効化`（5/13）の1件のみで UDP には無関係 → コード退行は否定。
-  - 5/25 `ac8c5ff デバック` で既に `beatRedundancy 2→4` ＆ `beatGapMs` 追加（test_v2）の RF ロス対策が入っており、ソフト冗長化を厚くしても改善しきらない＝radio 層自体の不調を示唆。
-  - 最有力候補は **XIAO ESP32-S3 Sense の外付け IPEX アンテナ接触不良**（半挿し・半田クラック・基板裏 0Ω アンテナ切替ジャンパ）。
-  対策として `node_01_devkitc` を作成: board を `esp32-s3-devkitc-1`（PCB 内蔵アンテナ）に差し替えロジック・I2C ピン (GPIO5/6 左列) は完全同一。USB CDC OFF / upload_protocol デフォルト (UART 側 esptool) に変更。`pio run` で RAM 14%・Flash 22%・警告 0 でビルド通過。実機テストはユーザー側 (CLAUDE.md ルールにより未テスト .ino には Claude 起点で踏み込まない)。
-- 直前まで: 塩澤の個人作業ログ第1回の事実関係訂正＋付録改訂（d50905b・2026-05-26）。
+- **DevKitC 派生ファームを test_v2 にも追加**（2026-05-27、
+  `firmware/test_v2/node_01_devkitc/`）。test_v1/node_01_devkitc でユーザーが実機
+  検証してパケロスが顕著に改善したため (= XIAO ESP32-S3 Sense の外付け IPEX
+  アンテナ接触不良が主因と判明)、test_v2 でも同じ派生を用意して本番運用候補と
+  する。`firmware/test_v2/node_01` をディレクトリごとコピー (.pio/.vscode 除外)、
+  差分はビルド設定とコメントのみ:
+  - `platformio.ini`: board=`esp32-s3-devkitc-1` / USB CDC マクロ無効化 /
+    `upload_protocol = esp-builtin` をコメントアウトして PIO デフォルト (UART 側
+    esptool) に変更。
+  - `include/ProjectConfig.h`: 冒頭・I2C ピン・StatusLedConfig のコメントを
+    DevKitC 用に更新。WS2812 (GPIO48) は `digitalWrite` で光らないため
+    `activeLow=false` に変更 (test_v1 と同様の理由)。
+  - `README.md`: 差分表・配線・ビルド/書き込み手順・LED 注意点・切り分け実験
+    プランを DevKitC 用に書き直し。
+  - `src/` `lib/` `include/SystemData.h` はバイト単位で同一 (拍検出・テンポ
+    推定・3 声輪唱の頭ずらしロジックは未変更)。
+  `pio run` で RAM 14.0%・Flash 21.6%・警告 0・11.54 秒でビルド通過。実機書き
+  込み・XIAO 版との比較検証はユーザー側 (CLAUDE.md ルール)。
+- 直前: test_v1/node_01_devkitc を作成 (e5a09fd・2026-05-27) → ユーザー実機検証
+  で改善確認 → 本ターンで test_v2 にも展開。
 
 ## 次の一手
 
-- ユーザー側で `node_01_devkitc` を ESP32-S3-DevKitC-1 (PCB 内蔵アンテナ N 版) に書き込んで実機検証。同じ位置・距離・時間帯で `node_01` (XIAO) と比較し、パケロスが顕著に減れば RF 経路 (アンテナ) 起因が確定。改善しなければ WiFi 環境 (ch6 混雑) か別要因。
-- 切り分け結果を踏まえて ADR-0007（パケロス対策方針）の起票内容を確定する。
+- ユーザー側で `firmware/test_v2/node_01_devkitc` を ESP32-S3-DevKitC-1 (PCB
+  内蔵アンテナ N 版) に書き込み、楽器 3 ノード (node_02〜04) + Processing
+  `pc_app/test_v2/orchestra_resynth/` 起動で 3 声輪唱を回して NOTE 受信ログ
+  からパケロス率を XIAO 版と比較。test_v1 と同じく改善するはず。
+- DevKitC 採用が確定したら ADR-0007（パケロス対策方針＝DevKitC 移行）を起票。
 
 ## 現フェーズで Read すべき設計書
 

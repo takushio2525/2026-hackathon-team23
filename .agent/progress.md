@@ -5,6 +5,17 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **DevKitC 派生ファームを test_v2 にも展開**
+  （`firmware/test_v2/node_01_devkitc/`）。test_v1/node_01_devkitc を実機検証
+  したユーザーから「DevKitC でうまく行った」報告を受け、test_v2 (3 声輪唱) でも
+  同じ派生を用意。`firmware/test_v2/node_01` をディレクトリごとコピーして
+  `.pio/`・`.vscode/` を除外、差分はビルド設定とコメントのみ (board=
+  esp32-s3-devkitc-1 / USB CDC マクロ無効化 / upload_protocol コメントアウトで
+  PIO デフォルト UART 側 esptool / ProjectConfig.h の冒頭・I2C ピン・StatusLed
+  コメント更新と activeLow=false / README.md を DevKitC 用に書き直し)。`src/`
+  `lib/` `include/SystemData.h` はバイト単位で同一。`pio run` で RAM 14.0%・
+  Flash 21.6%・警告 0・11.54 秒でビルド通過。XIAO 版との比較検証はユーザー側。
+
 - 2026-05-27: **パケロス原因切り分け用 DevKitC 派生ファームを追加**
   （`firmware/test_v1/node_01_devkitc/`）。test_v1 で 5/11 以降の UDP パケロス多発の
   原因がコード退行ではない（5/11 以降の test_v1/ への変更は SERIAL_DEBUG 無効化の 1
