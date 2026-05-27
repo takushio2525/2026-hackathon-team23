@@ -5,6 +5,21 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **orchestra_resynth のポート一覧に USB フィルタ+スクロール追加**
+  (`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`)。ユーザーの Mac
+  でポート一覧が画面下に並びきらず、書き込み直後に再認識された
+  `usbmodemF412FAA08558` (node_03) が一覧外でクリックできない件への対応。
+  追加要素: ①`isUsbSerialName()` で `usbmodem*`/`usbserial*`/`ttyUSB*`/
+  `ttyACM*`/`COM*` をマッチさせる USB シリアル判定、②`usbOnly` トグル
+  (`f` キー、既定 true、開いてるポートはフィルタ対象でも残して close 操作を
+  奪わない)、③`displayPorts` (フィルタ済リスト) と `portScrollY`、毎フレーム
+  `rebuildDisplayPorts()` で開閉に追従、④`drawPortList()` を `clip()` で
+  クリッピングし、`mouseWheel(MouseEvent)` で 1 ノッチ=1 行スクロール、
+  右端 4px のサムバー描画、⑤ヘッダ/上部ヘルプ/起動時 println に `[f]` と
+  `[wheel]` を追記。クリック判定 (`mousePressed`) もスクロール量を反映。
+  ポート数が多いマシンや書き込みリセット直後でもリストから node_03 を
+  確実にクリックできる状態に。
+
 - 2026-05-27: **楽器 node_02/03 を SERIAL_DEBUG=0 に戻して再書き込み**。
   test_v2 起動時に Processing 受信 0 だった原因が `ac8c5ff デバック` で入った
   `-DSERIAL_DEBUG=1` (NOTE バイナリ抑止モード) だったため、`platformio.ini` の

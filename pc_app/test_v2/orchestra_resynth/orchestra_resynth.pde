@@ -88,7 +88,10 @@ class PortConn {
   int     rxCount = 0;
   PortConn(String n) { name = n; }
 }
-String[]                  availablePorts = new String[0];
+String[]                  availablePorts = new String[0];  // Serial.list() の生 (全 OS ポート)
+String[]                  displayPorts   = new String[0];  // 一覧 UI に出すフィルタ済リスト
+boolean                   usbOnly        = true;            // true なら usbmodem/usbserial 系のみ表示 ('f' で切替)
+float                     portScrollY    = 0;               // ポート一覧の縦スクロール量 (px)
 HashMap<String,PortConn>  openByName     = new HashMap<String,PortConn>();
 HashMap<Serial,PortConn>  bySerial       = new HashMap<Serial,PortConn>();
 // serialEvent (Serial スレッド) は 20 B 揃ったパケットをここに積むだけ。
@@ -124,7 +127,7 @@ void setup(){
 
   println("=== orchestra_resynth (test_v2) ===");
   println("data/ から楽器定義 " + models.size() + " 個をロードしました。");
-  println("[click] ポート開閉  /  [r] ポート再列挙  /  [i] 楽器再スキャン  /  [t] テスト音  /  [0-3] 楽器ごとの試聴  /  [Space] 停止");
+  println("[click] ポート開閉  /  [wheel] スクロール  /  [r] ポート再列挙  /  [f] USB-onlyフィルタ切替  /  [i] 楽器再スキャン  /  [t] テスト音  /  [0-3] 楽器ごとの試聴  /  [Space] 停止");
 }
 
 // OS の日本語対応フォントを優先順位付きで探す (orchestra_player.pde と同じ手法)
@@ -186,11 +189,43 @@ InstrModel modelForId(int id){
 // ── シリアルポート 列挙 / 開閉 ─────────────────────────────
 void refreshPorts(){
   availablePorts = Serial.list();
+  rebuildDisplayPorts();
   println("");
-  println("Available serial ports:");
+  println("Available serial ports (usbOnly=" + usbOnly + "):");
   if (availablePorts.length == 0) println("  (none) — デバイスを挿してから 'r' で再列挙");
-  for (int i=0;i<availablePorts.length;i++)
-    println("  [" + i + "] " + availablePorts[i] + (openByName.containsKey(availablePorts[i]) ? "  <OPEN>" : ""));
+  for (int i=0;i<availablePorts.length;i++){
+    boolean shown = isUsbSerialName(availablePorts[i]);
+    println("  [" + i + "] " + availablePorts[i]
+        + (openByName.containsKey(availablePorts[i]) ? "  <OPEN>" : "")
+        + (usbOnly && !shown ? "  (hidden by USB-only filter)" : ""));
+  }
+}
+
+// USB シリアル系の名前判定。macOS の usbmodem*/usbserial*、Linux の ttyUSB*/ttyACM*、
+// Windows の COM* もマッチさせる (Windows は将来移植時の保険)。
+boolean isUsbSerialName(String name){
+  if (name == null) return false;
+  String n = name.toLowerCase();
+  return n.contains("usbmodem") || n.contains("usbserial")
+      || n.contains("ttyusb")   || n.contains("ttyacm")
+      || n.startsWith("com")    || n.contains("/com");
+}
+
+// availablePorts (生リスト) から displayPorts (UI 表示用) を作る。
+// usbOnly が true のときは USB シリアル系だけに絞る。
+// 既に開いているポートはフィルター対象でも常に残す (close 操作を奪わないため)。
+void rebuildDisplayPorts(){
+  if (!usbOnly){
+    displayPorts = availablePorts;
+  } else {
+    ArrayList<String> kept = new ArrayList<String>();
+    for (String n : availablePorts){
+      if (isUsbSerialName(n) || openByName.containsKey(n)) kept.add(n);
+    }
+    displayPorts = kept.toArray(new String[0]);
+  }
+  // スクロール量を新リスト長に合わせてクランプ (後段で h を知らないので 0 に寄せるだけ)
+  if (displayPorts.length == 0) portScrollY = 0;
 }
 void togglePort(String name){
   if (openByName.containsKey(name)) closePort(name);
@@ -361,7 +396,7 @@ void drawHeader(){
   text("楽器定義 " + models.size() + " 個ロード  /  開いているポート " + openByName.size() + " 個  /  発音中 " +
        activeVoices.size() + " / " + MAX_POLYPHONY + "  /  マスター音量 " + nf(masterVolume,1,2), 30, 56);
   textAlign(RIGHT); fill(120,120,160);
-  text("[click]ポート開閉  [r]ポート再列挙  [i]楽器再スキャン  [t]テスト音  [0-3]試聴  [a]包絡  [+/-]音量  [Space]停止", width-30, 56);
+  text("[click]ポート開閉  [wheel]スクロール  [r]再列挙  [f]USBフィルタ  [i]楽器再スキャン  [t]テスト音  [0-3]試聴  [a]包絡  [+/-]音量  [Space]停止", width-30, 56);
   textAlign(LEFT);
 }
 
@@ -420,31 +455,72 @@ void drawInstrumentList(){
 }
 
 // シリアルポート一覧 (クリックで開閉)
-float portRowX, portRowW, portRowY0, portRowH;
-int   portRowCount;
+// 縦方向にスクロール可能 (mouseWheel) で、表示は usbOnly フィルタ済の displayPorts を使う。
+// クリック判定もスクロール量を反映するため、座標計算は drawPortList と mousePressed で共有する。
+float portRowX, portRowW, portRowY0, portRowH;       // リストの 1 行ぶんの座標 (スクロール無視)
+float portViewY, portViewH;                          // リスト描画領域の Y / 高さ (スクロールクリップ範囲)
+int   portRowCount;                                  // displayPorts.length のキャッシュ
 void drawPortList(){
+  // ポート開閉直後 / フィルタ切替時の追従のため毎フレーム再構築 (availablePorts は 'r' でのみ更新)
+  rebuildDisplayPorts();
   float x=16, y=384, w=width-32, h=height-y-12;
   glassPanel(x,y,w,h);
   fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("シリアルポート — クリックで開く / もう一度クリックで閉じる (複数同時に開ける)", x+12, y+18);
-  portRowX = x+12; portRowW = w-24; portRowY0 = y+28; portRowH = 24; portRowCount = availablePorts.length;
+  String filterTag = usbOnly ? "USB のみ" : "全ポート";
+  text("シリアルポート [" + filterTag + " / 表示 " + displayPorts.length + " / 全 " + availablePorts.length + "] "
+       + "— クリックで開閉 / ホイールでスクロール / [f] フィルタ切替 / [r] 再列挙",
+       x+12, y+18);
+
+  portRowX = x+12; portRowW = w-24; portRowY0 = y+28; portRowH = 24;
+  portViewY = portRowY0; portViewH = (y + h) - portRowY0 - 4;
+  portRowCount = displayPorts.length;
+
   if (availablePorts.length == 0){
     fill(220,160,60); textSize(11);
     text("シリアルポートが見つかりません。Arduino を USB 接続して 'r' で再列挙してください。", x+12, y+40);
     textAlign(LEFT); return;
   }
-  for (int i=0;i<availablePorts.length;i++){
-    float ry = portRowY0 + i*portRowH;
-    if (ry > y+h-portRowH+4) break;
-    boolean isOpen = openByName.containsKey(availablePorts[i]);
-    boolean isHover = mouseOver(portRowX, ry, portRowW, portRowH-2);
+  if (displayPorts.length == 0){
+    fill(220,160,60); textSize(11);
+    text("USB-only フィルタで全部隠れています。'f' で全表示に切り替えるか USB デバイスを挿してください。", x+12, y+40);
+    textAlign(LEFT); return;
+  }
+
+  // スクロール範囲をクランプ (totalH > viewH のときだけスクロール余地がある)
+  float totalH = portRowCount * portRowH;
+  float maxScroll = max(0, totalH - portViewH);
+  portScrollY = constrain(portScrollY, 0, maxScroll);
+
+  // リスト領域をクリッピング (スクロール時に枠外へはみ出さない)
+  clip(portRowX - 2, portViewY - 2, portRowW + 4, portViewH + 4);
+  for (int i=0;i<displayPorts.length;i++){
+    float ry = portRowY0 + i*portRowH - portScrollY;
+    if (ry + portRowH < portViewY) continue;           // 上に消えた行はスキップ
+    if (ry > portViewY + portViewH)  break;            // 下にはみ出たら以降不要
+    boolean isOpen = openByName.containsKey(displayPorts[i]);
+    boolean isHover = mouseOver(portRowX, ry, portRowW, portRowH-2)
+                   && mouseOver(portRowX, portViewY, portRowW, portViewH); // 領域外ホバーは無視
     noStroke();
     if (isOpen) fill(isHover ? color(80,180,120) : color(96,200,140));
     else        fill(isHover ? color(255,255,255,235) : color(255,255,255,140));
     rect(portRowX, ry, portRowW, portRowH-2, 7);
     fill(isOpen ? 255 : color(60,57,110)); textSize(11);
-    String tag = isOpen ? ("● OPEN  受信 " + openByName.get(availablePorts[i]).rxCount + " 個") : "○ closed (クリックで開く)";
-    text("[" + i + "] " + availablePorts[i] + "    " + tag, portRowX+10, ry+16);
+    String tag = isOpen ? ("● OPEN  受信 " + openByName.get(displayPorts[i]).rxCount + " 個") : "○ closed (クリックで開く)";
+    text("[" + i + "] " + displayPorts[i] + "    " + tag, portRowX+10, ry+16);
+  }
+  noClip();
+
+  // スクロールバー (右端の細い縦バー)。スクロール余地があるときだけ描画。
+  if (maxScroll > 0){
+    float barX = portRowX + portRowW - 4;
+    float barW = 4;
+    float barTrackH = portViewH;
+    noStroke(); fill(0, 0, 0, 30);
+    rect(barX, portViewY, barW, barTrackH, 2);
+    float thumbH = max(20, barTrackH * (portViewH / totalH));
+    float thumbY = portViewY + (barTrackH - thumbH) * (portScrollY / maxScroll);
+    fill(99,102,241, 180);
+    rect(barX, thumbY, barW, thumbH, 2);
   }
   textAlign(LEFT);
 }
@@ -452,11 +528,26 @@ void drawPortList(){
 // ── マウス / キーボード ───────────────────────────────────
 void mousePressed(){
   if (portRowCount <= 0) return;
+  if (!mouseOver(portRowX, portViewY, portRowW, portViewH)) return;  // リスト領域外は無視
   for (int i=0;i<portRowCount;i++){
-    float ry = portRowY0 + i*portRowH;
-    if (mouseOver(portRowX, ry, portRowW, portRowH-2)){ togglePort(availablePorts[i]); return; }
+    float ry = portRowY0 + i*portRowH - portScrollY;
+    if (ry + portRowH < portViewY) continue;
+    if (ry > portViewY + portViewH)  break;
+    if (mouseOver(portRowX, ry, portRowW, portRowH-2)){ togglePort(displayPorts[i]); return; }
   }
 }
+
+// マウスホイールで一覧をスクロール。リスト領域内のホイールだけ拾う。
+void mouseWheel(processing.event.MouseEvent e){
+  if (portRowCount <= 0) return;
+  if (!mouseOver(portRowX, portViewY, portRowW, portViewH)) return;
+  portScrollY += e.getCount() * portRowH;  // 1 ノッチ = 1 行
+  // 範囲クランプは drawPortList 側でも行うが、即時にもクランプして UI 反応を素直にする
+  float totalH = portRowCount * portRowH;
+  float maxScroll = max(0, totalH - portViewH);
+  portScrollY = constrain(portScrollY, 0, maxScroll);
+}
+
 void keyPressed(){
   char c = Character.toLowerCase(key);
   if (c=='r'){ refreshPorts(); return; }
@@ -467,6 +558,13 @@ void keyPressed(){
   if (c=='-' || c=='_'){ masterVolume = constrain(masterVolume - 0.05f, 0.05f, 1.5f); return; }
   if (c==' '){ stopAll(); return; }
   if (c>='0' && c<='3'){ playTestNoteOnInstrument(c - '0'); return; }
+  if (c=='f'){
+    usbOnly = !usbOnly;
+    rebuildDisplayPorts();
+    portScrollY = 0;
+    println("ポートフィルタ: " + (usbOnly ? "USB のみ" : "全ポート") + " (表示 " + displayPorts.length + " / 全 " + availablePorts.length + ")");
+    return;
+  }
 }
 
 void dispose(){
