@@ -27,11 +27,15 @@
        2 個目以降で上書きする意味がなく、むしろ「発火後の後着で再キューして二重発音」
        事故を避けるため初回のみ。
   - ビルド: 3 ノードとも `pio run` SUCCESS (Flash 20.9% / RAM 20.6%、変化なし)。
-  - 次の一手: ユーザーが node_02 (SER=34B7DA64482C) / node_03 (SER=F412FAA08558) に
-    `pio run -d firmware/test_v2/node_02 -t upload --upload-port /dev/cu.usbmodem34B7DA64482C2`
-    のように書き込んで Processing 経由で応答性と多重受信時の挙動を確認。
-    node_04 は未接続のため書き込み不要 (2 声輪唱で評価)。
-    rollback したい場合は `git checkout shiozawa-work` で元ファームに戻れる。
+  - **実機書き込み済み** (2026-05-27、ユーザー指示「各マイコンに書き込んで」):
+    - node_02 (SER=34B7DA64482C → `/dev/cu.usbmodem34B7DA64482C2`): bossac 3.41 秒・total 6.38 秒
+    - node_03 (SER=F412FAA08558 → `/dev/cu.usbmodemF412FAA085582`): bossac 3.55 秒・total 5.67 秒
+    - node_04 は未接続のため書き込み不可 (2 声輪唱で評価開始)
+    - 指揮者 `node_01_devkitc` は今回のブランチでコード変更なしのため書き込まず
+      (改修対象は楽器側の OrcReceiverModule と ProjectConfig のみ)
+    - 書き込み時 Processing は停止確認済み
+  - 次の一手: Processing 起動 → 応答性 (振り→発音遅延) と連続スイング時の発音タイミング滑らかさ、
+    パケロス時挙動を耳とログで評価。rollback したい場合は `git checkout shiozawa-work` で元ファームに戻れる。
 
 - **test_v2 の楽曲を「きらきら星」→「かえるのうた」に差し替え済み**（2026-05-27、
   ユーザー指示）。`firmware/test_v2/node_02/03/04/src/score_data.cpp` の 3 ファイル。

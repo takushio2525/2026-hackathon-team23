@@ -5,6 +5,14 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **ジッタ削減版を楽器 node_02/03 に実機書き込み** (ユーザー指示「各マイコンに書き込んで」)。
+  `shiozawa-test_v2-jitter` ブランチのファームを 2 台に upload: node_02 (SER=34B7DA64482C →
+  `/dev/cu.usbmodem34B7DA64482C2`、bossac 3.41 秒・total 6.38 秒)、node_03 (SER=F412FAA08558 →
+  `/dev/cu.usbmodemF412FAA085582`、bossac 3.55 秒・total 5.67 秒)。両方 `[SUCCESS]`。node_04 は
+  未接続のため書き込み不可で 2 声輪唱で評価開始。指揮者 `node_01_devkitc` は今回のブランチで
+  コード変更なし (改修対象は楽器側の OrcReceiverModule と ProjectConfig のみ) なので書き込まず。
+  Processing は起動していないことを `pgrep` で確認してから書き込み (前回の Resource busy 事故対策)。
+
 - 2026-05-27: **test_v2 楽器側のジッタ削減と多重受信処理を改善** (ユーザー指示、挑戦的変更のため
   `shiozawa-test_v2-jitter` ブランチを新規作成)。node_02/03/04 の OrcReceiverModule と
   ProjectConfig を改修。①`loopIntervalMs` 5 → 2 ms (発火判定ジッタ最大 5 ms → 2 ms)、
