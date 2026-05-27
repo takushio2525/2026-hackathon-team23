@@ -1,11 +1,14 @@
 import processing.serial.*;
 import ddf.minim.*;
 import ddf.minim.ugens.*;
+import java.awt.Font;
+import java.awt.GraphicsEnvironment;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 Minim minim;
 AudioOutput out;
+PFont uiFont;
 Serial serialPort;
 SerialFrameReader frameReader;
 PartManager partManager;
@@ -17,6 +20,18 @@ String[] serialPorts = new String[0];
 String serialPortName = "";
 String appState = "PortSelect";
 String lastWarning = "";
+
+final int SCREEN_TITLE = 0;
+final int SCREEN_PORT_SELECT = 1;
+final int SCREEN_MODE_SELECT = 2;
+final int SCREEN_PERFORMANCE = 3;
+
+final int NODE_NONE = 0;
+final int NODE_FLOW = 1;
+final int NODE_PLAYER = 2;
+
+int screenState = SCREEN_TITLE;
+int nodeRole = NODE_NONE;
 
 int expectedPartId = 0x02;
 boolean acceptAllParts = false;
@@ -32,6 +47,8 @@ int lastNoteAtMs = 0;
 void setup() {
   size(1000, 560);
   surface.setTitle("processing");
+  uiFont = createJapaneseUiFont(14);
+  textFont(uiFont);
 
   minim = new Minim(this);
   out = minim.getLineOut(Minim.STEREO, 1024);
@@ -45,8 +62,33 @@ void setup() {
   refreshSerialPorts();
 }
 
+PFont createJapaneseUiFont(int size) {
+  String[] candidates = {
+    "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN",
+    "Hiragino Maru Gothic ProN",
+    "Yu Gothic",
+    "Meiryo",
+    "Noto Sans CJK JP",
+    "SansSerif"
+  };
+
+  Font[] fonts = GraphicsEnvironment.getLocalGraphicsEnvironment().getAllFonts();
+  for (String candidate : candidates) {
+    for (Font font : fonts) {
+      if ((font.getFamily().equals(candidate)
+          || font.getFontName().equals(candidate)
+          || font.getPSName().equals(candidate))
+          && font.canDisplay('あ')
+          && font.canDisplay('漢')) {
+        return createFont(font.getFontName(), size, true);
+      }
+    }
+  }
+  return createFont("SansSerif", size, true);
+}
+
 void draw() {
-  background(244, 247, 250);
   drainPackets();
   partManager.update();
   updateAppState();
@@ -103,6 +145,10 @@ void handlePacket(NotePacket packet) {
     logger.logPacket("wrong_part", packet);
     return;
   }
+  if (screenState != SCREEN_PERFORMANCE) {
+    lastWarning = "演奏モードを選択してください";
+    return;
+  }
   long partLastSeq = lastSeqByPart[packet.partId & 0xff];
   if (partLastSeq >= 0) {
     if (packet.seq == partLastSeq) {
@@ -147,6 +193,7 @@ void connectSerial(int index) {
     serialPort.clear();
     appState = "Ready";
     lastWarning = "接続しました: " + serialPortName;
+    screenState = nodeRole == NODE_FLOW ? SCREEN_MODE_SELECT : SCREEN_PERFORMANCE;
     logger.logEvent("serial_connected," + serialPortName);
   } catch (Exception e) {
     appState = "Error";
@@ -169,12 +216,58 @@ void closeSerial() {
 }
 
 void mousePressed() {
-  if (serialPort != null) return;
-  int index = ui.portIndexAt(mouseX, mouseY);
-  if (index >= 0) connectSerial(index);
+  if (screenState == SCREEN_TITLE) {
+    int selectedRole = ui.nodeRoleAt(mouseX, mouseY);
+    if (selectedRole != NODE_NONE) {
+      nodeRole = selectedRole;
+      closeSerial();
+      refreshSerialPorts();
+      screenState = SCREEN_PORT_SELECT;
+      lastWarning = nodeRole == NODE_FLOW ? "Node1 全体進行を選択" : "Node2-5 演奏ノードを選択";
+    }
+    return;
+  }
+
+  if (screenState == SCREEN_PORT_SELECT) {
+    if (ui.backButtonAt(mouseX, mouseY)) {
+      closeSerial();
+      nodeRole = NODE_NONE;
+      screenState = SCREEN_TITLE;
+      lastWarning = "";
+      return;
+    }
+    if (serialPort != null) return;
+    int index = ui.portIndexAt(mouseX, mouseY);
+    if (index >= 0) connectSerial(index);
+    return;
+  }
+
+  if (screenState == SCREEN_MODE_SELECT) {
+    if (ui.backButtonAt(mouseX, mouseY)) {
+      closeSerial();
+      refreshSerialPorts();
+      screenState = SCREEN_PORT_SELECT;
+      return;
+    }
+    if (ui.performanceModeAt(mouseX, mouseY)) {
+      screenState = SCREEN_PERFORMANCE;
+      lastWarning = "演奏モードを開始";
+      return;
+    }
+    if (ui.gameModeAt(mouseX, mouseY)) {
+      lastWarning = "ゲームモードは準備中です";
+      return;
+    }
+  }
 }
 
 void keyPressed() {
+  if (screenState == SCREEN_PORT_SELECT && (key == 'r' || key == 'R')) {
+    refreshSerialPorts();
+    return;
+  }
+  if (screenState != SCREEN_PERFORMANCE) return;
+
   if (key == '1') setExpectedPart(PART_BRASS_1);
   else if (key == '2') setExpectedPart(PART_BRASS_2);
   else if (key == '3') setExpectedPart(PART_BRASS_3);
@@ -189,9 +282,11 @@ void keyPressed() {
   } else if (key == 'r' || key == 'R') {
     closeSerial();
     refreshSerialPorts();
+    screenState = SCREEN_PORT_SELECT;
   } else if (key == 'd' || key == 'D') {
     closeSerial();
     appState = "PortSelect";
+    screenState = SCREEN_PORT_SELECT;
     lastWarning = "切断しました";
   } else if (key == 't' || key == 'T') {
     partManager.playTestNote(expectedPartId);
