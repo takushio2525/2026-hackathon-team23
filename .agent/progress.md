@@ -5,6 +5,18 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **test_v2 Processing 側に「全パート同じ音色」モードを追加** (ユーザー指示「一旦発音を
+  全部ピアノにしてわかりやすくして」、`shiozawa-test_v2-jitter` ブランチ)。輪唱の聞き分け補助。
+  `pc_app/test_v2/orchestra_resynth/data/piano.json` を新規追加 (手書き音色: attack 8 ms・1.5 s
+  指数減衰 τ=0.85 s・倍音 8 本・非調和性 B=0.0004・アタックノイズ 0.04、analyzer 由来ではないので
+  厳密なピアノ音ではないが打鍵→減衰の輪郭は出る)。`orchestra_resynth.pde` に
+  `forceSingleInstrument`(既定 true) と `FORCED_INSTRUMENT_FILE="piano.json"` を導入し、
+  `rescanInstruments()` で piano.json の index を `forcedInstrumentIdx` にキャッシュ、`modelForId(id)`
+  が ON 時は instrumentId を無視してその index を返すよう改修。'p' キーで ON/OFF トグル、画面の
+  楽器定義パネルにモード表示。ファーム側は無変更 (NOTE には引き続き instrumentId が乗る)。
+  既存音色 (0_organ/1_flute/2_bell/3_flute_tweaked) は退避せず data/ にそのまま残し、'p' OFF で
+  従来挙動に戻る。`python3 -m json.tool` で JSON 構文 OK 確認。
+
 - 2026-05-27: **ジッタ削減版を楽器 node_02/03 に実機書き込み** (ユーザー指示「各マイコンに書き込んで」)。
   `shiozawa-test_v2-jitter` ブランチのファームを 2 台に upload: node_02 (SER=34B7DA64482C →
   `/dev/cu.usbmodem34B7DA64482C2`、bossac 3.41 秒・total 6.38 秒)、node_03 (SER=F412FAA08558 →

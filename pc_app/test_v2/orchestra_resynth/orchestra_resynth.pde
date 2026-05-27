@@ -76,6 +76,11 @@ AudioOutput out;
 ArrayList<File>        instrumentFiles = new ArrayList<File>();
 ArrayList<InstrModel>  models          = new ArrayList<InstrModel>();
 ArrayList<String>      modelLabels     = new ArrayList<String>();
+// [一時] 輪唱の聞き分けを優しくするため、全パートを同じ音色 (piano.json) で鳴らすモード。
+// 'p' キーで切替。false なら従来通り NOTE.instrumentId で楽器を引く。
+boolean      forceSingleInstrument    = true;
+final String FORCED_INSTRUMENT_FILE   = "piano.json";
+int          forcedInstrumentIdx      = -1;   // rescanInstruments() が更新
 
 // ── シリアルポート ────────────────────────────────────────
 // 各ポートはフレーム同期状態を個別に持つ。serialEvent(Serial) でどのポートか引く。
@@ -127,7 +132,7 @@ void setup(){
 
   println("=== orchestra_resynth (test_v2) ===");
   println("data/ から楽器定義 " + models.size() + " 個をロードしました。");
-  println("[click] ポート開閉  /  [wheel] スクロール  /  [r] ポート再列挙  /  [f] USB-onlyフィルタ切替  /  [i] 楽器再スキャン  /  [t] テスト音  /  [0-3] 楽器ごとの試聴  /  [Space] 停止");
+  println("[click] ポート開閉  /  [wheel] スクロール  /  [r] ポート再列挙  /  [f] USB-onlyフィルタ切替  /  [i] 楽器再スキャン  /  [p] 全パート同じ音色 ON/OFF  /  [t] テスト音  /  [0-3] 楽器ごとの試聴  /  [Space] 停止");
 }
 
 // OS の日本語対応フォントを優先順位付きで探す (orchestra_player.pde と同じ手法)
@@ -174,12 +179,27 @@ void rescanInstruments(){
   }
   if (models.isEmpty())
     println("[警告] data/ に *.json がありません。sound_lab で作った楽器定義を data/ に置いて 'i' を押してください。");
+
+  // [一時] 全パートを同じ音色に固定するモード用。data/piano.json の index を覚える。
+  forcedInstrumentIdx = -1;
+  for (int i = 0; i < instrumentFiles.size(); i++){
+    if (instrumentFiles.get(i).getName().equalsIgnoreCase(FORCED_INSTRUMENT_FILE) && models.get(i) != null){
+      forcedInstrumentIdx = i;
+      break;
+    }
+  }
+  println("single-instrument モード: " + (forceSingleInstrument ? "ON" : "OFF")
+        + " / 固定先=" + FORCED_INSTRUMENT_FILE
+        + " (" + (forcedInstrumentIdx >= 0 ? "idx=" + forcedInstrumentIdx : "未検出") + ")");
 }
 
 // 楽器番号 → 使えるモデル (範囲外は末尾にクランプ。1 個も無ければ null)
+// forceSingleInstrument=true なら instrumentId を無視して FORCED_INSTRUMENT_FILE を引く。
 InstrModel modelForId(int id){
   if (models.isEmpty()) return null;
-  int idx = constrain(id, 0, models.size()-1);
+  int idx;
+  if (forceSingleInstrument && forcedInstrumentIdx >= 0) idx = forcedInstrumentIdx;
+  else                                                   idx = constrain(id, 0, models.size()-1);
   InstrModel m = models.get(idx);
   if (m != null) return m;
   for (InstrModel mm : models) if (mm != null) return mm;   // フォールバック
@@ -437,7 +457,10 @@ void drawInstrumentList(){
   float x=16, y=266, w=width-32, h=110;
   glassPanel(x,y,w,h);
   fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("楽器定義 (data/*.json) — 番号 = 楽器番号 (Arduino が送る instrumentId)", x+12, y+18);
+  String forcedTag = forceSingleInstrument
+      ? "  [p:ON 全パート→" + FORCED_INSTRUMENT_FILE + (forcedInstrumentIdx>=0 ? " (idx=" + forcedInstrumentIdx + ")" : " (未検出)") + "]"
+      : "  [p:OFF instrumentId に従う]";
+  text("楽器定義 (data/*.json) — 番号 = 楽器番号 (Arduino が送る instrumentId)" + forcedTag, x+12, y+18);
   if (models.isEmpty()){
     fill(150,150,180);
     text("data/ に *.json がありません。sound_lab で作った楽器定義を置いて 'i' を押してください。", x+12, y+40);
@@ -552,6 +575,11 @@ void keyPressed(){
   char c = Character.toLowerCase(key);
   if (c=='r'){ refreshPorts(); return; }
   if (c=='i'){ rescanInstruments(); return; }
+  if (c=='p'){
+    forceSingleInstrument = !forceSingleInstrument;
+    println("single-instrument モード: " + (forceSingleInstrument ? "ON (全パート " + FORCED_INSTRUMENT_FILE + ")" : "OFF (instrumentId に従う)"));
+    return;
+  }
   if (c=='t'){ playTestChord(); return; }
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; println("包絡: " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ")); return; }
   if (c=='+' || c=='='){ masterVolume = constrain(masterVolume + 0.05f, 0.05f, 1.5f); return; }

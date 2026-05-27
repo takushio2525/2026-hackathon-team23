@@ -5,6 +5,25 @@
 
 ## 現在の対象
 
+- **test_v2 Processing 側「全パート同じ音色 (piano.json)」モードを追加**（2026-05-27、ユーザー指示
+  「一旦発音を全部ピアノにしてわかりやすくして」）。輪唱の聞き分けが楽になるよう、Processing
+  受信側で instrumentId を無視して同じ音色で鳴らすスイッチを足した。ファーム側は無変更
+  (NOTE には引き続き instrumentId=0/1/2 が乗る)。
+  - 変更ファイル (`shiozawa-test_v2-jitter` ブランチ):
+    - `pc_app/test_v2/orchestra_resynth/data/piano.json` (新規・4.9 KB): 手書きピアノ音色。
+      attack 8 ms・1.5 s 指数減衰 (τ=0.85 s)、倍音 8 本 (n=1〜8、高次ほど env 減衰大)、
+      非調和性 B=0.0004、アタックノイズ level=0.04。analyzer 由来ではないため厳密な
+      ピアノ音ではないが「打鍵→減衰」の輪郭は出る。
+    - `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`: `forceSingleInstrument`
+      (既定 true) と `FORCED_INSTRUMENT_FILE="piano.json"` を導入。`rescanInstruments()`
+      末尾で piano.json の index を `forcedInstrumentIdx` にキャッシュし、`modelForId(id)`
+      で ON 時は instrumentId を無視してその index を返す。'p' キーで ON/OFF をトグル、
+      画面の楽器定義パネルに `[p:ON 全パート→piano.json (idx=4)]` を表示。
+  - 戻し方: 'p' キーで OFF。または `forceSingleInstrument = false` を初期値に戻す。
+    JSON や既存音色 (organ/flute/bell/flute_tweaked) は何も触っていない。
+  - 動作確認はユーザーが Processing を起動するだけ (`pc_app/test_v2/orchestra_resynth/
+    orchestra_resynth.pde` を Processing 4 で Open → Run)。ファーム書き込み不要。
+
 - **test_v2 のジッタ削減と多重受信処理の改善**（2026-05-27、ユーザー指示）。
   応答性が悪い・連送 BEAT の 2 個目以降が消されている雰囲気、という指摘への対応。
   挑戦的変更のため `shiozawa-test_v2-jitter` ブランチを切って作業。`shiozawa-work` には未マージ。
