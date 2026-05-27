@@ -72,6 +72,7 @@ venv/
 
 # ===== Node / 一般 =====
 node_modules/
+docs/.astro/
 
 # ===== Astro Starlight (docs/) =====
 docs/dist/

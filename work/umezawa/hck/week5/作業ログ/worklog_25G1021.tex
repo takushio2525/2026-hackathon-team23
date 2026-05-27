@@ -1,0 +1,226 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック（jsarticle標準では○が出る）
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：梅澤颯太
+
+報告日：2026年5月26日
+
+プロジェクト名：タクトーン～IMU ジェスチャーで奏でるArduino オーケストラ～
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：40\%
+  \item マイルストーン達成状況：達成
+  \item 主要成果：
+    \begin{itemize}
+      \item 252「金管音色合成エンジン」の楽器音を合成して鳴らす部分を仮作成した．
+      \item 倍音構成とADSRによる金管風音色の実装を行った．
+    \end{itemize}
+  \item 課題：
+    \begin{itemize}
+      \item \texttt{NOTE} 受信モジュールとの結合確認は，6月1日の同モジュール実装後に次工程として扱う．
+    \end{itemize}
+\end{itemize}
+
+\subsection{ガントチャート}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig/ガントチャート_梅澤_全員.pdf}
+  \caption{全体のガントチャート}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig/ガントチャート_梅澤_全員_5月21日-26日_コンパクト.pdf}
+  \caption{今週のガントチャート}
+\end{figure}
+
+\sectionrule
+
+%================================================================
+% 2. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{0.16\linewidth}p{0.12\linewidth}XX@{}}
+\toprule
+日付 & 作業時間 & 作業内容 & 成果・メモ \\
+\midrule
+2026/05/24 & 2h & 金管音色合成エンジンを仮作成した． & 楽器音を合成して鳴らす部分を作り，倍音構成とADSRを用いた音色合成の基本方針を整理した． \\
+2026/05/25 & 2.5h & 倍音構成とADSRによる金管風音色を実装した． & 金管風音色を鳴らすための初期実装を行い，今週のガントチャート上の作業範囲を完了した． \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 3. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{0.20\linewidth}Xp{0.08\linewidth}p{0.08\linewidth}Xp{0.11\linewidth}p{0.09\linewidth}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 期限 & 状態 \\
+\midrule
+\texttt{NOTE} 受信モジュールとの結合確認 & 今週は音色合成エンジンの仮作成と音色作成を対象とし，受信モジュールは次工程で実装予定のため． & 中 & 中 & 6月1日に\texttt{NOTE}受信モジュールを実装した後，音色合成エンジンへ接続して確認する． & 2026/06/01以降 & 未対応 \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 4. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証（再現性重視）}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：設計整理，実装方針の確認，作業ログ文章の整理
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item 倍音構成，ADSRの考え方，Processingでの音色合成実装の整理について質問した．
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item 金管楽器らしい音色を作るための倍音比率，ADSR設定，Processing上での実装方針を整理できた．
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item Processingで実際に音を鳴らし，意図した楽器音として聞こえるかを確認する．
+    \end{itemize}
+  \item 参照資料：
+    \begin{itemize}
+      \item これまでの設計資料，AIから得た倍音構成・ADSRに関する整理結果．
+    \end{itemize}
+  \item 検証手順：
+    \begin{enumerate}
+      \item 倍音構成とADSR値をもとに，金管風音色の初期実装を作成する．
+      \item Processingで音を鳴らし，音量，立ち上がり，余韻が確認できるかを聴感で確認する．
+    \end{enumerate}
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+  \item 一致点：
+    \begin{itemize}
+      \item 金管音色は倍音構成とADSRの立ち上がり・減衰で印象が変わるという方針は，これまでの設計方針と整合している．
+    \end{itemize}
+  \item 不一致・疑義：
+    \begin{itemize}
+      \item 実際の楽器音として十分自然かどうかは，聴感確認と今後の結合確認で追加検証が必要である．
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用
+    \end{itemize}
+  \item 根拠：
+    \begin{itemize}
+      \item 今週の目的は金管音色合成エンジンの仮作成であり，倍音構成とADSRによる金管風音色を鳴らせる状態まで進めたため．
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 5. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item \texttt{NOTE}受信モジュールを実装し，受信した音情報を音色合成エンジンへ渡せるようにする．
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item \texttt{NOTE}受信後に，金管風音色を選択して鳴らせる状態にする．
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item 2026/06/01
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item 今週は音色合成エンジン単体の作業を対象としたため，\texttt{NOTE}受信モジュールとの結合確認は次回以降に実施する．
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. 付録
+%================================================================
+\sectionrule
+
+\section{付録}
+無し
+\sectionrule
+
+\end{document}
