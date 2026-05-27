@@ -5,7 +5,17 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
-- 2026-05-26: **作業ログ第1回の句読点を「，．」に統一**
+- 2026-05-27: **パケロス原因切り分け用 DevKitC 派生ファームを追加**
+  （`firmware/test_v1/node_01_devkitc/`）。test_v1 で 5/11 以降の UDP パケロス多発の
+  原因がコード退行ではない（5/11 以降の test_v1/ への変更は SERIAL_DEBUG 無効化の 1
+  件のみ）と確認し、最有力候補の「XIAO ESP32-S3 Sense 外付け IPEX アンテナ接触不良」
+  を切り分けるために PCB 内蔵アンテナの ESP32-S3-DevKitC-1 用派生を作成。`node_01` を
+  ディレクトリごとコピーしてビルド設定だけ差し替え（board=esp32-s3-devkitc-1 / USB CDC
+  OFF / upload_protocol デフォルト UART 側）、ロジック (`src/` `lib/`) は完全同一。I2C
+  ピンは GPIO5/GPIO6 のまま (DevKitC 左列 5・6 番目に並ぶのでブレッドボード配線でも
+  そのまま使える)。`pio run` で RAM 14%・Flash 22%・警告 0 でビルド通過。実機書き込み
+  と XIAO 版との比較検証はユーザー側 (CLAUDE.md「実機未テスト .ino に Claude 起点で
+  追加変更を入れない」ルール準拠)。
   （`work/shiozawa/work-0525/作業ログ0525/作業ログ0525.tex` + `.pdf`）。
   本体計画書 19edb91 と同方針で「、」→「，」「。」→「．」を全置換。
   Docker latexmk で 6 ページ・Overfull 0 ビルド成功。
