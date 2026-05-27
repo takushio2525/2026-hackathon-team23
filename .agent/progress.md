@@ -5,6 +5,16 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **test_v2 の 3 台を実機書き込み**（DevKitC + Arduino UNO R4 WiFi
+  ×2、ユーザー指示）。`pio device list` で接続デバイスを判定し、CH343 ブリッジ
+  (`/dev/cu.usbmodem5B7A1660211`) ← `node_01_devkitc` (12.80 秒)、UNO R4 シリアル
+  34B7DA64482C ← `node_02` (5.50 秒)、F412FAA08558 ← `node_03` (5.55 秒) で順次
+  `pio run -t upload --upload-port`。3 台とも `[SUCCESS]`。Arduino 2 台の割当は
+  AskUserQuestion で確認 (VID/PID 同一で自動判別不可)。node_04 (声部 3) は未接続。
+  注意: 楽器側 `platformio.ini` の `-DSERIAL_DEBUG=1` (ac8c5ff 以降) は NOTE
+  バイナリ送出を抑止するため、Processing で音を鳴らすには `=0` への切り替えが
+  別途必要。
+
 - 2026-05-27: **DevKitC 派生ファームを test_v2 にも展開**
   （`firmware/test_v2/node_01_devkitc/`）。test_v1/node_01_devkitc を実機検証
   したユーザーから「DevKitC でうまく行った」報告を受け、test_v2 (3 声輪唱) でも

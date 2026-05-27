@@ -5,34 +5,33 @@
 
 ## 現在の対象
 
-- **DevKitC 派生ファームを test_v2 にも追加**（2026-05-27、
-  `firmware/test_v2/node_01_devkitc/`）。test_v1/node_01_devkitc でユーザーが実機
-  検証してパケロスが顕著に改善したため (= XIAO ESP32-S3 Sense の外付け IPEX
-  アンテナ接触不良が主因と判明)、test_v2 でも同じ派生を用意して本番運用候補と
-  する。`firmware/test_v2/node_01` をディレクトリごとコピー (.pio/.vscode 除外)、
-  差分はビルド設定とコメントのみ:
-  - `platformio.ini`: board=`esp32-s3-devkitc-1` / USB CDC マクロ無効化 /
-    `upload_protocol = esp-builtin` をコメントアウトして PIO デフォルト (UART 側
-    esptool) に変更。
-  - `include/ProjectConfig.h`: 冒頭・I2C ピン・StatusLedConfig のコメントを
-    DevKitC 用に更新。WS2812 (GPIO48) は `digitalWrite` で光らないため
-    `activeLow=false` に変更 (test_v1 と同様の理由)。
-  - `README.md`: 差分表・配線・ビルド/書き込み手順・LED 注意点・切り分け実験
-    プランを DevKitC 用に書き直し。
-  - `src/` `lib/` `include/SystemData.h` はバイト単位で同一 (拍検出・テンポ
-    推定・3 声輪唱の頭ずらしロジックは未変更)。
-  `pio run` で RAM 14.0%・Flash 21.6%・警告 0・11.54 秒でビルド通過。実機書き
-  込み・XIAO 版との比較検証はユーザー側 (CLAUDE.md ルール)。
-- 直前: test_v1/node_01_devkitc を作成 (e5a09fd・2026-05-27) → ユーザー実機検証
-  で改善確認 → 本ターンで test_v2 にも展開。
+- **test_v2 の 3 台を実機書き込み済み**（2026-05-27、ユーザー指示で実施）。
+  ポート割当:
+  - DevKitC (CH343 ブリッジ、`/dev/cu.usbmodem5B7A1660211`) ← `node_01_devkitc`
+    (RAM 14.0% / Flash 21.6%・esptool 12.80 秒・Hash verified)
+  - Arduino UNO R4 WiFi シリアル 34B7DA64482C (location 1-1、
+    `/dev/cu.usbmodem34B7DA64482C2`) ← `node_02` (声部 1、5.50 秒)
+  - Arduino UNO R4 WiFi シリアル F412FAA08558 (location 0-1、
+    `/dev/cu.usbmodemF412FAA085582`) ← `node_03` (声部 2、5.55 秒)
+  これで test_v2 が DevKitC 指揮者 + Arduino 楽器 2 台 (声部 1・2) で起動可能。
+  node_04 (声部 3) は今回未書き込み。
+- **注意**: 楽器側 (`node_02` / `node_03`) の `platformio.ini` は `ac8c5ff デバック`
+  以降 `-DSERIAL_DEBUG=1` のまま。このモードは **NOTE バイナリパケットを抑止**
+  して人間可読テキストを Serial に流す調査用設定で、Processing
+  (`pc_app/test_v2/orchestra_resynth/`) で音を鳴らすには `=0` に戻して再ビルド・
+  再書き込みが必要。AGENTS.md「楽器ノードはデフォルト SERIAL_DEBUG=0」とは
+  乖離した現状。
 
 ## 次の一手
 
-- ユーザー側で `firmware/test_v2/node_01_devkitc` を ESP32-S3-DevKitC-1 (PCB
-  内蔵アンテナ N 版) に書き込み、楽器 3 ノード (node_02〜04) + Processing
-  `pc_app/test_v2/orchestra_resynth/` 起動で 3 声輪唱を回して NOTE 受信ログ
-  からパケロス率を XIAO 版と比較。test_v1 と同じく改善するはず。
-- DevKitC 採用が確定したら ADR-0007（パケロス対策方針＝DevKitC 移行）を起票。
+- 動作モード次第で 2 系統:
+  - **パケロス検証 (Serial ログ)**: 現状 `SERIAL_DEBUG=1` のまま、楽器ノード
+    `pio device monitor` でテキストを読みパケロス率を XIAO 版 (`node_01`) と
+    比較。改善が顕著なら ADR-0007 (DevKitC 移行) を起票。
+  - **3 声輪唱で音を鳴らす**: `node_02`/`node_03` の `platformio.ini` を
+    `-DSERIAL_DEBUG=0` に戻して再ビルド・再書き込み + Processing 起動。
+    ただし `SERIAL_DEBUG=1` 設定の経緯 (`ac8c5ff`) を踏まえ、ユーザー判断で。
+- いずれにせよ node_04 (声部 3) は別途書き込みが必要。今回は接続されていなかった。
 
 ## 現フェーズで Read すべき設計書
 
