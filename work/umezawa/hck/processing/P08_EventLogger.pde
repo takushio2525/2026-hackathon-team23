@@ -2,7 +2,7 @@ class Logger {
   PrintWriter writer;
 
   Logger() {
-    String filename = "orchestra_processing_final_log_" + year() + nf(month(), 2) + nf(day(), 2)
+    String filename = "processing_log_" + year() + nf(month(), 2) + nf(day(), 2)
       + "_" + nf(hour(), 2) + nf(minute(), 2) + nf(second(), 2) + ".csv";
     writer = createWriter(filename);
     writer.println("millis,event,seq,timestampMs,partId,noteNumber,velocity,gate,durationMs");

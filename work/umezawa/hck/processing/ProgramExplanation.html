@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>orchestra_processing_final 解説</title>
+  <title>processing 解説</title>
   <style>
     :root {
       color-scheme: light;
@@ -528,7 +528,7 @@
 </div>
 <div class="page">
 <div class="hero">
-  <h1>orchestra_processing_final プログラム解説</h1>
+  <h1>processing プログラム解説</h1>
   <p class="lead">
     Processing を触り始めた人でも追えるように、
     「前提知識」「データの流れ」「各ファイルの役割」「音が鳴る理由」を順番に説明します。
@@ -692,7 +692,7 @@
 
   <p>
     Processing では、同じフォルダ内にある複数の <code>.pde</code> ファイルは、1つのスケッチとしてまとめて扱われます。
-    つまり、<code>02_ConstantsAndParts.pde</code> や <code>06_SoundVoices.pde</code> に書かれた関数やクラスも、
+    つまり、<code>P02_ConstantsAndParts.pde</code> や <code>P06_SoundVoices.pde</code> に書かれた関数やクラスも、
     メインファイル <code>processing.pde</code> からそのまま使えます。
   </p>
 
@@ -726,11 +726,11 @@
     </div>
     <div class="card green">
       <strong>通信の翻訳</strong>
-      <p><code>04_SerialNoteFrameReader.pde</code> と <code>03_NoteProtocol.pde</code><br>バイト列を意味のあるデータにします。</p>
+      <p><code>P04_SerialNoteFrameReader.pde</code> と <code>P03_NoteProtocol.pde</code><br>バイト列を意味のあるデータにします。</p>
     </div>
     <div class="card amber">
       <strong>音の管理</strong>
-      <p><code>05_SoundPartManager.pde</code> と <code>06_SoundVoices.pde</code><br>どの音を、どの音色で、いつ止めるかを決めます。</p>
+      <p><code>P05_SoundPartManager.pde</code> と <code>P06_SoundVoices.pde</code><br>どの音を、どの音色で、いつ止めるかを決めます。</p>
     </div>
   </div>
   <table>
@@ -746,31 +746,31 @@
         <td>メイン処理です。画面の初期化、シリアル受信、受信データの処理、キー操作、終了処理を担当します。</td>
       </tr>
       <tr>
-        <td><code>02_ConstantsAndParts.pde</code></td>
+        <td><code>P02_ConstantsAndParts.pde</code></td>
         <td>通信速度、プロトコル番号、パートID、最大同時発音数など、全体で使う定数をまとめています。</td>
       </tr>
       <tr>
-        <td><code>03_NoteProtocol.pde</code></td>
+        <td><code>P03_NoteProtocol.pde</code></td>
         <td>20バイトの NOTE フレームを <code>NotePacket</code> に変換する処理と、テスト用フレームを作る処理があります。</td>
       </tr>
       <tr>
-        <td><code>04_SerialNoteFrameReader.pde</code></td>
+        <td><code>P04_SerialNoteFrameReader.pde</code></td>
         <td>シリアル通信で1バイトずつ届くデータをためて、正しい20バイトのまとまりとして取り出します。</td>
       </tr>
       <tr>
-        <td><code>05_SoundPartManager.pde</code></td>
+        <td><code>P05_SoundPartManager.pde</code></td>
         <td>受け取った音符をどの音源で鳴らすか決め、同時に鳴る音の数も管理します。</td>
       </tr>
       <tr>
-        <td><code>06_SoundVoices.pde</code></td>
+        <td><code>P06_SoundVoices.pde</code></td>
         <td>実際に音を鳴らすクラス群です。金管音の <code>BrassVoice</code> とリズム音の <code>RhythmVoice</code> があります。</td>
       </tr>
       <tr>
-        <td><code>07_ScreenView.pde</code></td>
+        <td><code>P07_ScreenView.pde</code></td>
         <td>画面表示を担当します。シリアルポート一覧、状態、波形、キー操作の説明を描画します。</td>
       </tr>
       <tr>
-        <td><code>08_EventLogger.pde</code></td>
+        <td><code>P08_EventLogger.pde</code></td>
         <td>受信したパケットやイベントを CSV ファイルに記録します。デバッグや実験後の確認に使えます。</td>
       </tr>
       <tr>
@@ -895,7 +895,7 @@
   <h2 id="frame">5. NOTE フレームの中身</h2>
   <p>
     このプログラムが受け取る NOTE フレームは、固定長の20バイトです。
-    <code>03_NoteProtocol.pde</code> の <code>decodeNote()</code> が、この20バイトを読み取って
+    <code>P03_NoteProtocol.pde</code> の <code>decodeNote()</code> が、この20バイトを読み取って
     <code>NotePacket</code> という扱いやすい形に変換します。
   </p>
 
@@ -1094,7 +1094,7 @@
 
   <h2 id="parts">7. パートID</h2>
   <p>
-    <code>02_ConstantsAndParts.pde</code> では、使うパートIDが次のように定義されています。
+    <code>P02_ConstantsAndParts.pde</code> では、使うパートIDが次のように定義されています。
   </p>
   <table>
     <thead>
@@ -1267,7 +1267,7 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
 
   <h2>10. 画面表示</h2>
   <p>
-    <code>07_ScreenView.pde</code> は、画面に見える部分をまとめて担当しています。
+    <code>P07_ScreenView.pde</code> は、画面に見える部分をまとめて担当しています。
     <code>draw()</code> の中で、次の5つを描いています。
   </p>
   <ul>
@@ -1285,7 +1285,7 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
   <h2>11. ログ出力</h2>
   <p>
     <code>Logger</code> は起動時に CSV ファイルを作ります。
-    ファイル名は <code>orchestra_processing_final_log_年月日_時分秒.csv</code> のような形式です。
+    ファイル名は <code>processing_log_年月日_時分秒.csv</code> のような形式です。
   </p>
   <p>
     ログには、受信したパケット、破棄された理由、シリアル接続、音の開始・停止などが記録されます。
@@ -1393,7 +1393,7 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
   <h2>15. 改造するときの考え方</h2>
   <h3>受け付けるパートを増やしたい</h3>
   <p>
-    <code>02_ConstantsAndParts.pde</code> に新しい <code>PART_...</code> 定数を追加し、
+    <code>P02_ConstantsAndParts.pde</code> に新しい <code>PART_...</code> 定数を追加し、
     <code>partName()</code> と <code>isKnownPart()</code> にも追加します。
     そのうえで <code>PartManager.noteOn()</code> で、どの <code>Voice</code> を使うか決めます。
   </p>
@@ -1487,17 +1487,17 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
   <h2 id="reading-order">18. 読む順番のおすすめ</h2>
   <ol>
     <li><code>README.md</code> で実行方法とキー操作を確認する。</li>
-    <li><code>02_ConstantsAndParts.pde</code> で定数とパートIDを見る。</li>
+    <li><code>P02_ConstantsAndParts.pde</code> で定数とパートIDを見る。</li>
     <li><code>processing.pde</code> の <code>setup()</code>、<code>draw()</code>、<code>handlePacket()</code> を読む。</li>
-    <li><code>03_NoteProtocol.pde</code> で20バイトの読み取り方を見る。</li>
-    <li><code>04_SerialNoteFrameReader.pde</code> でフレームの探し方を見る。</li>
-    <li><code>05_SoundPartManager.pde</code> と <code>06_SoundVoices.pde</code> で音が鳴る仕組みを見る。</li>
-    <li><code>07_ScreenView.pde</code> と <code>08_EventLogger.pde</code> で表示と記録を見る。</li>
+    <li><code>P03_NoteProtocol.pde</code> で20バイトの読み取り方を見る。</li>
+    <li><code>P04_SerialNoteFrameReader.pde</code> でフレームの探し方を見る。</li>
+    <li><code>P05_SoundPartManager.pde</code> と <code>P06_SoundVoices.pde</code> で音が鳴る仕組みを見る。</li>
+    <li><code>P07_ScreenView.pde</code> と <code>P08_EventLogger.pde</code> で表示と記録を見る。</li>
   </ol>
 
   <p class="small">
     作成対象: <code>umezawa_work</code> ブランチの
-    <code>work/umezawa/hck/week3/orchestra_processing_final</code>
+    <code>work/umezawa/hck/processing</code>
   </p>
 </div>
 </div>
