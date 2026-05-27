@@ -14,18 +14,27 @@
   - `headRestBeats=0/8/16` (ProjectConfig.h) は不変 → 楽譜内位相が (0, 8, 16) と
     3 声とも違うので輪唱成立。16 拍版にすると node_04 が node_02 と完全同位相に
     なるため 24 拍周期を選択。
-  - 3 ノードとも `pio run` で SUCCESS (Flash 20.9% / RAM 20.6%)。**実機書き込みは
-    未実施**。
-- 直前状態 (履歴): test_v2 3 台 (DevKitC 指揮者 + Arduino UNO R4 WiFi 楽器 2 台)
-  は SERIAL_DEBUG=0 化して書き込み済み。node_04 (声部 3) は接続前のため未書き込み。
-  指揮者 `node_01_devkitc` は `SERIAL_DEBUG=1` のまま (拍検出デバッグ用)。
+  - 3 ノードとも `pio run` で SUCCESS (Flash 20.9% / RAM 20.6%)。
+  - **node_02/03 は実機書き込み済み** (2026-05-27、ユーザー指示):
+    - node_02 (SER=34B7DA64482C → `/dev/cu.usbmodem34B7DA64482C2`): bossac
+      3.43 秒・total 6.12 秒・Hash verified
+    - node_03 (SER=F412FAA08558 → `/dev/cu.usbmodemF412FAA085582`): bossac
+      3.49 秒・total 5.41 秒・Hash verified
+    - 初回試行時 Processing (orchestra_resynth, PID 54869) が両ポートを掴んで
+      `[Errno 16] Resource busy` で失敗。ユーザーに Processing 終了を依頼して
+      再書き込み成功。
+  - node_04 は未接続のため未書き込み (前回 2026-05-27 のときと同じ状態)。
+- 指揮者 `node_01_devkitc` は楽譜を持たない (`score_data.cpp` なし) ため、今回の
+  楽曲差し替えでは書き込み不要。前回 `SERIAL_DEBUG=1` のまま (拍検出デバッグ用)。
 
 ## 次の一手
 
-- ユーザー側で node_02/03 (および接続できれば node_04) に新しい楽譜を
-  `pio run -t upload` で書き込み、Processing を起動して「かえるのうた」が
-  3 声輪唱で鳴るか確認。8 拍ずれ輪唱なので、第 1 声「ドレミファ…」が始まって
-  8 拍後に第 2 声 (node_03)、さらに 8 拍後に第 3 声 (node_04) が入る。
+- ユーザー側で Processing (`pc_app/test_v2/orchestra_resynth/`) を再起動し、
+  「かえるのうた」が 2 声輪唱 (node_02=声部 1、node_03=声部 2) で鳴るか確認。
+  8 拍ずれなので、第 1 声「ドレミファ…」が始まって 8 拍後に第 2 声が「ドレミ
+  ファ…」で入る。3 声目 (node_04) は未接続なので位相 16 拍の声部は鳴らない。
+- node_04 (声部 3) を接続して書き込むと 3 声フル輪唱になる
+  (`~/.platformio/penv/bin/pio run -d firmware/test_v2/node_04 -t upload`)。
 - パケロス観察も継続 (DevKitC 移行で改善されたか)。
 - 鳴り方が安定したら ADR-0007（パケロス対策方針＝DevKitC 移行）を起票。
 

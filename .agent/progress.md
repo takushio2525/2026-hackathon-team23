@@ -5,6 +5,17 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **かえるのうた版を node_02/03 に実機書き込み** (ユーザー指示)。
+  接続中の Arduino UNO R4 WiFi 2 台を `pio device list` でシリアル番号判定:
+  node_02 (SER=34B7DA64482C, `/dev/cu.usbmodem34B7DA64482C2`, bossac 3.43 秒,
+  total 6.12 秒) と node_03 (SER=F412FAA08558, `/dev/cu.usbmodemF412FAA085582`,
+  bossac 3.49 秒, total 5.41 秒)。両方 `[SUCCESS]` / Hash verified。初回試行
+  時に Processing (orchestra_resynth, PID 54869) が両ポートを `lsof` で掴んで
+  おり `[Errno 16] Resource busy` で失敗、ユーザーに Processing 終了を依頼
+  して再試行で成功。node_04 (声部 3) は未接続のため未書き込み。指揮者
+  `node_01_devkitc` は楽譜を持たないので書き込み不要。これで test_v2 が
+  「かえるのうた」2 声輪唱 (位相 0/8) で動作可能な状態。
+
 - 2026-05-27: **test_v2 の楽曲を「きらきら星」→「かえるのうた」へ差し替え**
   (`firmware/test_v2/node_02/03/04/src/score_data.cpp`、コミット 655d72e)。
   きらきら星は同型反復で輪唱の聞き分けが難しいというユーザー判断。1 周 24 拍
