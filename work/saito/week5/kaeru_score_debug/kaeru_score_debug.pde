@@ -5,12 +5,18 @@ final int BPM = 96;
 final int NOTE_ON = 0x01;
 final int REST = 0x04;
 final int MAX_HARMONICS = 12;
+final int DRUM_PART = 4;
+final int KICK_DRUM = 36;
+final int SNARE_DRUM = 38;
+final int CLOSED_HI_HAT = 42;
+final int CRASH_CYMBAL = 49;
 
 final String[] PART_NAMES = {
   "主旋律1 / トランペット",
   "主旋律2 / ホルン",
   "主旋律3 / トロンボーン",
-  "低音 / チューバ"
+  "低音 / チューバ",
+  "リズム / ドラム"
 };
 
 final String[] INSTRUMENT_FILES = {
@@ -20,13 +26,13 @@ final String[] INSTRUMENT_FILES = {
   "tuba.tweaked.instrument.json"
 };
 
-final int[] START_BEATS = {0, 8, 16, 0};
-final float[] PART_AMPLITUDES = {0.20f, 0.17f, 0.15f, 0.13f};
+final int[] START_BEATS = {0, 8, 16, 0, 0};
+final float[] PART_AMPLITUDES = {0.20f, 0.17f, 0.15f, 0.13f, 0.24f};
 
 Minim minim;
 AudioOutput out;
 TimbreData[] timbres;
-String currentMode = "P キーで主旋律3声と低音を再生します";
+String currentMode = "P キーで主旋律3声、低音、ドラムを再生します";
 
 class ScoreEvent {
   int beatAt;
@@ -190,6 +196,64 @@ ScoreEvent[] BASS_SCORE = {
   new ScoreEvent(39,  0,  0, 256, REST)
 };
 
+// ドラム用のリズム伴奏。キックとスネアを交互に置き、各拍にハイハットを重ねる。
+// MIDI 打楽器番号を用い、最後の拍はクラッシュシンバルで輪唱全体を締める。
+ScoreEvent[] DRUM_SCORE = {
+  // 主旋律1の前半
+  new ScoreEvent( 0, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent( 1, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent( 2, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent( 3, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent( 4, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent( 5, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent( 6, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent( 7, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent( 8, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent( 9, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(10, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(11, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(12, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(13, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(14, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(15, SNARE_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
+
+  // 主旋律が3声そろう区間
+  new ScoreEvent(16, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
+  new ScoreEvent(17, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 52, 0, 48),
+  new ScoreEvent(18, KICK_DRUM, 102, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(19, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 52, 0, 48),
+  new ScoreEvent(20, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
+  new ScoreEvent(21, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 52, 0, 48),
+  new ScoreEvent(22, KICK_DRUM, 102, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(23, SNARE_DRUM, 100, 64, NOTE_ON, CLOSED_HI_HAT, 60, 0, 48),
+  new ScoreEvent(24, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
+  new ScoreEvent(25, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 52, 0, 48),
+  new ScoreEvent(26, KICK_DRUM, 102, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(27, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 52, 0, 48),
+  new ScoreEvent(28, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
+  new ScoreEvent(29, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 52, 0, 48),
+  new ScoreEvent(30, KICK_DRUM, 102, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(31, SNARE_DRUM, 102, 64, NOTE_ON, CLOSED_HI_HAT, 62, 0, 48),
+
+  // 遅れて入った主旋律3の終止まで
+  new ScoreEvent(32, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(33, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(34, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(35, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(36, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(37, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(38, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(39, SNARE_DRUM,  96, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(40, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
+  new ScoreEvent(41, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(42, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(43, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
+  new ScoreEvent(44, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
+  new ScoreEvent(45, SNARE_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
+  new ScoreEvent(46, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 60, 0, 48),
+  new ScoreEvent(47, KICK_DRUM, 112, 96, NOTE_ON, CRASH_CYMBAL, 92, 0, 192)
+};
+
 class BrassNote implements Instrument {
   Oscil[] harmonics;
   Summer mix;
@@ -220,8 +284,47 @@ class BrassNote implements Instrument {
   }
 }
 
+class DrumNote implements Instrument {
+  Summer mix;
+  Oscil tone;
+  Noise noise;
+  ADSR envelope;
+
+  DrumNote(int noteNumber, float amplitude) {
+    mix = new Summer();
+    if (noteNumber == KICK_DRUM) {
+      tone = new Oscil(58.0f, amplitude * 1.20f, Waves.SINE);
+      tone.patch(mix);
+      envelope = new ADSR(1.0f, 0.001f, 0.075f, 0.0f, 0.030f);
+    } else {
+      noise = new Noise(amplitude, Noise.Tint.WHITE);
+      noise.patch(mix);
+      if (noteNumber == SNARE_DRUM) {
+        tone = new Oscil(180.0f, amplitude * 0.30f, Waves.SINE);
+        tone.patch(mix);
+        envelope = new ADSR(1.0f, 0.001f, 0.120f, 0.0f, 0.035f);
+      } else if (noteNumber == CRASH_CYMBAL) {
+        envelope = new ADSR(1.0f, 0.001f, 0.300f, 0.0f, 0.100f);
+      } else {
+        envelope = new ADSR(1.0f, 0.001f, 0.035f, 0.0f, 0.015f);
+      }
+    }
+    mix.patch(envelope);
+  }
+
+  void noteOn(float duration) {
+    envelope.noteOn();
+    envelope.patch(out);
+  }
+
+  void noteOff() {
+    envelope.unpatchAfterRelease(out);
+    envelope.noteOff();
+  }
+}
+
 void setup() {
-  size(920, 420);
+  size(920, 470);
   minim = new Minim(this);
   out = minim.getLineOut(Minim.STEREO, 1024);
   out.setTempo(BPM);
@@ -236,32 +339,32 @@ void draw() {
   background(248, 246, 242);
   fill(34);
   textSize(26);
-  text("かえるのうた 楽譜・解析音色プレビュー", 28, 42);
+  text("かえるのうた 楽譜・音色プレビュー", 28, 42);
   textSize(15);
-  text("固定テンポ: " + BPM + " BPM   主旋律: " + MELODY_SCORE.length + " 拍   低音: " + BASS_SCORE.length + " 拍", 28, 72);
-  text("P: 全パート再生    1-4: 単独再生    再生完了後に次のキーを押してください", 28, 98);
+  text("固定テンポ: " + BPM + " BPM   主旋律: " + MELODY_SCORE.length + " 拍   低音: " + BASS_SCORE.length + " 拍   ドラム: " + DRUM_SCORE.length + " 拍", 28, 72);
+  text("P: 全パート再生    1-5: 単独再生    再生完了後に次のキーを押してください", 28, 98);
 
   int y = 148;
   for (int part = 0; part < PART_NAMES.length; part++) {
     fill(34);
     text(PART_NAMES[part] + "   開始拍 = " + START_BEATS[part], 28, y);
     fill(70 + part * 24, 130, 180);
-    int scoreLength = part == 3 ? BASS_SCORE.length : MELODY_SCORE.length;
+    int scoreLength = scoreForPart(part).length;
     rect(322 + START_BEATS[part] * 8, y - 14, scoreLength * 8, 14, 3);
     y += 42;
   }
 
   fill(34);
-  text(currentMode, 28, 338);
+  text(currentMode, 28, 382);
   textSize(13);
-  text("音色: 解析 JSON の第1〜第" + MAX_HARMONICS + "倍音と ADSR を利用", 28, 377);
-  text("Arduino 転記対象: { beatAt, noteNumber, velocity, durationQ8, flags, sub... }", 28, 398);
+  text("音色: 金管・低音は解析 JSON、ドラムはキック / スネア / ハイハットの簡易合成を利用", 28, 421);
+  text("Arduino 転記対象: { beatAt, noteNumber, velocity, durationQ8, flags, sub... }", 28, 442);
 }
 
 void keyPressed() {
   if (key == 'p' || key == 'P') {
     playAllParts();
-  } else if (key >= '1' && key <= '4') {
+  } else if (key >= '1' && key <= '5') {
     int part = key - '1';
     playPart(part);
   }
@@ -273,7 +376,7 @@ void playAllParts() {
     schedulePart(part);
   }
   out.resumeNotes();
-  currentMode = "主旋律3声の輪唱と、チューバの低音伴奏を再生中です。";
+  currentMode = "主旋律3声の輪唱、チューバ低音、ドラム伴奏を再生中です。";
 }
 
 void playPart(int part) {
@@ -284,26 +387,39 @@ void playPart(int part) {
 }
 
 void schedulePart(int part) {
-  ScoreEvent[] score = part == 3 ? BASS_SCORE : MELODY_SCORE;
+  ScoreEvent[] score = scoreForPart(part);
   for (ScoreEvent event : score) {
     if (event.isRest()) {
       continue;
     }
     float startBeat = START_BEATS[part] + event.beatAt;
     float durationBeats = event.durationQ8 / 256.0f;
-    float frequency = midiToFrequency(event.noteNumber);
     float velocityScale = event.velocity / 127.0f;
     float amplitude = PART_AMPLITUDES[part] * velocityScale;
-    out.playNote(startBeat, durationBeats, new BrassNote(frequency, amplitude, timbres[part]));
+    out.playNote(startBeat, durationBeats, noteInstrument(part, event.noteNumber, amplitude));
     if (event.subNote != 0) {
       float subStartBeat = startBeat + event.subOffsetQ8 / 256.0f;
       float subDurationBeats = event.subDurationQ8 / 256.0f;
-      float subFrequency = midiToFrequency(event.subNote);
       float subVelocityScale = event.subVelocity / 127.0f;
       float subAmplitude = PART_AMPLITUDES[part] * subVelocityScale;
-      out.playNote(subStartBeat, subDurationBeats, new BrassNote(subFrequency, subAmplitude, timbres[part]));
+      out.playNote(subStartBeat, subDurationBeats, noteInstrument(part, event.subNote, subAmplitude));
     }
   }
+}
+
+ScoreEvent[] scoreForPart(int part) {
+  if (part == DRUM_PART) {
+    return DRUM_SCORE;
+  }
+  return part == 3 ? BASS_SCORE : MELODY_SCORE;
+}
+
+Instrument noteInstrument(int part, int noteNumber, float amplitude) {
+  if (part == DRUM_PART) {
+    return new DrumNote(noteNumber, amplitude);
+  }
+  float frequency = midiToFrequency(noteNumber);
+  return new BrassNote(frequency, amplitude, timbres[part]);
 }
 
 float midiToFrequency(int midiNote) {
