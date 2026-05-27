@@ -5,33 +5,29 @@
 
 ## 現在の対象
 
-- **test_v2 の 3 台を実機書き込み済み**（2026-05-27、ユーザー指示で実施）。
-  ポート割当:
-  - DevKitC (CH343 ブリッジ、`/dev/cu.usbmodem5B7A1660211`) ← `node_01_devkitc`
-    (RAM 14.0% / Flash 21.6%・esptool 12.80 秒・Hash verified)
-  - Arduino UNO R4 WiFi シリアル 34B7DA64482C (location 1-1、
-    `/dev/cu.usbmodem34B7DA64482C2`) ← `node_02` (声部 1、5.50 秒)
-  - Arduino UNO R4 WiFi シリアル F412FAA08558 (location 0-1、
-    `/dev/cu.usbmodemF412FAA085582`) ← `node_03` (声部 2、5.55 秒)
-  これで test_v2 が DevKitC 指揮者 + Arduino 楽器 2 台 (声部 1・2) で起動可能。
-  node_04 (声部 3) は今回未書き込み。
-- **node_02/03 を SERIAL_DEBUG=0 で再書き込み済み**（同日中、ユーザー指示）。
-  Processing (`pc_app/test_v2/orchestra_resynth/`) を起動して受信 0 だったため、
-  `ac8c5ff デバック` 以降残っていた `-DSERIAL_DEBUG=1` を `=0` に戻して再ビルド・
-  再書き込み。node_04 の `platformio.ini` は元から `=0` のままだったので変更
-  なし。これで AGENTS.md「楽器ノードはデフォルト SERIAL_DEBUG=0」と整合。
-  - node_02: bossac 16.41 秒 / Hash verified
-  - node_03: bossac 12.67 秒 / Hash verified
-- 指揮者側 `node_01_devkitc` は `SERIAL_DEBUG=1` のまま (拍検出デバッグ用、
-  Processing とは独立しているので問題なし)。
+- **test_v2 の楽曲を「きらきら星」→「かえるのうた」に差し替え済み**（2026-05-27、
+  ユーザー指示）。`firmware/test_v2/node_02/03/04/src/score_data.cpp` の 3 ファイル。
+  きらきら星は構造が複雑で輪唱の聞き分けが難しい (≒同型反復で 8 拍ずれが分かりに
+  くい) ため、3 フレーズで識別しやすい「かえるのうた」に。
+  - 1 周 = 24 拍 (ドレミファミレドー / ミファソラソファミー / ドドドドドドドー)
+  - kScoreLength=48 を維持 (24 拍版を 2 周ぶん直書き)
+  - `headRestBeats=0/8/16` (ProjectConfig.h) は不変 → 楽譜内位相が (0, 8, 16) と
+    3 声とも違うので輪唱成立。16 拍版にすると node_04 が node_02 と完全同位相に
+    なるため 24 拍周期を選択。
+  - 3 ノードとも `pio run` で SUCCESS (Flash 20.9% / RAM 20.6%)。**実機書き込みは
+    未実施**。
+- 直前状態 (履歴): test_v2 3 台 (DevKitC 指揮者 + Arduino UNO R4 WiFi 楽器 2 台)
+  は SERIAL_DEBUG=0 化して書き込み済み。node_04 (声部 3) は接続前のため未書き込み。
+  指揮者 `node_01_devkitc` は `SERIAL_DEBUG=1` のまま (拍検出デバッグ用)。
 
 ## 次の一手
 
-- ユーザー側で Processing を起動 (またはシリアルを再接続) し、3 声輪唱で
-  きらきら星が鳴るか確認。XIAO 版時代に問題だったパケロスが DevKitC で改善
-  されているかも同時に観察 (節目ごとに NOTE が抜けるかどうか)。
+- ユーザー側で node_02/03 (および接続できれば node_04) に新しい楽譜を
+  `pio run -t upload` で書き込み、Processing を起動して「かえるのうた」が
+  3 声輪唱で鳴るか確認。8 拍ずれ輪唱なので、第 1 声「ドレミファ…」が始まって
+  8 拍後に第 2 声 (node_03)、さらに 8 拍後に第 3 声 (node_04) が入る。
+- パケロス観察も継続 (DevKitC 移行で改善されたか)。
 - 鳴り方が安定したら ADR-0007（パケロス対策方針＝DevKitC 移行）を起票。
-- node_04 (声部 3) を接続して書き込むと 3 声フル輪唱になる。
 
 ## 現フェーズで Read すべき設計書
 

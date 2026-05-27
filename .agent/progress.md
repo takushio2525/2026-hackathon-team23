@@ -5,6 +5,18 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **test_v2 の楽曲を「きらきら星」→「かえるのうた」へ差し替え**
+  (`firmware/test_v2/node_02/03/04/src/score_data.cpp`、コミット 655d72e)。
+  きらきら星は同型反復で輪唱の聞き分けが難しいというユーザー判断。1 周 24 拍
+  (ドレミファミレドー / ミファソラソファミー / ドドドドドドドー) を 2 周ぶん
+  直書きして kScoreLength=48 を維持。`headRestBeats=0/8/16` (ProjectConfig.h)
+  はそのまま → 楽譜内位相 (0,8,16) で 3 声輪唱成立。16 拍版にすると node_04 が
+  node_02 と完全同位相になるため 24 拍周期を採用。3 ノードとも `pio run` で
+  SUCCESS (Flash 20.9% / RAM 20.6%)。実機書き込みは未実施 (CLAUDE.md「実機未
+  テスト .ino/.cpp に Claude 起点で追加変更を入れない」ルール準拠でユーザー
+  作業に委ねる)。`.agent/activeContext.md` の課題曲メモ「かえるのうたでチーム
+  判断確定」が今回の差し替えで実装側にも反映された形。
+
 - 2026-05-27: **orchestra_resynth のポート一覧に USB フィルタ+スクロール追加**
   (`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`)。ユーザーの Mac
   でポート一覧が画面下に並びきらず、書き込み直後に再認識された
