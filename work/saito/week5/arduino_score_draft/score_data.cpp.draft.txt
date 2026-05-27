@@ -1,68 +1,47 @@
 #include "score_data.h"
 
-// "Twinkle, Twinkle, Little Star" in C major.
-// All four brass nodes share this score and change only headRestBeats.
-// Sub fields are retained for the planned format, but are unused in this tune.
+// 「かえるのうた」のハ長調主旋律。主旋律3ノードで共有し、入り拍だけ変更する。
+// 最後の細かい音符では、1拍内の後半音を sub 系フィールドで表現する。
 const ScoreEvent kScore[] = {
-    // Phrase 1: C C G G A A G-
+    // かえるのうたが
     {  1, 60, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    {  2, 60, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    {  3, 67, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    {  4, 67, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    {  5, 69, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    {  6, 69, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    {  7, 67, 96, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    {  2, 62, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    {  3, 64, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    {  4, 65, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    {  5, 64, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    {  6, 62, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    {  7, 60, 96, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
     {  8,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
 
-    // Phrase 2: F F E E D D C-
-    {  9, 65, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    // きこえてくるよ
+    {  9, 64, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
     { 10, 65, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 11, 64, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 12, 64, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 13, 62, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 14, 62, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 15, 60, 96, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 11, 67, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 12, 69, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 13, 67, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 14, 65, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 15, 64, 96, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
     { 16,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
 
-    // Phrase 3: G G F F E E D-
-    { 17, 67, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 18, 67, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 19, 65, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 20, 65, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 21, 64, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 22, 64, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 23, 62, 92, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    // クワ クワ クワ クワ
+    { 17, 60, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 18,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 19, 60, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 20,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 21, 60, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 22,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 23, 60, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
     { 24,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
 
-    // Phrase 4: G G F F E E D-
-    { 25, 67, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 26, 67, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 27, 65, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 28, 65, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 29, 64, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 30, 64, 90, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 31, 62, 92, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 32,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
-
-    // Phrase 5: C C G G A A G-
-    { 33, 60, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 34, 60, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 35, 67, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 36, 67, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 37, 69, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 38, 69, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 39, 67, 96, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 40,  0,  0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
-
-    // Phrase 6: F F E E D D C-
-    { 41, 65, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 42, 65, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 43, 64, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 44, 64, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 45, 62, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 46, 62, 92, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 47, 60, 100, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
-    { 48,  0,   0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    // ケケケケケケケケ クワクワクワ
+    { 25, 60, 96, 128, SCORE_FLAG_NOTE_ON, 60, 96, 128, 128 },
+    { 26, 62, 96, 128, SCORE_FLAG_NOTE_ON, 62, 96, 128, 128 },
+    { 27, 64, 96, 128, SCORE_FLAG_NOTE_ON, 64, 96, 128, 128 },
+    { 28, 65, 96, 128, SCORE_FLAG_NOTE_ON, 65, 96, 128, 128 },
+    { 29, 64, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 30, 62, 96, 256, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 31, 60, 100, 512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 },
+    { 32,  0,   0,   0, SCORE_FLAG_REST,    0, 0, 0, 0 },
 };
 
 const size_t kScoreLength = sizeof(kScore) / sizeof(kScore[0]);

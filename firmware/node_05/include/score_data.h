@@ -1,14 +1,16 @@
 #pragma once
-
-#include <Arduino.h>
+#include <stdint.h>
 
 constexpr uint8_t SCORE_FLAG_NOTE_ON = 0x01;
 constexpr uint8_t SCORE_FLAG_NOTE_OFF = 0x02;  // 将来用に予約。
 constexpr uint8_t SCORE_FLAG_REST = 0x04;
 
+constexpr uint8_t kInstrumentId = 3;      // チューバ。
+constexpr uint16_t kHeadRestBeats = 0;    // 曲頭から低音を開始。
+
 // 1要素が1拍を表す。sub 系フィールドで拍の途中の第2音を保持できる。
 struct ScoreEvent {
-    uint16_t beatAt;          // 確認用の1始まりの拍番号。
+    uint16_t beatAt;          // パート開始からの0始まりの拍番号。
     uint8_t noteNumber;       // MIDI ノート番号。0 は休符。
     uint8_t velocity;         // 楽譜上の強さ。0〜127。
     uint16_t durationQ8;      // 1/256拍。256 = 1拍、1024 = 4拍。
@@ -20,4 +22,4 @@ struct ScoreEvent {
 };
 
 extern const ScoreEvent kScore[];
-extern const size_t kScoreLength;
+extern const uint16_t kScoreLength;

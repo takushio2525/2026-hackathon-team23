@@ -1,0 +1,48 @@
+#include "score_data.h"
+
+// 「かえるのうた」のチューバ用低音伴奏。C3、F2、G2 の長音で輪唱の和声を支える。
+// node_05 では主旋律配列の代わりに、この配列を score_data.cpp として利用する。
+const ScoreEvent kScore[] = {
+    {  1, 48, 84, 1024, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、4拍
+    {  2,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    {  3,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    {  4,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    {  5, 43, 80,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // G2、2拍
+    {  6,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    {  7, 48, 84,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    {  8,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    {  9, 48, 84,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 10,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 11, 41, 80,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // F2、2拍
+    { 12,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 13, 43, 80,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // G2、2拍
+    { 14,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 15, 48, 84,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 16,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 17, 48, 84,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 18,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 19, 43, 80,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // G2、2拍
+    { 20,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 21, 48, 84,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 22,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 23, 43, 80,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // G2、2拍
+    { 24,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 25, 48, 84,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 26,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 27, 41, 80,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // F2、2拍
+    { 28,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 29, 43, 82,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // G2、2拍
+    { 30,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 31, 48, 88,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 32,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 33, 48, 84, 1024, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、4拍
+    { 34,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 35,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 36,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 37, 43, 82,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // G2、2拍
+    { 38,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+    { 39, 48, 88,  512, SCORE_FLAG_NOTE_ON, 0, 0, 0, 0 }, // C3、2拍
+    { 40,  0,  0,    0, SCORE_FLAG_REST,    0, 0, 0, 0 },
+};
+
+const size_t kScoreLength = sizeof(kScore) / sizeof(kScore[0]);
