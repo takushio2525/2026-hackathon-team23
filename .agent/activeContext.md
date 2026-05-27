@@ -15,23 +15,23 @@
     `/dev/cu.usbmodemF412FAA085582`) ← `node_03` (声部 2、5.55 秒)
   これで test_v2 が DevKitC 指揮者 + Arduino 楽器 2 台 (声部 1・2) で起動可能。
   node_04 (声部 3) は今回未書き込み。
-- **注意**: 楽器側 (`node_02` / `node_03`) の `platformio.ini` は `ac8c5ff デバック`
-  以降 `-DSERIAL_DEBUG=1` のまま。このモードは **NOTE バイナリパケットを抑止**
-  して人間可読テキストを Serial に流す調査用設定で、Processing
-  (`pc_app/test_v2/orchestra_resynth/`) で音を鳴らすには `=0` に戻して再ビルド・
-  再書き込みが必要。AGENTS.md「楽器ノードはデフォルト SERIAL_DEBUG=0」とは
-  乖離した現状。
+- **node_02/03 を SERIAL_DEBUG=0 で再書き込み済み**（同日中、ユーザー指示）。
+  Processing (`pc_app/test_v2/orchestra_resynth/`) を起動して受信 0 だったため、
+  `ac8c5ff デバック` 以降残っていた `-DSERIAL_DEBUG=1` を `=0` に戻して再ビルド・
+  再書き込み。node_04 の `platformio.ini` は元から `=0` のままだったので変更
+  なし。これで AGENTS.md「楽器ノードはデフォルト SERIAL_DEBUG=0」と整合。
+  - node_02: bossac 16.41 秒 / Hash verified
+  - node_03: bossac 12.67 秒 / Hash verified
+- 指揮者側 `node_01_devkitc` は `SERIAL_DEBUG=1` のまま (拍検出デバッグ用、
+  Processing とは独立しているので問題なし)。
 
 ## 次の一手
 
-- 動作モード次第で 2 系統:
-  - **パケロス検証 (Serial ログ)**: 現状 `SERIAL_DEBUG=1` のまま、楽器ノード
-    `pio device monitor` でテキストを読みパケロス率を XIAO 版 (`node_01`) と
-    比較。改善が顕著なら ADR-0007 (DevKitC 移行) を起票。
-  - **3 声輪唱で音を鳴らす**: `node_02`/`node_03` の `platformio.ini` を
-    `-DSERIAL_DEBUG=0` に戻して再ビルド・再書き込み + Processing 起動。
-    ただし `SERIAL_DEBUG=1` 設定の経緯 (`ac8c5ff`) を踏まえ、ユーザー判断で。
-- いずれにせよ node_04 (声部 3) は別途書き込みが必要。今回は接続されていなかった。
+- ユーザー側で Processing を起動 (またはシリアルを再接続) し、3 声輪唱で
+  きらきら星が鳴るか確認。XIAO 版時代に問題だったパケロスが DevKitC で改善
+  されているかも同時に観察 (節目ごとに NOTE が抜けるかどうか)。
+- 鳴り方が安定したら ADR-0007（パケロス対策方針＝DevKitC 移行）を起票。
+- node_04 (声部 3) を接続して書き込むと 3 声フル輪唱になる。
 
 ## 現フェーズで Read すべき設計書
 

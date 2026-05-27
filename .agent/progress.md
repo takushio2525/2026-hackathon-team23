@@ -5,6 +5,14 @@
 
 ## 2026-05 — ドキュメント刷新フェーズ
 
+- 2026-05-27: **楽器 node_02/03 を SERIAL_DEBUG=0 に戻して再書き込み**。
+  test_v2 起動時に Processing 受信 0 だった原因が `ac8c5ff デバック` で入った
+  `-DSERIAL_DEBUG=1` (NOTE バイナリ抑止モード) だったため、`platformio.ini` の
+  該当行 1 箇所だけ `=0` に戻して node_02 (16.41 秒) / node_03 (12.67 秒) を
+  再書き込み。node_04 は元から `=0` のままだったので変更なし。指揮者
+  `node_01_devkitc` は `SERIAL_DEBUG=1` のまま (拍検出デバッグ用)。AGENTS.md
+  既定 (楽器=0 / 指揮者=1) と整合する状態に復元。
+
 - 2026-05-27: **test_v2 の 3 台を実機書き込み**（DevKitC + Arduino UNO R4 WiFi
   ×2、ユーザー指示）。`pio device list` で接続デバイスを判定し、CH343 ブリッジ
   (`/dev/cu.usbmodem5B7A1660211`) ← `node_01_devkitc` (12.80 秒)、UNO R4 シリアル
