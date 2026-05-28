@@ -50,8 +50,15 @@ struct OrcNetConfig {
     uint16_t    udpPort;
     uint8_t     channel;              // SoftAp 時のみ参照
     uint32_t    reconnectIntervalMs;
+    uint8_t     beatGapMs;            // BEAT 連送 (redundancy>1) の各回送信の間に挿む delay [ms]。0=旧挙動 (タイトループ連送)。送信側ノードでのみ意味を持つ
 };
 ```
+
+> 📝 **`beatGapMs` の暫定運用**: ESP32-S3 SoftAP で「radio が同一状態で連発するとロスする」
+> 癖の切り分け対策として 2026-05-25 に追加。現状は `0`（旧挙動）でコミットされており、
+> 1-5 ms を実機で試して確定値を入れる段取り。詳しくは
+> [orc-sender.md の BEAT 連送節](/firmware/orc-sender/#beat-連送-redundant-transmission)
+> 参照。
 
 ### 指揮者ノードの設定
 
@@ -64,6 +71,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,        // 2.4 GHz CH6 を使う
     /*reconnectIntervalMs=*/ 2000,     // SoftAP 側は使わない
+    /*beatGapMs=*/           0,        // 0 = タイトループ連送 (旧挙動)。一時的に切り分け用
 };
 ```
 
@@ -78,6 +86,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,
     /*reconnectIntervalMs=*/ 2000,
+    /*beatGapMs=*/           0,        // 楽器側 (Sta) では実質未使用 (受信のみ)
 };
 ```
 
