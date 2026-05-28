@@ -144,7 +144,7 @@ inline const ImuConfig IMU_CONFIG = {
 // 送信周期
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
-    /*beatRedundancy=*/  2,    // BEAT 2 連送
+    /*beatRedundancy=*/  4,    // BEAT 4 連送 (2026-05-25 に旧 2 -> 4。ESP32-S3 SoftAP の radio ロス対策・暫定値)
     /*beatLookaheadMs=*/ 50,   // playAtMasterMs = masterNow + 50 ms
 };
 

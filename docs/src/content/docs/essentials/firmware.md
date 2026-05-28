@@ -216,11 +216,12 @@ flowchart TB
 | パケット | 送る頻度 | 中身の核 |
 |---|---|---|
 | **CTRL** | 50 ms ごと（20 Hz） | 推定 BPM、velocity、状態 |
-| **BEAT** | 拍発火のたびに **2 連送** | 拍番号 `beatNo`、発音目標時刻 `playAtMasterMs` |
+| **BEAT** | 拍発火のたびに **4 連送** | 拍番号 `beatNo`、発音目標時刻 `playAtMasterMs` |
 
-「BEAT を 2 連送する」のは **パケロス対策**。
-WiFi マルチキャストは到達保証がないので、同じ内容を 2 回送って 1 回でも届けば OK にしている。
-楽器側は `beatNo` の重複を見て弾く。
+「BEAT を連送する」のは **パケロス対策**。
+WiFi マルチキャストは到達保証がないので、同じ内容を複数回送って 1 回でも届けば OK にしている。
+楽器側は `beatNo` の重複を見て弾く。連送回数は当初 2 回だったが、ESP32-S3 SoftAP の
+radio ロス対策で 2026-05-25 から 4 連送に増量（暫定値）。
 
 ## 楽器ノードが何をしているか
 
@@ -350,7 +351,7 @@ constexpr uint8_t I2C_SCL_PIN = 6;          // D5
 
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,                 // CTRL を 20 Hz で送信
-    /*beatRedundancy=*/  2,                  // BEAT を 2 連送
+    /*beatRedundancy=*/  4,                  // BEAT を 4 連送 (2026-05-25 暫定・旧 2 から増量)
     /*beatLookaheadMs=*/ 50,                 // 発音は 50 ms 先読み
 };
 
