@@ -13,7 +13,7 @@
 
 struct OrcSenderConfig {
     uint32_t ctrlIntervalMs;   // 50 ms = 20 Hz
-    uint8_t  beatRedundancy;   // 同一 BEAT を何発まで連送するか (1-3)
+    uint8_t  beatRedundancy;   // 同一 BEAT を何発まで連送するか (1-8 想定。2026-05-25 に ESP32-S3 SoftAP の radio ロス対策で旧 2 -> 4 に増量。連送間隔は OrcNetConfig.beatGapMs を参照)
     uint16_t beatLookaheadMs;  // playAtMasterMs = masterNow + lookahead
 };
 
