@@ -133,7 +133,7 @@ playAtMasterMs = (指揮者時計の現在時刻) + 50 ms
 
 | オフセット | サイズ | フィールド | 内容 |
 |---|---|---|---|
-| 12 | 1 B | `partId` | ノード ID。test_v2 は `0x02`〜`0x04`（楽器 3 台）、production 想定は `0x02`〜`0x05`（楽器 4 台）。輪唱のどの声部か |
+| 12 | 1 B | `partId` | ノード ID。test_v2 は `0x02`〜`0x04`（楽器 3 台）、production 想定は `0x02`〜`0x06`（楽器 5 台 = 金管 4 ＋ ドラム 1。[ADR-0004](/decisions/0004-ensemble-structure/) 改訂版）。輪唱のどの声部か |
 | 13 | 1 B | `noteNumber` | MIDI ノート番号（0–127、60=C4） |
 | 14 | 1 B | `velocity` | 0–127 |
 | 15 | 1 B | `gate` | `1=NoteOn`、`0=NoteOff`（test_v2 は常に `1`、消音は PC 側が `durationMs` から自動） |

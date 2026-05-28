@@ -50,7 +50,7 @@ struct BeatPayload {
 };
 
 struct NotePayload {
-    uint8_t  partId;       // test_v2 は 0x02-0x04 / production 想定は 0x02-0x05 (輪唱のどの声部か)
+    uint8_t  partId;       // test_v2 は 0x02-0x04 / production 想定は 0x02-0x06 (ADR-0004 改訂版で楽器 5 台 = 金管 4 + ドラム 1)
     uint8_t  noteNumber;   // MIDI 0-127, 60=C4 (高さ)
     uint8_t  velocity;     // 0-127
     uint8_t  gate;         // 1=NoteOn, 0=NoteOff
