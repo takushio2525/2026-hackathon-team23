@@ -123,15 +123,20 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,
     /*reconnectIntervalMs=*/ 2000,
+    /*beatGapMs=*/           0,     // BEAT 連送間に挿む delay [ms]。0=旧挙動 (タイトループ連送)。2026-05-25 暫定追加
 };
 
 // 送信周期
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
-    /*beatRedundancy=*/  2,    // BEAT を 2 連送
+    /*beatRedundancy=*/  4,    // BEAT を 4 連送 (2026-05-25 に旧 2 -> 4。ESP32-S3 SoftAP の radio ロス対策・暫定値)
     /*beatLookaheadMs=*/ 50,   // playAtMasterMs = masterNow + 50 ms
 };
 ```
+
+> ⚠️ **2026-05-25 暫定設定**: `beatRedundancy=4` と `beatGapMs=0` は ESP32-S3 SoftAP の
+> パケットロス切り分け中の値。実機計測で確定値（旧 2 連送に戻すか、4 連送＋beatGapMs=1〜5 ms
+> で確定）を入れ、本節を書き直す予定。
 
 ### 拍検出の閾値（`logic_params` 名前空間）
 
