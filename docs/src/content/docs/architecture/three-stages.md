@@ -61,7 +61,7 @@ test_v1 からの主な変更点：
 
 [ADR-0005](/decisions/0005-firmware-embedded-module-architecture/) で
 「テスト系で十分に検証してから取り込む」と決めた運用に従う。
-test_v2 で 4 声化・強弱・ビブラート等が安定したら production に取り込む。
+test_v2 で 5 声化（[ADR-0004](/decisions/0004-ensemble-structure/)）・強弱・ビブラート等が安定したら production に取り込む。
 
 ## バージョン使い分けのフロー
 

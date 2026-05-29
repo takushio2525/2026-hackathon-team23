@@ -123,7 +123,7 @@ sidebar:
 
 - `MAX_POLYPHONY = 24`。これを超えると `triggerNote()` が **最古の non-releasing ボイスを
   強制 `noteOff()`** してから新規ボイスを作る（`countNonReleasing()` で判定）
-- ハッカソン規模（3〜4 声輪唱）では到達しない値。**バグの保険** として置いてある
+- ハッカソン規模（3〜5 声輪唱。test_v2 は 3 声・production は 5 声目標）では到達しない値。**バグの保険** として置いてある
 
 ### gate=0（NoteOff 単独パケット）が来た場合
 
