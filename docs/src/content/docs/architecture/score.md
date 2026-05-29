@@ -118,7 +118,7 @@ fireScoreEvent(data, kScore[scoreIndex], now);
 1. 新しい曲の `ScoreEvent` 配列を作る（DAW のエクスポートや手打ち）
 2. `node_0{2,3,4}/src/score_data.cpp` を 3 台分とも置き換える（または共通ヘッダに切り出して include させる）
 3. `kScoreLength` は `sizeof(kScore) / sizeof(kScore[0])` で自動算出されるので再計算不要
-4. `headRestBeats` を曲構造に合わせて調整（4 声なら 0 / 8 / 16 / 24 など）
+4. `headRestBeats` を曲構造に合わせて調整（5 声（[ADR-0004](/decisions/0004-ensemble-structure/)）なら 0 / 8 / 16 / 24 / 32 など）
 
 将来的に複数曲対応するなら：
 

@@ -306,7 +306,7 @@ void firePendingSub(SystemData& data, uint32_t now) {
 
 ### シナリオ 4: 拍が 1 つ落ちる
 
-- BEAT の 2 連送が両方届かない（極めて稀）
+- BEAT の連送（`beatRedundancy` 連、暫定 4）がすべて届かない（極めて稀）
 - 次の BEAT で `firedBeatNo` が 1 進んでいる
 - `scoreIndex` も 1 進むので、楽譜の流れに復帰
 - 1 拍ぶん演奏が抜けるが、ズレは残らない（自己補正）
