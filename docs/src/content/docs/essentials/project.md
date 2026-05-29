@@ -59,7 +59,7 @@ flowchart LR
     PC["PC: Processing<br/>orchestra_resynth.pde"]
     SP["🔊 スピーカ"]
 
-    Sender -- "CTRL 20Hz/<br/>BEAT 2連送" --> UDP
+    Sender -- "CTRL 20Hz/<br/>BEAT N連送" --> UDP
     UDP --> N2 & N3 & N4
     N2 -- "NOTE<br/>USB Serial" --> PC
     N3 -- NOTE --> PC
@@ -76,7 +76,7 @@ flowchart LR
 | パケット | 流れる向き | 何を伝える |
 |---|---|---|
 | **CTRL** | 指揮者 → 楽器（WiFi、20 Hz 連続） | 「今の BPM はこれくらい / 強さはこれくらい / 状態はこれ」 |
-| **BEAT** | 指揮者 → 楽器（WiFi、拍ごとに 2 連送） | 「○拍目を、指揮者時計の T 時に鳴らして」 |
+| **BEAT** | 指揮者 → 楽器（WiFi、拍ごとに N 連送。連送数は `beatRedundancy` で設定、暫定 4） | 「○拍目を、指揮者時計の T 時に鳴らして」 |
 | **NOTE** | 楽器 → PC（USB シリアル、音符ごと） | 「楽器ID 0 で、MIDI 60 を 0.5 秒、強さ 80 で鳴らして」 |
 
 CTRL は **常に流れている川**、BEAT は **拍ごとのスタンプ**、NOTE は **音 1 つ 1 つのチケット**、と

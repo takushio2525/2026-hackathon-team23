@@ -283,7 +283,7 @@ void OrcNetModule::pollReceive(OrcNetData& net) {
 4. **type 不一致 → 破棄**: `PKT_NOTE` を楽器側が受信してもどこにも書かれない
 
 `while (parsePacket() > 0)` で **1 周期内に届いた全パケットを処理する**。蓄積を許さない設計。
-これにより BEAT の冗長送信（2 連送）が連続到達した場合でも、`lastBeat` には最後のものが残る。
+これにより BEAT の冗長送信（`beatRedundancy` 連送、暫定 4）が連続到達した場合でも、`lastBeat` には最後のものが残る。
 楽器側の `OrcReceiverModule` 側で `beatNo` による重複排除を行う。
 
 ## updateOutput() — 送信処理
@@ -334,8 +334,8 @@ for (uint8_t i = 0; i < reps; ++i) {
 
 理由：
 - BEAT は **イベント駆動** で、ロスすると次のチャンスまで楽器が無音になる
-- 2 連送なら片方ロスしても通る（独立ロス確率を仮定すれば p² まで下がる）
-- 楽器側は `beatNo` で重複排除するので、2 回受け取っても発音は 1 回
+- N 連送（`beatRedundancy`、暫定 4）なら一部ロスしても通る（独立ロス確率を仮定すれば pᴺ まで下がる）
+- 楽器側は `beatNo` で重複排除するので、何回受け取っても発音は 1 回
 
 ### 送信フラグの責任
 
