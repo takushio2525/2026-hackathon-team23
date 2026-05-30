@@ -15,22 +15,28 @@ if [ ! -d node_modules ]; then
     echo ""
 fi
 
+# 空きポートを探す（4321 から順に、使用中なら 1 ずつ増やす）
+PORT=4321
+while lsof -i :$PORT >/dev/null 2>&1; do
+    PORT=$((PORT + 1))
+done
+
 # サーバー起動後にブラウザを自動で開く（3 秒待ってから）
 open_url() {
     sleep 5
     if [ -d "/Applications/Google Chrome.app" ]; then
-        open -a "Google Chrome" "http://localhost:4321"
+        open -a "Google Chrome" "http://localhost:$PORT"
     else
-        open "http://localhost:4321"
+        open "http://localhost:$PORT"
     fi
 }
 open_url &
 
 echo "================================================================"
 echo "  ドキュメントサイトを起動します"
-echo "  URL: http://localhost:4321"
+echo "  URL: http://localhost:$PORT"
 echo "  終了するには Ctrl+C を押してください"
 echo "================================================================"
 echo ""
 
-npm run dev
+npm run dev -- --port "$PORT"
