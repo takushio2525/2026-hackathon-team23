@@ -1,0 +1,104 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+\renewcommand{\labelitemi}{\textbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+
+\begin{document}
+
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：梅澤颯太
+
+報告日：2026年6月2日
+
+プロジェクト名：タクトーン～IMU ジェスチャーで奏でるArduino オーケストラ～
+
+\sectionrule
+
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 2026/05/27に，UI/モード表示のプログラム作成を授業時間内に行った．
+  \item 2026/05/30に，4パート同時発音管理ロジック確認・プログラムの作成を行った．
+\end{itemize}
+
+\sectionrule
+
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{0.16\linewidth}p{0.12\linewidth}XX@{}}
+\toprule
+日付 & 作業時間 & 作業内容 & 成果・メモ \\
+\midrule
+2026/05/27 & 2h & UI/モード表示のプログラム作成を授業時間内に行った． & UI画面とモード表示に関する実装を進めた． \\
+2026/05/30 & 1.5h & 4パート同時発音管理ロジック確認・プログラムの作成を行った． & 複数パートを同時に扱うための発音管理ロジックを確認し，プログラム作成を進めた． \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 3. 課題管理
+%================================================================
+\section{課題管理}
+
+\sectionrule
+
+%================================================================
+% 4. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証（再現性重視）}
+
+\subsection{利用内容}
+
+\sectionrule
+
+\subsection{検証方法}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\sectionrule
+
+%================================================================
+% 5. 次回計画
+%================================================================
+\section{次回計画}
+
+\sectionrule
+
+%================================================================
+% 6. その他
+%================================================================
+\section{その他}
+
+\sectionrule
+
+%================================================================
+% 7. 付録
+%================================================================
+\section{付録}
+
+\sectionrule
+
+\end{document}
