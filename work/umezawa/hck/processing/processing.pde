@@ -223,7 +223,7 @@ void mousePressed() {
       closeSerial();
       refreshSerialPorts();
       screenState = SCREEN_PORT_SELECT;
-      lastWarning = nodeRole == NODE_FLOW ? "Node1 全体進行を選択" : "Node2-5 演奏ノードを選択";
+      lastWarning = nodeRole == NODE_FLOW ? "Node1 全体進行を選択" : "Node2-6 演奏ノードを選択";
     }
     return;
   }
@@ -272,6 +272,7 @@ void keyPressed() {
   else if (key == '2') setExpectedPart(PART_BRASS_2);
   else if (key == '3') setExpectedPart(PART_BRASS_3);
   else if (key == '4') setExpectedPart(PART_RHYTHM);
+  else if (key == '5') setExpectedPart(PART_BRASS_4);
   else if (key == 'a' || key == 'A') {
     acceptAllParts = !acceptAllParts;
     lastWarning = acceptAllParts ? "全パートを受信します" : "選択中のパートだけ受信します";
@@ -297,7 +298,7 @@ void setExpectedPart(int partId) {
 }
 
 void injectTestFrame(int partId) {
-  byte[] frame = makeNoteFrame(partId, partId == PART_RHYTHM ? 36 : 60, 96, 1, 500, millis());
+  byte[] frame = makeNoteFrame(partId, partManager.testNoteFor(partId), 96, 1, 500, millis());
   for (int i = 0; i < frame.length; i++) frameReader.pushByte(frame[i] & 0xff);
   NotePacket packet = frameReader.pollPacket();
   if (packet != null) handlePacket(packet);
