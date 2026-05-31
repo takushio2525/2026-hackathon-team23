@@ -62,7 +62,7 @@ class UiView {
     text("タクトーン", width / 2 + 5, 214);
 
     drawBigButton(titleNode1X, titleNodeY, titleNodeW, titleNodeH, "Node1", "全体進行", color(31, 123, 220), true);
-    drawBigButton(titleNodePlayerX, titleNodeY, titleNodeW, titleNodeH, "Node2-5", "演奏ノード", color(24, 156, 104), true);
+    drawBigButton(titleNodePlayerX, titleNodeY, titleNodeW, titleNodeH, "Node2-6", "演奏ノード", color(24, 156, 104), true);
     fill(43, 66, 91);
     textSize(17);
   }
@@ -255,7 +255,7 @@ class UiView {
     strokeWeight(1);
     fill(28, 54, 80);
     textSize(14);
-    text("キー: 1-4 パート選択  |  a 全パート受信  |  t テスト音  |  g 疑似NOTE  |  m ミュート  |  r ポート再選択", 50, 511);
+    text("キー: 1-5 パート選択  |  a 全パート受信  |  t テスト音  |  g 疑似NOTE  |  m ミュート  |  r ポート再選択", 50, 511);
   }
 
   void drawNotice(String message, int x, int y) {
@@ -301,7 +301,7 @@ class UiView {
 
   String nodeRoleLabel() {
     if (nodeRole == NODE_FLOW) return "Node1 全体進行";
-    if (nodeRole == NODE_PLAYER) return "Node2-5 演奏ノード";
+    if (nodeRole == NODE_PLAYER) return "Node2-6 演奏ノード";
     return "Node未選択";
   }
 
@@ -316,10 +316,11 @@ class UiView {
   }
 
   String partLabel(int partId) {
-    if (partId == PART_BRASS_1) return "金管1";
-    if (partId == PART_BRASS_2) return "金管2";
-    if (partId == PART_BRASS_3) return "金管3";
+    if (partId == PART_BRASS_1) return "チューバ";
+    if (partId == PART_BRASS_2) return "トロンボーン";
+    if (partId == PART_BRASS_3) return "ホルン";
     if (partId == PART_RHYTHM) return "リズム";
+    if (partId == PART_BRASS_4) return "トランペット";
     return "不明";
   }
 

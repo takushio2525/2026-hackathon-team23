@@ -667,7 +667,7 @@
     <div class="step">
       <div>
         <strong>Arduino 側は「音符の命令」を数字にして送る</strong>
-        <p>たとえば「Brass 1で、ドを、少し強めに、500ms鳴らす」という情報を、20個のバイトに分けて送ります。</p>
+        <p>たとえば「Tubaで、ドを、少し強めに、500ms鳴らす」という情報を、20個のバイトに分けて送ります。</p>
       </div>
     </div>
     <div class="step">
@@ -963,7 +963,7 @@
       <tr>
         <td>12</td>
         <td><code>partId</code></td>
-        <td>どのパートの音かを表します。<code>0x02</code> から <code>0x05</code> までを使います。</td>
+        <td>どのパートの音かを表します。<code>0x02</code> から <code>0x06</code> までを使います。</td>
       </tr>
       <tr>
         <td>13</td>
@@ -1108,27 +1108,32 @@
       <tr>
         <td><code>PART_BRASS_1</code></td>
         <td><code>0x02</code></td>
-        <td>Brass 1</td>
+        <td>Tuba</td>
       </tr>
       <tr>
         <td><code>PART_BRASS_2</code></td>
         <td><code>0x03</code></td>
-        <td>Brass 2</td>
+        <td>Trombone</td>
       </tr>
       <tr>
         <td><code>PART_BRASS_3</code></td>
         <td><code>0x04</code></td>
-        <td>Brass 3</td>
+        <td>Horn</td>
       </tr>
       <tr>
         <td><code>PART_RHYTHM</code></td>
         <td><code>0x05</code></td>
         <td>Rhythm</td>
       </tr>
+      <tr>
+        <td><code>PART_BRASS_4</code></td>
+        <td><code>0x06</code></td>
+        <td>Trumpet</td>
+      </tr>
     </tbody>
   </table>
   <p>
-    通常は、キー <span class="kbd">1</span> から <span class="kbd">4</span> で受け取りたいパートを選びます。
+    通常は、キー <span class="kbd">1</span> から <span class="kbd">5</span> で受け取りたいパートを選びます。
     <span class="kbd">a</span> を押すと、すべてのパートを受け付ける検証モードになります。
   </p>
 
@@ -1170,13 +1175,17 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
   <h3>金管パートとリズムパート</h3>
   <p>
     <code>partId</code> が <code>PART_RHYTHM</code> なら <code>RhythmVoice</code>、
-    それ以外なら <code>BrassVoice</code> が作られます。
+    それ以外なら楽器ごとの <code>BrassProfile</code> を持った <code>BrassVoice</code> が作られます。
   </p>
   <pre><code>if (partId == PART_RHYTHM) {
   voice = new RhythmVoice(partId, noteNumber, amp, dur);
 } else {
-  voice = new BrassVoice(partId, noteNumber, amp, dur, brassWaveform);
+  voice = new BrassVoice(partId, noteNumber, amp, dur, brassProfileFor(partId));
 }</code></pre>
+  <p>
+    <code>BrassProfile</code> では、波形、立ち上がり、減衰、伸び、消え方、音量、音域補正を楽器ごとに変えています。
+    そのため同じ <code>BrassVoice</code> でも、Tuba、Trombone、Horn、Trumpet を聞き分けやすくしています。
+  </p>
   <p>
     <code>velocity</code> は <code>0</code> から <code>127</code> の値なので、
     <code>velocityToAmp()</code> で 0.0 から 1.0 の音量に変換されます。
@@ -1208,9 +1217,9 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
       コード中の <code>pow(2.0f, (noteNumber - 69) / 12.0f)</code> は、この半音とオクターブの関係を計算しています。
     </p>
   </div>
-  <pre><code>brassWaveform = WavetableGenerator.gen10(
-  4096,
-  new float[] { 1.00, 0.70, 0.50, 0.30, 0.20, 0.10, 0.05 }
+  <pre><code>tubaProfile = makeBrassProfile(
+  new float[] { 1.00, 0.42, 0.20, 0.10 },
+  45, 90, 0.85, 130, 1.15, -12
 );</code></pre>
   <p>
     また、音量は急に最大になって急に消えるのではなく、
@@ -1302,8 +1311,8 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
     </thead>
     <tbody>
       <tr>
-        <td><span class="kbd">1</span> から <span class="kbd">4</span></td>
-        <td>受け取りたいパートを <code>Brass 1</code>、<code>Brass 2</code>、<code>Brass 3</code>、<code>Rhythm</code> に切り替えます。</td>
+        <td><span class="kbd">1</span> から <span class="kbd">5</span></td>
+        <td>受け取りたいパートを <code>Tuba</code>、<code>Trombone</code>、<code>Horn</code>、<code>Rhythm</code>、<code>Trumpet</code> に切り替えます。</td>
       </tr>
       <tr>
         <td><span class="kbd">a</span></td>
@@ -1400,8 +1409,8 @@ noteOn(packet.partId, packet.noteNumber, packet.velocity, packet.durationMs);</c
 
   <h3>音色を変えたい</h3>
   <p>
-    金管音は <code>PartManager</code> の <code>brassWaveform</code> と、
-    <code>BrassVoice</code> の <code>attackMs</code>、<code>decayMs</code>、<code>sustain</code>、<code>releaseMs</code>
+    金管音は <code>PartManager</code> の各 <code>BrassProfile</code> にある波形、<code>attackMs</code>、
+    <code>decayMs</code>、<code>sustain</code>、<code>releaseMs</code>、<code>gain</code>、<code>noteShift</code>
     を調整すると変わります。
     リズム音は <code>RhythmVoice</code> の <code>rhythmDecay()</code>、<code>rhythmFreq()</code>、
     <code>rhythmWave()</code> を変更します。

@@ -44,32 +44,51 @@ class Voice {
   }
 }
 
-class BrassVoice extends Voice {
+class BrassProfile {
   Waveform waveform;
-  int phase = 0;
-  int attackMs = 20;
-  int decayMs = 40;
-  int releaseMs = 60;
-  float sustain = 0.75;
+  int attackMs;
+  int decayMs;
+  float sustain;
+  int releaseMs;
+  float gain;
+  int noteShift;
 
-  BrassVoice(int partId, int noteNumber, float amp, int durationMs, Waveform waveform) {
-    super(partId, noteNumber, amp, durationMs);
+  BrassProfile(Waveform waveform, int attackMs, int decayMs, float sustain, int releaseMs, float gain, int noteShift) {
     this.waveform = waveform;
+    this.attackMs = attackMs;
+    this.decayMs = decayMs;
+    this.sustain = sustain;
+    this.releaseMs = releaseMs;
+    this.gain = gain;
+    this.noteShift = noteShift;
+  }
+}
+
+class BrassVoice extends Voice {
+  BrassProfile profile;
+  int phase = 0;
+  float effectiveAmp;
+
+  BrassVoice(int partId, int noteNumber, float amp, int durationMs, BrassProfile profile) {
+    super(partId, noteNumber, amp, durationMs);
+    this.profile = profile;
+    this.effectiveAmp = amp * profile.gain;
   }
 
   void start() {
     super.start();
-    osc = new Oscil(midiToHz(noteNumber), 0, waveform);
+    int adjustedNote = constrain(noteNumber + profile.noteShift, 0, 127);
+    osc = new Oscil(midiToHz(adjustedNote), 0, profile.waveform);
     env = new Line();
     env.patch(osc.amplitude);
     osc.patch(out);
-    env.activate(attackMs / 1000.0, 0, amp);
+    env.activate(profile.attackMs / 1000.0, 0, effectiveAmp);
   }
 
   void update() {
     int elapsed = millis() - startedAtMs;
-    if (phase == 0 && elapsed >= attackMs) {
-      env.activate(decayMs / 1000.0, amp, amp * sustain);
+    if (phase == 0 && elapsed >= profile.attackMs) {
+      env.activate(profile.decayMs / 1000.0, effectiveAmp, effectiveAmp * profile.sustain);
       phase = 1;
     }
     super.update();
@@ -79,11 +98,11 @@ class BrassVoice extends Voice {
     if (releasing) return;
     releasing = true;
     releaseAtMs = millis();
-    env.activate(releaseMs / 1000.0, amp * sustain, 0);
+    env.activate(profile.releaseMs / 1000.0, effectiveAmp * profile.sustain, 0);
   }
 
   boolean finished() {
-    return releasing && millis() >= releaseAtMs + releaseMs + 20;
+    return releasing && millis() >= releaseAtMs + profile.releaseMs + 20;
   }
 }
 

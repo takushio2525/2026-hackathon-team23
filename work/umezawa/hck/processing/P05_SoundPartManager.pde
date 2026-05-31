@@ -1,12 +1,15 @@
 class PartManager {
   ArrayList<Voice> voices = new ArrayList<Voice>();
-  Waveform brassWaveform;
+  BrassProfile tubaProfile;
+  BrassProfile tromboneProfile;
+  BrassProfile hornProfile;
+  BrassProfile trumpetProfile;
 
   PartManager() {
-    brassWaveform = WavetableGenerator.gen10(
-      4096,
-      new float[] { 1.00, 0.70, 0.50, 0.30, 0.20, 0.10, 0.05 }
-    );
+    tubaProfile = makeBrassProfile(new float[] { 1.00, 0.42, 0.20, 0.10 }, 45, 90, 0.85, 130, 1.15, -12);
+    tromboneProfile = makeBrassProfile(new float[] { 1.00, 0.68, 0.46, 0.24, 0.14 }, 30, 70, 0.80, 110, 1.00, -5);
+    hornProfile = makeBrassProfile(new float[] { 1.00, 0.48, 0.28, 0.15, 0.08 }, 55, 95, 0.70, 140, 0.90, 0);
+    trumpetProfile = makeBrassProfile(new float[] { 1.00, 0.92, 0.70, 0.48, 0.30, 0.18, 0.10 }, 12, 35, 0.78, 70, 0.95, 7);
   }
 
   void handleNote(NotePacket packet) {
@@ -27,7 +30,7 @@ class PartManager {
     if (partId == PART_RHYTHM) {
       voice = new RhythmVoice(partId, noteNumber, amp, dur);
     } else {
-      voice = new BrassVoice(partId, noteNumber, amp, dur, brassWaveform);
+      voice = new BrassVoice(partId, noteNumber, amp, dur, brassProfileFor(partId));
     }
     voices.add(voice);
     voice.start();
@@ -78,9 +81,30 @@ class PartManager {
 
   void playTestNote(int partId) {
     if (muted) muted = false;
-    int note = partId == PART_RHYTHM ? 36 : 60 + (partId - PART_BRASS_1) * 4;
+    int note = testNoteFor(partId);
     noteOn(partId, note, 100, DEFAULT_TEST_DURATION_MS);
     lastWarning = "テスト音: " + partName(partId);
+  }
+
+  BrassProfile makeBrassProfile(float[] harmonics, int attackMs, int decayMs, float sustain, int releaseMs, float gain, int noteShift) {
+    return new BrassProfile(WavetableGenerator.gen10(4096, harmonics), attackMs, decayMs, sustain, releaseMs, gain, noteShift);
+  }
+
+  BrassProfile brassProfileFor(int partId) {
+    if (partId == PART_BRASS_1) return tubaProfile;
+    if (partId == PART_BRASS_2) return tromboneProfile;
+    if (partId == PART_BRASS_3) return hornProfile;
+    if (partId == PART_BRASS_4) return trumpetProfile;
+    return trumpetProfile;
+  }
+
+  int testNoteFor(int partId) {
+    if (partId == PART_BRASS_1) return 48;
+    if (partId == PART_BRASS_2) return 55;
+    if (partId == PART_BRASS_3) return 60;
+    if (partId == PART_RHYTHM) return 36;
+    if (partId == PART_BRASS_4) return 65;
+    return 60;
   }
 
   float velocityToAmp(int velocity) {
