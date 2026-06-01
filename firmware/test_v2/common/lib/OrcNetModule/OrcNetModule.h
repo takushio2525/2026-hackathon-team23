@@ -75,5 +75,6 @@ private:
     OrcNetConfig cfg_;
     WiFiUDP      udp_;
     bool         started_ = false;
+    bool         wasLinkUp_ = false;   // Sta 側の down→up 遷移検出用 (UDP 再 join のトリガ)
     uint32_t     lastReconnectMs_ = 0;
 };
