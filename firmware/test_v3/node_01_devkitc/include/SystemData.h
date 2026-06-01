@@ -18,6 +18,8 @@ enum class ConductorState : uint8_t {
     Calibrating = 1,
     Conducting  = 2,
     Fallback    = 3,
+    Menu        = 4,   // test_v3: IMU ナビでモード選択中 (拍検出は止める)
+    Result      = 5,   // test_v3: ゲーム結果表示中 (得点を凍結・縦振りで Menu へ)
 };
 
 struct BeatLogicData {
@@ -56,6 +58,20 @@ struct ConductorStateData {
     ConductorState state = ConductorState::Idle;
 };
 
+// test_v3 ゲームモードの司令塔状態。CTRL 予約バイト (mode/navCursor/targetBpm/score) の源。
+// 詳細設計は .agent/test_v3-game-design.md。
+struct GameData {
+    uint8_t  mode = 0;            // 0=自由演奏 / 1=ゲーム
+    uint8_t  navCursor = 0;       // メニューカーソル位置 0..MENU_ITEM_COUNT-1
+    uint8_t  targetBpm = 0;       // ゲーム目標テンポ (生 BPM, 0=未設定/自由演奏)
+    uint8_t  score = 0xFF;        // 得点 0-100 (0xFF=採点中/未確定)
+    uint16_t gameBeatCount = 0;   // ゲーム開始からの経過拍数 (採点・ガイドフェード・終了判定に使う)
+    // 採点累積: ガイド強度で重み付けした拍間隔誤差の総和とその重み総和。
+    // ゲーム終了時に avgErr = errAccum / weightAccum を 0-100 へ写像する。
+    float    scoreErrAccum = 0.0f;
+    float    scoreWeightAccum = 0.0f;
+};
+
 struct SystemData {
     ImuData             imu;
     OrcNetData          orcNet;
@@ -65,4 +81,5 @@ struct SystemData {
     TempoLogicData      tempo;
     CalibrationData     calibration;
     ConductorStateData  conductor;
+    GameData            game;       // test_v3: ゲームモード状態
 };

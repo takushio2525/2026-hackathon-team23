@@ -45,10 +45,14 @@ void OrcSenderModule::updateOutput(SystemData& data) {
         float bpm = data.tempo.bpm;
         if (bpm < 0)    bpm = 0;
         if (bpm > 8000) bpm = 8000;
-        pkt.payload.bpmQ8    = (uint16_t)(bpm * 8.0f + 0.5f);
-        pkt.payload.velocity = data.tempo.velocity;
-        pkt.payload.state    = (uint8_t)data.conductor.state;
-        for (uint8_t i = 0; i < 4; ++i) pkt.payload.reserved[i] = 0;
+        pkt.payload.bpmQ8     = (uint16_t)(bpm * 8.0f + 0.5f);
+        pkt.payload.velocity  = data.tempo.velocity;
+        pkt.payload.state     = (uint8_t)data.conductor.state;
+        // test_v3 ゲームモード: 旧 reserved[4] に mode/navCursor/targetBpm/score を載せる
+        pkt.payload.mode      = data.game.mode;
+        pkt.payload.navCursor = data.game.navCursor;
+        pkt.payload.targetBpm = data.game.targetBpm;
+        pkt.payload.score     = data.game.score;
 
         data.orcNet.pendingCtrl    = pkt;
         data.orcNet.hasPendingCtrl = true;

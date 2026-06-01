@@ -54,6 +54,49 @@ void gateToIdle() {
     sReleaseStartMs    = 0;
 }
 
+// ── test_v3: メニューナビのゲート (拍検出ゲートとは独立) ──
+// dynAcc の左右(X)/上下(Y)成分の符号と大きさだけで「カーソル移動」「決定」を判定する単純式。
+// 複雑なジェスチャ認識はしない (要件外)。Menu / Result 状態でのみ動かす。
+enum class NavGate : uint8_t { Idle, Armed };
+NavGate  sNavGate   = NavGate::Idle;
+uint32_t sLastNavMs = 0;
+
+// 1 振りを 1 操作として処理する。左右振り→カーソル移動 (data.game.navCursor を更新・false)、
+// 縦振り→決定 (true を返す)。多重発火は Armed ゲート + 不応期で防ぐ。
+bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
+    using namespace logic_params;
+    if (!data.imu.ready) return false;
+    if (sNavGate == NavGate::Armed) {
+        // 振りが収まったら次操作に備えて Idle へ戻す
+        if (data.imu.dynNorm < NAV_RELEASE_G) sNavGate = NavGate::Idle;
+        return false;
+    }
+    // Idle: しきい値超え + 不応期経過の立ち上がりで 1 回だけ発火
+    if (data.imu.dynNorm <= NAV_SWING_THRESHOLD_G) return false;
+    if ((now - sLastNavMs) < NAV_REFRACTORY_MS) return false;
+    sNavGate   = NavGate::Armed;
+    sLastNavMs = now;
+    const float lr = data.imu.dynAcc[NAV_LR_AXIS];
+    const float ud = data.imu.dynAcc[NAV_UD_AXIS];
+    if (fabsf(lr) >= fabsf(ud)) {
+        // 左右が支配的 → カーソル移動 (符号で左/右)
+        if (lr < 0.0f) { if (data.game.navCursor > 0)             data.game.navCursor--; }
+        else           { if (data.game.navCursor + 1 < itemCount) data.game.navCursor++; }
+        return false;
+    }
+    return true;   // 上下が支配的 → 決定
+}
+
+// メトロノームガイド強度 (経過拍ベースの固定スケジュール・通信不要)。1.0=はっきり / 0.0=なし。
+// 採点重みは 1 - この値 (ガイドが薄い/無い区間ほど重く配点する)。
+float gameGuideIntensity(uint16_t beatCount) {
+    using namespace logic_params;
+    if (beatCount <  GAME_GUIDE_FULL_BEATS) return 1.0f;
+    if (beatCount >= GAME_GUIDE_ZERO_BEATS) return 0.0f;
+    const float span = (float)(GAME_GUIDE_ZERO_BEATS - GAME_GUIDE_FULL_BEATS);
+    return 1.0f - (float)(beatCount - GAME_GUIDE_FULL_BEATS) / span;
+}
+
 void updateLed(SystemData& data) {
     using namespace logic_params;
     switch (data.conductor.state) {
@@ -66,11 +109,27 @@ void updateLed(SystemData& data) {
             data.led.blinkIntervalMs = LED_CALIBRATING_MS;
             break;
         case ConductorState::Conducting:
-            data.led.solidOn = true;
+            // ゲーム中でガイドが残っている区間は目標テンポで点滅 (LED メトロノームガイド)。
+            // ガイドが切れたら点灯のまま (自由演奏も常時点灯)。
+            if (data.game.mode == 1 && data.game.targetBpm > 0 &&
+                gameGuideIntensity(data.game.gameBeatCount) > 0.5f) {
+                data.led.solidOn = false;
+                data.led.blinkIntervalMs = (uint16_t)(30000u / data.game.targetBpm);
+            } else {
+                data.led.solidOn = true;
+            }
             break;
         case ConductorState::Fallback:
             data.led.solidOn = false;
             data.led.blinkIntervalMs = LED_FALLBACK_MS;
+            break;
+        case ConductorState::Menu:
+            data.led.solidOn = false;
+            data.led.blinkIntervalMs = LED_MENU_MS;
+            break;
+        case ConductorState::Result:
+            data.led.solidOn = false;
+            data.led.blinkIntervalMs = LED_RESULT_MS;
             break;
     }
 }
@@ -177,7 +236,13 @@ void applyPattern(SystemData& data) {
                     data.calibration.gravityMag = 1.0f;   // フォールバック: 1g
                 }
                 data.calibration.done = true;
-                data.conductor.state = ConductorState::Conducting;
+                // test_v3: キャリブ完了後はまず Menu へ (モード選択)。
+                data.conductor.state = ConductorState::Menu;
+                data.game.mode = 0;          // 既定カーソル = 自由演奏
+                data.game.navCursor = 0;
+                data.game.targetBpm = 0;
+                data.game.score = 0xFF;
+                sNavGate = NavGate::Idle;
             }
             break;
         }
@@ -196,6 +261,40 @@ void applyPattern(SystemData& data) {
                                (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
             if (imuOk && data.orcNet.wifiConnected) {
                 data.conductor.state = ConductorState::Conducting;
+            }
+            break;
+        }
+
+        // ── test_v3: メニュー (IMU ナビでモード選択。拍検出は止まる) ──
+        case ConductorState::Menu: {
+            if (updateNav(data, now, MENU_ITEM_COUNT)) {
+                if (data.game.navCursor == 1) {
+                    // ゲーム開始: 目標テンポ提示・採点カウンタをリセット
+                    data.game.mode = 1;
+                    data.game.targetBpm = GAME_TARGET_BPM;
+                    data.game.gameBeatCount = 0;
+                    data.game.scoreErrAccum = 0.0f;
+                    data.game.scoreWeightAccum = 0.0f;
+                    data.game.score = 0xFF;
+                } else {
+                    // 自由演奏
+                    data.game.mode = 0;
+                    data.game.targetBpm = 0;
+                    data.game.score = 0xFF;
+                }
+                data.conductor.state = ConductorState::Conducting;
+            }
+            break;
+        }
+
+        // ── test_v3: 結果表示 (縦振り=決定で Menu へ戻る。拍検出は止まる) ──
+        case ConductorState::Result: {
+            if (updateNav(data, now, 1)) {
+                data.conductor.state = ConductorState::Menu;
+                data.game.mode = 0;
+                data.game.navCursor = 0;
+                data.game.targetBpm = 0;
+                data.game.score = 0xFF;
             }
             break;
         }
@@ -266,10 +365,42 @@ void applyPattern(SystemData& data) {
                             data.tempo.bpm = sBpmEma;
                             const uint32_t periodMs = (uint32_t)(60000.0f / sBpmEma);
                             data.tempo.nextBeatPredictedMs = now + periodMs;
+
+                            // ── test_v3 ゲーム採点 ──
+                            // 実振り間隔 intervalMs と目標拍間隔の誤差を、ガイド強度で重み付け
+                            // して累積する (ガイドが薄い区間ほど重い)。1 拍目は基準が無いので除外。
+                            if (data.game.mode == 1 && data.game.targetBpm > 0 &&
+                                data.game.gameBeatCount >= 1) {
+                                const float targetInterval = 60000.0f / (float)data.game.targetBpm;
+                                const float err = fabsf((float)intervalMs - targetInterval);
+                                const float w   = 1.0f - gameGuideIntensity(data.game.gameBeatCount);
+                                data.game.scoreErrAccum    += w * err;
+                                data.game.scoreWeightAccum += w;
+                            }
                         }
                     }
                     sLastBeatMs       = now;
                     sBeatFiredInArmed = true;
+
+                    // ── test_v3 ゲーム進行: 経過拍を数え、規定拍に達したら結果へ ──
+                    if (data.game.mode == 1) {
+                        data.game.gameBeatCount += 1;
+                        if (data.game.gameBeatCount >= GAME_LENGTH_BEATS) {
+                            // 得点確定: 平均誤差を 0-100 へ写像 (誤差小=高得点)
+                            float s = 100.0f;
+                            if (data.game.scoreWeightAccum > 0.0f && data.game.targetBpm > 0) {
+                                const float avgErr =
+                                    data.game.scoreErrAccum / data.game.scoreWeightAccum;
+                                const float targetInterval = 60000.0f / (float)data.game.targetBpm;
+                                const float tol = targetInterval * GAME_SCORE_TOLERANCE_RATIO;
+                                s = 100.0f * (1.0f - avgErr / tol);
+                            }
+                            if (s <   0.0f) s =   0.0f;
+                            if (s > 100.0f) s = 100.0f;
+                            data.game.score = (uint8_t)(s + 0.5f);
+                            data.conductor.state = ConductorState::Result;
+                        }
+                    }
                 }
 
                 // ── リリース判定 (デバウンス付き) ──

@@ -104,4 +104,30 @@ namespace logic_params {
     constexpr uint16_t LED_IDLE_MS             = 1000;  // 1 Hz
     constexpr uint16_t LED_CALIBRATING_MS      = 500;   // 2 Hz
     constexpr uint16_t LED_FALLBACK_MS         = 200;   // 5 Hz
+    constexpr uint16_t LED_MENU_MS             = 300;   // メニュー中 (約 1.7 Hz)
+    constexpr uint16_t LED_RESULT_MS           = 120;   // 結果表示中 (速い点滅で完了を示す)
+
+    // ── test_v3 ゲームモード: IMU メニューナビ (単純閾値判定) ──
+    // dynAcc[NAV_LR_AXIS] (左右) / dynAcc[NAV_UD_AXIS] (上下) の符号と大きさだけで判定する。
+    // 複雑なジェスチャ認識はしない。軸番号と符号は IMU の物理取付に依存するので実機で確定する
+    // (右に振る→カーソル右、下に振る→決定、になる軸/符号へ要調整)。暫定: X=左右 / Y=上下。
+    constexpr uint8_t  NAV_LR_AXIS             = 0;     // 左右 = X 軸 (要実機確認)
+    constexpr uint8_t  NAV_UD_AXIS             = 1;     // 上下 = Y 軸 (要実機確認)
+    constexpr float    NAV_SWING_THRESHOLD_G   = 1.00f; // ナビ振り検出しきい値 (拍検出 1.20g より低め)
+    constexpr float    NAV_RELEASE_G           = 0.30f; // ナビゲート解放 (1 振り=1 操作にするため)
+    constexpr uint32_t NAV_REFRACTORY_MS       = 400;   // ナビ不応期 (誤連打防止)
+    constexpr uint8_t  MENU_ITEM_COUNT         = 2;     // メニュー項目数 (0=自由演奏 / 1=ゲーム)
+
+    // ── test_v3 ゲームモード: ゲーム進行・採点・ガイドフェード ──
+    constexpr uint16_t GAME_LENGTH_BEATS       = 24;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周。設定値)
+    constexpr uint8_t  GAME_TARGET_BPM         = 100;   // 目標テンポ (固定・設定値)
+    // メトロノームガイド強度の固定スケジュール (経過拍ベース):
+    //   beat <  FULL          : 強度 1.0 (はっきり刻む)
+    //   FULL <= beat <  ZERO  : 1.0→0 へ線形フェード
+    //   beat >= ZERO          : 強度 0   (ガイドなし・記憶で維持)
+    // 採点重み = 1 - 強度 (ガイドが薄い/無い区間ほど重く配点)。
+    constexpr uint16_t GAME_GUIDE_FULL_BEATS   = 8;
+    constexpr uint16_t GAME_GUIDE_ZERO_BEATS   = 16;
+    // 採点の許容誤差比: 拍間隔誤差が目標拍間隔のこの割合に達したら 0 点。0.5 = 半拍ずれで 0 点。
+    constexpr float    GAME_SCORE_TOLERANCE_RATIO = 0.5f;
 }
