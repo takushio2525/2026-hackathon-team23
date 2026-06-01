@@ -16,6 +16,7 @@
 #include "OrcReceiverModule.h"
 #include "NoteSenderModule.h"
 #include "StatusLedModule.h"
+#include "UiRelayModule.h"
 
 inline const OrcNetConfig ORC_NET_CONFIG = {
     /*mode=*/                WifiMode::Sta,
@@ -41,6 +42,15 @@ inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
     /*baudRate=*/     115200,
     /*partId=*/       0x02,
     /*instrumentId=*/ 0,             // PC 側で読み込んだ楽器定義 (data/*.json) の何番目を使うか
+};
+
+// test_v3 ゲームモード: 指揮者の UI 状態 (mode/画面/カーソル/score) を PC へ中継する設定。
+// node_02 = メイン操作 UI が付く PC。低頻度送出 (変化時 + 最大 5Hz + 1s heartbeat) で
+// 演奏 NOTE バーストを阻害しない。node_03/04 はアナライザのため UiRelayModule を載せない。
+inline const UiRelayConfig UI_RELAY_CONFIG = {
+    /*partId=*/        0x02,
+    /*minIntervalMs=*/ 200,    // 変化送出の最小間隔 (5Hz 上限)
+    /*heartbeatMs=*/   1000,   // 無変化でも 1s ごとに 1 発 (PC 途中接続でも状態を拾える)
 };
 
 inline const StatusLedConfig STATUS_LED_CONFIG = {

@@ -36,6 +36,12 @@ void OrcReceiverModule::updateInput(SystemData& data) {
         data.ctrl.bpm = data.orcNet.lastCtrl.payload.bpmQ8 / 8.0f;
         data.ctrl.velocity = data.orcNet.lastCtrl.payload.velocity;
         data.ctrl.state = data.orcNet.lastCtrl.payload.state;
+        // test_v3 ゲームモード: 予約バイトから UI 状態を展開 (UiRelayModule が PC へ中継)
+        data.ctrl.bpmQ8     = data.orcNet.lastCtrl.payload.bpmQ8;
+        data.ctrl.mode      = data.orcNet.lastCtrl.payload.mode;
+        data.ctrl.navCursor = data.orcNet.lastCtrl.payload.navCursor;
+        data.ctrl.targetBpm = data.orcNet.lastCtrl.payload.targetBpm;
+        data.ctrl.score     = data.orcNet.lastCtrl.payload.score;
         data.ctrl.lastReceivedMs = millis();
     }
 

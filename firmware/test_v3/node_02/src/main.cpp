@@ -14,6 +14,7 @@
 #include "OrcNetModule.h"
 #include "OrcReceiverModule.h"
 #include "NoteSenderModule.h"
+#include "UiRelayModule.h"
 #include "StatusLedModule.h"
 #include "SerialDebug.h"
 
@@ -25,10 +26,11 @@ SystemData         gData;
 OrcNetModule       gNet(ORC_NET_CONFIG);
 OrcReceiverModule  gRecv(ORC_RECEIVER_CONFIG);
 NoteSenderModule   gNote(NOTE_SENDER_CONFIG);
+UiRelayModule      gUi(UI_RELAY_CONFIG);
 StatusLedModule    gLed(STATUS_LED_CONFIG);
 
 IModule* gInputs[]  = { &gNet, &gRecv };
-IModule* gOutputs[] = { &gNote, &gLed, &gNet };
+IModule* gOutputs[] = { &gNote, &gUi, &gLed, &gNet };
 
 constexpr size_t MAX_RETRY = 3;
 uint32_t gLastLoopMs = 0;
@@ -141,6 +143,7 @@ void setup() {
     initWithRetry(&gNet,  "OrcNetModule");
     initWithRetry(&gRecv, "OrcReceiverModule");
     initWithRetry(&gNote, "NoteSenderModule");
+    initWithRetry(&gUi,   "UiRelayModule");
     initWithRetry(&gLed,  "StatusLedModule");
 
     DBG_PRINTLN("[N2 INIT] done");
