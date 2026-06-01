@@ -5,7 +5,15 @@
 
 ## 現在の対象
 
-- **test_v2 低遅延化・パケロス削減・堅牢化を実装**（2026-06-01、`shiozawa-test_v2-latency`
+- **test_v3 ゲームモード 設計フェーズ（Phase 1 残り）を完了**（2026-06-01、`shiozawa-test_v3-game`
+  ブランチ）。`.agent/test_v3-game-design.md` を新規作成。(a) CTRL 予約4B 割当（mode/navCursor/
+  targetBpm/score・画面は state を Menu/Result 拡張して導出）、(b) node_01 IMU ナビ（左右=カーソル/
+  縦=決定、新 Menu/Result state で拍検出と排他）、(c) node_02 UI 中継（新 type=4 PKT_UI、変化時＋最大5Hz）、
+  (d) Processing 役割自動判定（手動選択廃止・partId/UIフレームで判定）を設計。**重要な逸脱**: 計画書 Phase 4A は
+  予約4B=mode/targetBpmQ8(2B)/score だったがカーソルの空きが無く、targetBpmQ8→targetBpm(1B) に簡素化。
+  master 確認事項として明記済み。実装は Phase 2 以降で master 指示後（鉄則: コンパイルまで、実機はユーザー）。
+  - **（以下は前フェーズ＝test_v2 latency。完了済み・参照用に残置）**
+- **test_v2 低遅延化・パケロス削減・堅牢化を実装**（`shiozawa-test_v2-latency`
   ブランチ。`shiozawa-test_v2-jitter` から分岐＝jitter の実機検証済み土台が前提）。
   計画書 `.agent/test_v2-latency-plan.md` の「6. 実装項目」A/B/C を実装しコンパイル確認済み。
   実機 upload と最終評価はユーザー（鉄則: main に触らない／push しない／Claude はコンパイルまで）。
@@ -26,7 +34,11 @@
 
 ## 次の一手
 
-- ユーザー作業: `shiozawa-test_v2-latency` を各マイコンへ upload して実機評価。
+- **test_v3**: master の指示を待って Phase 2 着手（設計メモ §8 の実装分解順）。1=共通 OrcProtocol
+  （PKT_UI/CtrlPayload）、2=node_01（Menu/Result state・GameData・ナビ・採点・ガイド）、3=node_02
+  （CtrlData 拡張・UiRelayModule）、4=Processing（役割自動判定・4 画面＋アナライザ・メトロノームフェード）。
+  着手前に `.agent/test_v3-game-design.md` を Read。master の確認待ち事項は同メモ §9。
+- （以下 test_v2 latency 用・完了済み）ユーザー作業: `shiozawa-test_v2-latency` を各マイコンへ upload して実機評価。
   - 指揮者は `node_01_devkitc`（DevKitC、A の config 変更あり）を書き込む。
   - 楽器 node_02/03/04 は B（OrcNetModule 再join）の変更を含むので書き込む。
   - Processing は C 適用済みの `.pde` を Open→Run（書き込み不要）。

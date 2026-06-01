@@ -3,6 +3,19 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+## 2026-06 — test_v3 ゲームモードフェーズ
+
+- 2026-06-01: **test_v3 ゲームモード 設計メモを作成**（`shiozawa-test_v3-game`、`.agent/test_v3-game-design.md`、
+  Phase 1 残り＝設計）。(a) CTRL 予約4B を mode/navCursor/targetBpm/score にフィールド化（画面は state を
+  Menu=4/Result=5 へ拡張して PC が (state,mode) から導出）、(b) node_01 IMU ナビ（dynAcc の左右(X)/上下(Y)
+  成分の符号・閾値で単純判定、左右=カーソル移動/縦=決定。新 Menu/Result state で拍検出と排他＝既存の
+  state==Conducting ガードを流用）、(c) node_02 に新 type=4 PKT_UI を追加し CTRL 内容を USB シリアルで PC へ
+  中継（変化時＋最大5Hz の低頻度・UiRelayModule 新規・NOTE 20B 不変）、(d) Processing は役割の手動選択を廃止し
+  partId/UIフレーム presence で自動判定（node_02=メイン操作UI / node_03,04=アナライザ）、画面はデータ駆動で毎フレーム
+  再判定。**計画書 Phase 4A からの逸脱**: 予約4B に targetBpmQ8(2B) だとカーソルの空きが無いため
+  targetBpmQ8→targetBpm(1B 生BPM) に簡素化（master 確認事項に明記）。同期経路(BEAT/NOTE/CTRL 20B)・拍検出・
+  楽譜進行は不変＝自由演奏は test_v2 同一挙動を維持。実装は Phase 2 以降で master 指示後。
+
 ## 2026-06 — test_v2 低遅延化フェーズ
 
 - 2026-06-01: **test_v2 低遅延化・パケロス削減・堅牢化を実装**（`shiozawa-test_v2-latency`
