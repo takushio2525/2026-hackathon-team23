@@ -3,6 +3,21 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+## 2026-06 — test_v2 低遅延化フェーズ
+
+- 2026-06-01: **test_v2 低遅延化・パケロス削減・堅牢化を実装**（`shiozawa-test_v2-latency`
+  ブランチ、計画書 `.agent/test_v2-latency-plan.md` 6節 A/B/C）。A=指揮者 config 2ファイル
+  (`node_01`/`node_01_devkitc` の ProjectConfig.h) で `beatLookaheadMs` 50→30・`beatGapMs`
+  0→2。B=共通 OrcNetModule に `wasLinkUp_` を足し、Sta 側 WiFi down→up 復帰時に
+  `udp_.stop()→beginMulticast()` でマルチキャスト購読を貼り直す（init 末尾で wasLinkUp_
+  初期化＝起動直後の偽遷移で無駄な再joinを防ぐ。SoftAp 側は isLinkUp が常時 true で無影響）。
+  C=Processing の getLineOut バッファ 1024→512・setup 冒頭に frameRate(90) 明示。4ノード
+  とも `pio run` SUCCESS（node_01_devkitc RAM14.0%/Flash21.6%、node_02-04 RAM20.6%/
+  Flash20.9%＝jitter 時と同サイズ）。実機 upload と評価はユーザー（鉄則: main 不触・push せず・
+  コンパイルまで）。残課題: B の WiFiS3 再join 実機確認、5台構成(node_05/06)は編曲＝音楽判断で
+  master 確認待ち保留。計画書7節（楽器 Receiver/applyPattern/NoteSender/OrcProtocol/
+  score_data）は不変。
+
 ## 2026-05 — ドキュメント刷新フェーズ
 
 - 2026-05-28: 夜間レビュー 2026-05-28（PR #19）の **docs 用語追従**。ADR-0004 改訂（楽器5台・partId
@@ -11,6 +26,151 @@
   docs build 70ページ・リンク切れ無し。ファーム本体ロジックは不変（`docs/nightly-2026-05-28-followup`）。
 - 2026-05-28: PR #18（e170ba7）で 5/23-27 の累積指摘を一括追従（docs とコメントのみ、ファーム本体
   ロジックは不変）。
+- 2026-05-27: **test_v2 Processing 側に「全パート同じ音色」モードを追加** (ユーザー指示「一旦発音を
+  全部ピアノにしてわかりやすくして」、`shiozawa-test_v2-jitter` ブランチ)。輪唱の聞き分け補助。
+  `pc_app/test_v2/orchestra_resynth/data/piano.json` を新規追加 (手書き音色: attack 8 ms・1.5 s
+  指数減衰 τ=0.85 s・倍音 8 本・非調和性 B=0.0004・アタックノイズ 0.04、analyzer 由来ではないので
+  厳密なピアノ音ではないが打鍵→減衰の輪郭は出る)。`orchestra_resynth.pde` に
+  `forceSingleInstrument`(既定 true) と `FORCED_INSTRUMENT_FILE="piano.json"` を導入し、
+  `rescanInstruments()` で piano.json の index を `forcedInstrumentIdx` にキャッシュ、`modelForId(id)`
+  が ON 時は instrumentId を無視してその index を返すよう改修。'p' キーで ON/OFF トグル、画面の
+  楽器定義パネルにモード表示。ファーム側は無変更 (NOTE には引き続き instrumentId が乗る)。
+  既存音色 (0_organ/1_flute/2_bell/3_flute_tweaked) は退避せず data/ にそのまま残し、'p' OFF で
+  従来挙動に戻る。`python3 -m json.tool` で JSON 構文 OK 確認。
+
+- 2026-05-27: **ジッタ削減版を楽器 node_02/03 に実機書き込み** (ユーザー指示「各マイコンに書き込んで」)。
+  `shiozawa-test_v2-jitter` ブランチのファームを 2 台に upload: node_02 (SER=34B7DA64482C →
+  `/dev/cu.usbmodem34B7DA64482C2`、bossac 3.41 秒・total 6.38 秒)、node_03 (SER=F412FAA08558 →
+  `/dev/cu.usbmodemF412FAA085582`、bossac 3.55 秒・total 5.67 秒)。両方 `[SUCCESS]`。node_04 は
+  未接続のため書き込み不可で 2 声輪唱で評価開始。指揮者 `node_01_devkitc` は今回のブランチで
+  コード変更なし (改修対象は楽器側の OrcReceiverModule と ProjectConfig のみ) なので書き込まず。
+  Processing は起動していないことを `pgrep` で確認してから書き込み (前回の Resource busy 事故対策)。
+
+- 2026-05-27: **test_v2 楽器側のジッタ削減と多重受信処理を改善** (ユーザー指示、挑戦的変更のため
+  `shiozawa-test_v2-jitter` ブランチを新規作成)。node_02/03/04 の OrcReceiverModule と
+  ProjectConfig を改修。①`loopIntervalMs` 5 → 2 ms (発火判定ジッタ最大 5 ms → 2 ms)、
+  ②`clockSyncEmaAlpha` 0.10 → 0.20 (初回サンプル吸込み倍速化、時定数 ≈0.25 s)、
+  ③`OrcReceiverConfig` に `clockSyncEmaAlphaDup` フィールド新設 (= 0.05) して、同一 beatNo の
+  連送 2 個目以降は別 α で EMA 更新するよう OrcReceiverModule.cpp の duplicate 判定箇所を
+  書き換え。旧実装は連送 4 個を全て α=0.10 で吸って同じサンプルに 4 回追従していた問題
+  (= 強相関サンプルの過剰反映) を、初回 0.20 + 重複 0.05×3 で合計影響 ≈0.32 (初回 α 単独に
+  近い吸い方) に補正。pending (発音予約) は初到着 1 個固定を維持 (連送 payload は同一・
+  発火後後着の再キューによる二重発音事故を避けるため)。3 ノードとも `pio run` SUCCESS
+  (Flash 20.9% / RAM 20.6% 不変)。実機書き込みは AGENTS.md の「実機未テスト .ino/.cpp に
+  Claude 起点で追加変更を入れない」ルール準拠でユーザー作業に委ねる。
+
+- 2026-05-27: **かえるのうた版を node_02/03 に実機書き込み** (ユーザー指示)。
+  接続中の Arduino UNO R4 WiFi 2 台を `pio device list` でシリアル番号判定:
+  node_02 (SER=34B7DA64482C, `/dev/cu.usbmodem34B7DA64482C2`, bossac 3.43 秒,
+  total 6.12 秒) と node_03 (SER=F412FAA08558, `/dev/cu.usbmodemF412FAA085582`,
+  bossac 3.49 秒, total 5.41 秒)。両方 `[SUCCESS]` / Hash verified。初回試行
+  時に Processing (orchestra_resynth, PID 54869) が両ポートを `lsof` で掴んで
+  おり `[Errno 16] Resource busy` で失敗、ユーザーに Processing 終了を依頼
+  して再試行で成功。node_04 (声部 3) は未接続のため未書き込み。指揮者
+  `node_01_devkitc` は楽譜を持たないので書き込み不要。これで test_v2 が
+  「かえるのうた」2 声輪唱 (位相 0/8) で動作可能な状態。
+
+- 2026-05-27: **test_v2 の楽曲を「きらきら星」→「かえるのうた」へ差し替え**
+  (`firmware/test_v2/node_02/03/04/src/score_data.cpp`、コミット 655d72e)。
+  きらきら星は同型反復で輪唱の聞き分けが難しいというユーザー判断。1 周 24 拍
+  (ドレミファミレドー / ミファソラソファミー / ドドドドドドドー) を 2 周ぶん
+  直書きして kScoreLength=48 を維持。`headRestBeats=0/8/16` (ProjectConfig.h)
+  はそのまま → 楽譜内位相 (0,8,16) で 3 声輪唱成立。16 拍版にすると node_04 が
+  node_02 と完全同位相になるため 24 拍周期を採用。3 ノードとも `pio run` で
+  SUCCESS (Flash 20.9% / RAM 20.6%)。実機書き込みは未実施 (CLAUDE.md「実機未
+  テスト .ino/.cpp に Claude 起点で追加変更を入れない」ルール準拠でユーザー
+  作業に委ねる)。`.agent/activeContext.md` の課題曲メモ「かえるのうたでチーム
+  判断確定」が今回の差し替えで実装側にも反映された形。
+
+- 2026-05-27: **orchestra_resynth のポート一覧に USB フィルタ+スクロール追加**
+  (`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`)。ユーザーの Mac
+  でポート一覧が画面下に並びきらず、書き込み直後に再認識された
+  `usbmodemF412FAA08558` (node_03) が一覧外でクリックできない件への対応。
+  追加要素: ①`isUsbSerialName()` で `usbmodem*`/`usbserial*`/`ttyUSB*`/
+  `ttyACM*`/`COM*` をマッチさせる USB シリアル判定、②`usbOnly` トグル
+  (`f` キー、既定 true、開いてるポートはフィルタ対象でも残して close 操作を
+  奪わない)、③`displayPorts` (フィルタ済リスト) と `portScrollY`、毎フレーム
+  `rebuildDisplayPorts()` で開閉に追従、④`drawPortList()` を `clip()` で
+  クリッピングし、`mouseWheel(MouseEvent)` で 1 ノッチ=1 行スクロール、
+  右端 4px のサムバー描画、⑤ヘッダ/上部ヘルプ/起動時 println に `[f]` と
+  `[wheel]` を追記。クリック判定 (`mousePressed`) もスクロール量を反映。
+  ポート数が多いマシンや書き込みリセット直後でもリストから node_03 を
+  確実にクリックできる状態に。
+
+- 2026-05-27: **楽器 node_02/03 を SERIAL_DEBUG=0 に戻して再書き込み**。
+  test_v2 起動時に Processing 受信 0 だった原因が `ac8c5ff デバック` で入った
+  `-DSERIAL_DEBUG=1` (NOTE バイナリ抑止モード) だったため、`platformio.ini` の
+  該当行 1 箇所だけ `=0` に戻して node_02 (16.41 秒) / node_03 (12.67 秒) を
+  再書き込み。node_04 は元から `=0` のままだったので変更なし。指揮者
+  `node_01_devkitc` は `SERIAL_DEBUG=1` のまま (拍検出デバッグ用)。AGENTS.md
+  既定 (楽器=0 / 指揮者=1) と整合する状態に復元。
+
+- 2026-05-27: **test_v2 の 3 台を実機書き込み**（DevKitC + Arduino UNO R4 WiFi
+  ×2、ユーザー指示）。`pio device list` で接続デバイスを判定し、CH343 ブリッジ
+  (`/dev/cu.usbmodem5B7A1660211`) ← `node_01_devkitc` (12.80 秒)、UNO R4 シリアル
+  34B7DA64482C ← `node_02` (5.50 秒)、F412FAA08558 ← `node_03` (5.55 秒) で順次
+  `pio run -t upload --upload-port`。3 台とも `[SUCCESS]`。Arduino 2 台の割当は
+  AskUserQuestion で確認 (VID/PID 同一で自動判別不可)。node_04 (声部 3) は未接続。
+  注意: 楽器側 `platformio.ini` の `-DSERIAL_DEBUG=1` (ac8c5ff 以降) は NOTE
+  バイナリ送出を抑止するため、Processing で音を鳴らすには `=0` への切り替えが
+  別途必要。
+
+- 2026-05-27: **DevKitC 派生ファームを test_v2 にも展開**
+  （`firmware/test_v2/node_01_devkitc/`）。test_v1/node_01_devkitc を実機検証
+  したユーザーから「DevKitC でうまく行った」報告を受け、test_v2 (3 声輪唱) でも
+  同じ派生を用意。`firmware/test_v2/node_01` をディレクトリごとコピーして
+  `.pio/`・`.vscode/` を除外、差分はビルド設定とコメントのみ (board=
+  esp32-s3-devkitc-1 / USB CDC マクロ無効化 / upload_protocol コメントアウトで
+  PIO デフォルト UART 側 esptool / ProjectConfig.h の冒頭・I2C ピン・StatusLed
+  コメント更新と activeLow=false / README.md を DevKitC 用に書き直し)。`src/`
+  `lib/` `include/SystemData.h` はバイト単位で同一。`pio run` で RAM 14.0%・
+  Flash 21.6%・警告 0・11.54 秒でビルド通過。XIAO 版との比較検証はユーザー側。
+
+- 2026-05-27: **パケロス原因切り分け用 DevKitC 派生ファームを追加**
+  （`firmware/test_v1/node_01_devkitc/`）。test_v1 で 5/11 以降の UDP パケロス多発の
+  原因がコード退行ではない（5/11 以降の test_v1/ への変更は SERIAL_DEBUG 無効化の 1
+  件のみ）と確認し、最有力候補の「XIAO ESP32-S3 Sense 外付け IPEX アンテナ接触不良」
+  を切り分けるために PCB 内蔵アンテナの ESP32-S3-DevKitC-1 用派生を作成。`node_01` を
+  ディレクトリごとコピーしてビルド設定だけ差し替え（board=esp32-s3-devkitc-1 / USB CDC
+  OFF / upload_protocol デフォルト UART 側）、ロジック (`src/` `lib/`) は完全同一。I2C
+  ピンは GPIO5/GPIO6 のまま (DevKitC 左列 5・6 番目に並ぶのでブレッドボード配線でも
+  そのまま使える)。`pio run` で RAM 14%・Flash 22%・警告 0 でビルド通過。実機書き込み
+  と XIAO 版との比較検証はユーザー側 (CLAUDE.md「実機未テスト .ino に Claude 起点で
+  追加変更を入れない」ルール準拠)。
+  （`work/shiozawa/work-0525/作業ログ0525/作業ログ0525.tex` + `.pdf`）。
+  本体計画書 19edb91 と同方針で「、」→「，」「。」→「．」を全置換。
+  Docker latexmk で 6 ページ・Overfull 0 ビルド成功。
+
+- 2026-05-26: **塩澤の作業ログ第1回の事実関係訂正と付録改訂**
+  （`work/shiozawa/work-0525/作業ログ0525/作業ログ0525.tex` + `.pdf`）。
+  前ターン 31aedae のパケロス重点リライトに対するユーザー指摘を反映:
+  ①「test_v2 で 3 声輪唱を実装／鳴らした」記述は嘘になるため全削除、
+  ②4 ノード同期試験（test_v1）もパケロスによる停滞で進捗 70\% に訂正
+  （マイルストーン「test_v1 達成」を「未達」へ）、
+  ③§4.2 検証方法の「参照資料」リスト削除、
+  ④付録: 回路図・配線資料項目を削除、GitHub リポジトリ URL を `\url{}` で追加
+  （preamble に `\usepackage{url}` 追加）、プライベートリポジトリで TA・教員が
+  閲覧不可な点を「閲覧の要検討事項」として記載（パブリック化／Collaborator 招待の
+  2 案）。Docker latexmk で 6 ページ・Overfull 0 ビルド成功。
+
+- 2026-05-26: **塩澤の個人作業ログ第1回をパケロス重点へ全面リライト**
+  （`work/shiozawa/work-0525/作業ログ0525/作業ログ0525.tex` + `.pdf`）。
+  スコープを「test_v1 完了まで」→「test_v1 完了 + test_v2 のパケロス調査」に拡張し、
+  重大課題を WiFi 到達ばらつき（解決済）から UDP マルチキャストのパケロス
+  （未解決・対応中）へ全面置換。作業ログ表に test_v2 輪唱検証行とパケロス計測・対策行を
+  追加、課題管理表でパケロスを最上段化、AI 利用・検証方法・ファクトチェック・次回計画も
+  シーケンス番号付与＋同一パケット連送と NOTE のユニキャスト分離検討の話に書き直し。
+  付録の `\texttt` 長尺パス並列で Overfull 2 件が出たため test_v1/test_v2 を別 item に
+  分割して解消。Docker latexmk で 6 ページ・Overfull 0・Underfull は表組み内の和文行末の
+  微小なもののみ。
+
+- 2026-05-26: **塩澤の個人作業ログ第1回（test_v1 まで）を作成**
+  （`work/shiozawa/work-0525/作業ログ0525/作業ログ0525.tex` + `.pdf`）。教員配布テンプレ
+  `report/作業ログテンプレート/` を流用し、GW から続けた IMU モーション取得・WiFi UDP 通信・
+  回路結線・4ノード同期試験を「作業ログ表」に整理。重大課題は WiFi 到達ばらつきとし
+  マスタクロック方式＋EMA で吸収済みを明記。AI 利用は ADR-0002／-0003／-0006 と河瀬2014 を
+  ファクトチェック源とした旨を記述。Docker latexmk でビルド成功（5ページ・Overfull 0・
+  Underfull は和文行末の微小なもののみ）。次回計画は test_v2 輪唱検証。
 - 2026-05-25: ac8c5ff で node_02/03 を `SERIAL_DEBUG=1` に切り分け中。本番演奏前に 0 へ戻す前提（.ini は今回不変）。
 
 - 2026-05-25: **作業ログ LaTeX テンプレートを追加**（`report/作業ログテンプレート/`）。教員配布

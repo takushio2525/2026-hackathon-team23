@@ -5,15 +5,40 @@
 
 ## 現在の対象
 
-- **結合レポート 最終チェック15件すべて決着**（2026-05-22）。即修正5件（b678370・53fbf7c）→
-  残10件のうち8件（中④⑦⑧・低⑪⑫⑬⑭⑮）→ 最後の2件（高③・中⑨）まで完了。
-  ビルド53ページ（`_作業計画.md` §7「53〜54頁は許容範囲」内）・Overfull/Underfull 0・
-  未定義参照0（残る undefined 3件は Hiragino W6 bold の Font Warning で実害なし）。
-- 高③＝5.52cent を ref:onkai 論文要旨の「3.6cent未満」に修正。中⑨＝MOE「音階の誤差」の
-  測定方法を「合成出力音を録音・周波数分析し楽譜の平均律理論音高と比較」と明記。
+- **test_v2 低遅延化・パケロス削減・堅牢化を実装**（2026-06-01、`shiozawa-test_v2-latency`
+  ブランチ。`shiozawa-test_v2-jitter` から分岐＝jitter の実機検証済み土台が前提）。
+  計画書 `.agent/test_v2-latency-plan.md` の「6. 実装項目」A/B/C を実装しコンパイル確認済み。
+  実機 upload と最終評価はユーザー（鉄則: main に触らない／push しない／Claude はコンパイルまで）。
+  - **A. 指揮者 config** (`node_01` と `node_01_devkitc` の `include/ProjectConfig.h`):
+    `beatLookaheadMs` 50→30（playAt=now+30ms。連送受信完了 ~23ms にマージン約7ms）、
+    `beatGapMs` 0→2（連送4発を2ms間隔で時間分散しradio のまとめ落ちを軽減）。
+  - **B. 共通 OrcNetModule** (`common/lib/OrcNetModule/OrcNetModule.{h,cpp}`):
+    `wasLinkUp_` メンバ追加。Sta 側で WiFi down→up 復帰を検出し `udp_.stop()` →
+    `beginMulticast()` で UDP マルチキャスト購読を貼り直す。`init()` 末尾で `wasLinkUp_`
+    を初期化（起動直後の偽 false→true 遷移で無駄な再joinを走らせない）。SoftAp 側は
+    `isLinkUp()` が `started_` 依存で常時 true のまま＝この遷移が起きず無影響。
+  - **C. Processing** (`pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`):
+    `getLineOut` バッファ 1024→512（約23.2ms→11.6ms）、`setup()` 冒頭に `frameRate(90)`
+    明示（draw/drainPackets を 16.7ms→~11ms 粒度に）。
+  - ビルド: 4ノードとも `pio run` SUCCESS（node_01_devkitc RAM14.0%/Flash21.6%、
+    node_02/03/04 RAM20.6%/Flash20.9%＝jitter 時と同サイズ）。pio は
+    `~/.platformio/penv/bin/pio`（非対話シェルの PATH に無いのでフルパス指定が必要）。
 
 ## 次の一手
 
+- ユーザー作業: `shiozawa-test_v2-latency` を各マイコンへ upload して実機評価。
+  - 指揮者は `node_01_devkitc`（DevKitC、A の config 変更あり）を書き込む。
+  - 楽器 node_02/03/04 は B（OrcNetModule 再join）の変更を含むので書き込む。
+  - Processing は C 適用済みの `.pde` を Open→Run（書き込み不要）。
+- **実機で要確認**（B のリスク）: WiFiS3（UNO R4）で `udp_.stop()→beginMulticast()` を
+  繰り返したときの挙動。AP を一度落として復帰させ、リンク復活後に BEAT/NOTE が再び
+  受信できるか（再join が効くか）を確認。ESP32 側 Sta はこの構成に無いが将来流用時の注意。
+- 評価観点: 振り→発音遅延が下がったか（lookahead 30 + audio512 + frameRate90）、
+  連続スイングの滑らかさ、パケロス時の挙動（beatGap 2ms 分散の効果）。
+- **5台構成（node_05/06）は保留＝master 確認事項**。計画書5節: かえるのうた1周24拍・
+  輪唱 headRest 8拍刻みなので 0/8/16 で3声がちょうど一巡。4声以上を等間隔で重ねると
+  24=0(node_02と同位相)/32=8(node_03と同位相)で破綻する。5声化は不等間隔位相 or
+  楽曲周期延長＝**編曲（音楽判断）**が必要なので勝手に作曲せず保留。
 - 結合レポート最終チェック・夜間レビュー累積指摘の docs/コメント追従（〜e170ba7／PR #18・
   2026-05-28 分は `docs/nightly-2026-05-28-followup`）はいずれも完了。次の指示待ち。
 - 残保留はファーム実機検証が要る案件（production の board 名・共通ライブラリ集約・CI 取り込み・
@@ -22,38 +47,21 @@
 
 ## 現フェーズで Read すべき設計書
 
-- 経緯・全方針: `report/計画書_中間発表/_作業計画.md` §6-6（Phase 6・指摘15件＝全件決着済み）。
-- 本体修正時: `report/計画書_中間発表/23_計画書・設計書.tex`。
-
-## draw.io ワークフロー（再修正時の参照）
-
-- 書き出し: `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png
-  --scale 2 --crop --border 14 --output 出力.png 入力.drawio`
-- `.drawio` と `.png` を両方コミットする。`.png` を手で描き換えない。
-
-## ガント図の整合基準（再修正時の参照）
-
-- バー週数は **アロー図 `arrow.drawio` が正**: 110/120=各1.5週，210=0.5，220=1.0，
-  230=0.5，240=1.0，250/260=各1.5，310/320=1.0，330=1.0，510=1.0週。図上 1週=66px。
-- 絶対日付は授業スケジュール: 計画発表5/20・実装5/27〜・評価会6/24・発表会7/1。
-- フェーズ工数は WBS 表: 設計3週・製造2週・テスト2週。
-- クリティカルパスは逐次（階段配置）。240/250/260 は製造期間に並行・フロートあり。
+- 本作業の全体方針: `.agent/test_v2-latency-plan.md`（遅延チェーン分解・各改善の根拠）。
+- ファーム構造: `.agent/architecture.md`（OrcNetModule の3フェーズループ責務）、
+  `.agent/api.md`（UDP マルチキャスト・CTRL/BEAT/NOTE 仕様・OrcSenderConfig 各値）。
 
 ## ユーザーの好み
 
-- 大規模作業は計画を作ってから着手。設計章は大まかに（内容が伝われば可）。
-- 図は draw.io に一本化（TikZ 廃止済み）。表が読みやすければ図を表化してよい。
-- 短い指示は行間を読み，前提のズレを感じたら着手前に指摘する。
+- 大規模作業は計画を作ってから着手。短い指示は行間を読み，前提のズレを感じたら着手前に指摘。
+- 実機未テストの .ino/.cpp に Claude 起点で変更を入れたらコンパイル確認まで＝upload はユーザー。
 
-## 既知の論点
+## 計画書フェーズ用メモ（latency 作業では非アクティブ・再開時参照）
 
-- 本体ページ数は **53頁が許容範囲**（§7「53〜54頁は許容範囲・無理な圧縮不要」）。
-  図表が `[H]` 固定配置のため本文を数行足すと図の押し出しでページが増えやすい。
-- 本体 .tex の句点は **「．」**（origin コミット 19edb91 で「。→．」一括統一済み）。
-  本体 .tex を編集するときは句点を「．」で書く。.agent/ や .md 類は「。」のまま。
-- CTRL state は現行ファーム整合で `0=Idle/1=Calibrating/2=Conducting/3=Fallback/4=ModeSelect`。
-- ADR-0004 は楽器5台構成（金管4＋ドラム・全体6台）に改訂済み。改訂履歴を本文に明記。
-- 状態遷移図はユーザー決定でシーケンス図を主図とし，節名「状態遷移図」は現状維持で決着（低⑪）。
-  課題曲「かえるのうた」はチーム判断で確定（中⑦）。
-- `.gitignore` に例外 `!report/計画書_中間発表/23_計画書・設計書.pdf` あり。本体 PDF はコミット対象。
-- 図インベントリは全10点 draw.io（`_作業計画.md` §8）。
+- draw.io 書き出し: `/Applications/draw.io.app/Contents/MacOS/draw.io --export --format png
+  --scale 2 --crop --border 14 --output 出力.png 入力.drawio`。`.drawio` と `.png` を両コミット。
+- 本体 .tex の句点は「．」（origin 19edb91 で統一済み）。.agent/・.md 類は「。」のまま。
+- 本体ページ数は 53〜54頁が許容範囲。`.gitignore` に
+  `!report/計画書_中間発表/23_計画書・設計書.pdf` の例外あり（本体 PDF はコミット対象）。
+- CTRL state は `0=Idle/1=Calibrating/2=Conducting/3=Fallback/4=ModeSelect`。
+  ADR-0004 は楽器5台（金管4＋ドラム・全体6台）に改訂済み。

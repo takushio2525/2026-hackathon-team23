@@ -29,11 +29,12 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
 };
 
 inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
-    /*partId=*/              0x03,    // 輪唱 声部 2
-    /*headRestBeats=*/       8,       // 8 拍ぶん頭に休符を入れてから入る
-    /*clockSyncEmaAlpha=*/   0.10f,
-    /*clockSyncMinSamples=*/ 5,
-    /*loopIntervalMs=*/      5,
+    /*partId=*/                0x03,    // 輪唱 声部 2
+    /*headRestBeats=*/         8,       // 8 拍ぶん頭に休符を入れてから入る
+    /*clockSyncEmaAlpha=*/     0.20f,   // 初回サンプル: 旧 0.10 → 0.20 で応答性向上 (時定数 ≈0.25 s)
+    /*clockSyncEmaAlphaDup=*/  0.05f,   // 連送 2 個目以降: 過剰反映を避けて軽く補正
+    /*clockSyncMinSamples=*/   5,
+    /*loopIntervalMs=*/        2,       // 旧 5 ms → 2 ms (発音判定ジッタ最大 5 ms → 2 ms)
 };
 
 inline const NoteSenderConfig NOTE_SENDER_CONFIG = {

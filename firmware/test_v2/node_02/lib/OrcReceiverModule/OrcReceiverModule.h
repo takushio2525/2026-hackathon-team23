@@ -11,12 +11,16 @@
 #include "IModule.h"
 
 struct OrcReceiverConfig {
-    uint8_t  partId;              // 0x02-0x04: 輪唱のどの声部か
-    uint16_t headRestBeats;       // 輪唱: 先頭に入れる休符の拍数 (0=先頭から入る)。
-                                  // applyPattern が firedBeatNo からこのぶん引いて楽譜を引く
-    float    clockSyncEmaAlpha;   // 0.10
-    uint8_t  clockSyncMinSamples; // 5 (デバッグ表示用. Playing 遷移条件には使わない)
-    uint16_t loopIntervalMs;      // 5 ms (ループ周期)
+    uint8_t  partId;                  // 0x02-0x04: 輪唱のどの声部か
+    uint16_t headRestBeats;           // 輪唱: 先頭に入れる休符の拍数 (0=先頭から入る)。
+                                      // applyPattern が firedBeatNo からこのぶん引いて楽譜を引く
+    float    clockSyncEmaAlpha;       // 初回サンプル (新規 CTRL / 初到着 BEAT) の EMA 係数
+    float    clockSyncEmaAlphaDup;    // 重複サンプル (同一 beatNo の連送 2 個目以降) の EMA 係数。
+                                      // 連送は数 ms 以内の強相関サンプルなので、初回より小さく
+                                      // して過剰反映を防ぐ。初回 0.20 × 重複 0.05 で、4 連送
+                                      // 合計の影響は ≈ 0.32 (初回 α 単独に近い吸い方)。
+    uint8_t  clockSyncMinSamples;     // 5 (デバッグ表示用. Playing 遷移条件には使わない)
+    uint16_t loopIntervalMs;          // 2 ms (発火判定粒度。短いほど発音ジッタが減る)
 };
 
 struct PendingBeat {
