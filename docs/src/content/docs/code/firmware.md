@@ -144,7 +144,7 @@ inline const ImuConfig IMU_CONFIG = {
 // 送信周期
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
-    /*beatRedundancy=*/  2,    // BEAT 2 連送
+    /*beatRedundancy=*/  4,    // BEAT 4 連送 (2026-05-25 に旧 2 -> 4。ESP32-S3 SoftAP の radio ロス対策・暫定値)
     /*beatLookaheadMs=*/ 50,   // playAtMasterMs = masterNow + 50 ms
 };
 
@@ -232,7 +232,9 @@ upload_speed = 921600
 - `src/score_data.cpp`: 配列リテラルで全曲分の音符を直書き
 
 3 ノード（node_02/03/04）で **完全に同一内容**（輪唱なので）。
-ロジック側（`applyPattern.cpp`）は `beatNo - headRestBeats` から楽譜位置を計算する。
+ロジック側（`applyPattern.cpp`）は `firedBeatNo - 1 - headRestBeats` から楽譜位置を計算する
+（`beatNo` は 1 オリジンなので `-1` で 0 オリジンの配列インデックスに揃え、さらに `headRestBeats`
+で輪唱の頭休符ぶんずらす）。
 
 ## 読み始めの推奨順
 

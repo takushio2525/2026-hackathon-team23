@@ -201,7 +201,7 @@ pkt.payload.playAtMasterMs = masterNow + cfg_.beatLookaheadMs;
 
 ```cpp
 struct NotePayload {
-    uint8_t  partId;       // 楽器ノードの ID（test_v2 は 0x02-0x04、production 想定は 0x02-0x05）
+    uint8_t  partId;       // 楽器ノードの ID（test_v2 は 0x02-0x04、production 想定は 0x02-0x06。ADR-0004 改訂版で楽器 5 台構成）
     uint8_t  noteNumber;   // MIDI 0-127, 60=C4
     uint8_t  velocity;     // 0-127
     uint8_t  gate;         // 1=NoteOn, 0=NoteOff

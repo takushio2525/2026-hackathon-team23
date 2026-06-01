@@ -61,7 +61,7 @@ test_v1 からの主な変更点：
 
 [ADR-0005](/decisions/0005-firmware-embedded-module-architecture/) で
 「テスト系で十分に検証してから取り込む」と決めた運用に従う。
-test_v2 で 4 声化・強弱・ビブラート等が安定したら production に取り込む。
+test_v2 で 5 声化（[ADR-0004](/decisions/0004-ensemble-structure/)）・強弱・ビブラート等が安定したら production に取り込む。
 
 ## バージョン使い分けのフロー
 
@@ -94,12 +94,17 @@ firmware/
 │   ├── node_03/         ← 楽器 声部 2
 │   └── node_04/         ← 楽器 声部 3
 └── production/
-    ├── node_01/         ← 雛形のみ
-    ├── node_02/
-    ├── node_03/
-    ├── node_04/
-    └── node_05/         ← ドラム想定（未実装）
+    ├── node_01/         ← 雛形のみ（指揮者）
+    ├── node_02/         ← 楽器 1（金管 1 想定）
+    ├── node_03/         ← 楽器 2（金管 2 想定）
+    ├── node_04/         ← 楽器 3（金管 3 想定）
+    ├── node_05/         ← 楽器 4（金管 4 想定）
+    └── node_06/         ← 楽器 5（ドラム想定・フォルダ未作成）
 ```
+
+> production 想定の楽器 5 台構成（金管 4 ＋ ドラム 1）は [ADR-0004](/decisions/0004-ensemble-structure/)
+> 改訂版（2026-05-21）。現状の `firmware/production/` には `node_01〜05` までしか実体がなく、
+> `node_06`（ドラム）は今後作成。
 
 共通層は **バージョンごとに独立** している。
 これは「test_v2 の変更が test_v1 を壊さない」「production が安定するまで test は自由に

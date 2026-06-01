@@ -102,7 +102,7 @@ sidebar:
 
 ### 音が二重に鳴る
 
-- 原因: BEAT 2 連送の重複検知が効いていない。
+- 原因: BEAT 連送（`beatRedundancy` 連、暫定 4）の重複検知が効いていない。
 - 対処: 楽器側で `beatNo` の重複チェックが入っているか確認。`OrcReceiverModule` の
   処理を見直す。
 

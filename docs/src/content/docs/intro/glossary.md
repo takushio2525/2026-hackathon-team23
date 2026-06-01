@@ -42,7 +42,7 @@ sidebar:
 
 **声部（Voice / Part）**
 : 多声音楽で、各楽器が担当する独立した旋律。本プロジェクトの **test_v2 は 3 声**（`node_02〜04`）で輪唱を実装済み。
-  **production 想定は 4 声**（`node_02〜05`）。
+  **production 想定は 5 声**（`node_02〜06`、金管 4 ＋ ドラム 1。[ADR-0004](/decisions/0004-ensemble-structure/) 改訂版）。
 
 **輪唱（Canon / Round）**
 : 同じ旋律を一定拍ずらして重ねる演奏形式。「きらきら星」「かえるのうた」など。
@@ -86,8 +86,8 @@ sidebar:
   - **NOTE**: 楽器 → PC、発音情報（MIDI ノート + 楽器番号）
 
 **`partId`**
-: 楽器ノードの識別 ID。NOTE パケットに含まれる。test_v2 では `0x02`〜`0x04`、
-  production 想定では `0x02`〜`0x05`。
+: 楽器ノードの識別 ID。NOTE パケットに含まれる。test_v2 では `0x02`〜`0x04`（楽器 3 台）、
+  production 想定では `0x02`〜`0x06`（楽器 5 台 = 金管 4 ＋ ドラム 1）。
 
 **`instrumentId`**
 : 音色 ID。PC 側は `pc_app/test_v2/orchestra_resynth/data/` 内の JSON を

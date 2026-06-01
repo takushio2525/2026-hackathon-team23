@@ -36,7 +36,7 @@
      3  type        uint8   3=NOTE (1=CTRL / 2=BEAT は USB には流れないが来ても無視)
      4  seq         uint32
      8  timestampMs uint32
-     12 partId      uint8   test_v2 は 0x02-0x04 / production 想定は 0x02-0x05 (輪唱のどの声部か)
+     12 partId      uint8   test_v2 は 0x02-0x04 / production 想定は 0x02-0x06 (ADR-0004 改訂版で楽器 5 台 = 金管 4 + ドラム 1)
      13 noteNumber  uint8   MIDI ノート番号 (60=C4, 高さ)
      14 velocity    uint8   0-127
      15 gate        uint8   1=NoteOn (0=NoteOff は来ないが来たら一致音を release)

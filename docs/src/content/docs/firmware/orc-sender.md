@@ -35,7 +35,7 @@ sidebar:
 ```cpp
 struct OrcSenderConfig {
     uint32_t ctrlIntervalMs;   // 50 ms = 20 Hz
-    uint8_t  beatRedundancy;   // 同一 BEAT を何発まで連送するか (1-3)
+    uint8_t  beatRedundancy;   // 同一 BEAT を何発まで連送するか (1-8 を実用域として想定)
     uint16_t beatLookaheadMs;  // playAtMasterMs = masterNow + lookahead
 };
 ```
@@ -45,10 +45,14 @@ struct OrcSenderConfig {
 ```cpp
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
-    /*beatRedundancy=*/  2,    // BEAT を 2 連送
+    /*beatRedundancy=*/  4,    // BEAT を 4 連送 (旧 2 だが ESP32-S3 SoftAP の radio ロス対策で増やした暫定値・2026-05-25)
     /*beatLookaheadMs=*/ 50,   // playAtMasterMs = masterNow + 50 ms
 };
 ```
+
+> ⚠️ **2026-05-25 時点の暫定設定**: ESP32-S3 SoftAP で BEAT パケットロスが多発した件の
+> 切り分け中。`beatRedundancy = 2 → 4` に増やし、連送間隔は `OrcNetConfig.beatGapMs`
+> （別フィールド）で挿入する設計。実機計測で確定値が出たら 2 連送に戻すか 4 を据え置く。
 
 ### `ctrlIntervalMs = 50` の根拠（20 Hz CTRL）
 
@@ -63,16 +67,24 @@ CTRL は「現在のテンポと状態」を常時配信する **ハートビー
 50 ms より遅くすると：時計同期が遅延、楽器側の `data.ctrl.bpm` が古くなる。
 50 ms より速くすると：帯域の無駄、楽器側の処理オーバーヘッドが増える。
 
-### `beatRedundancy = 2` の根拠（BEAT 2 連送）
+### `beatRedundancy` の根拠（BEAT 連送）
 
 BEAT はイベント駆動でロスすると **次の拍まで楽器が無音** になる。
 
-2 連送なら：
-- 独立ロス確率 p のとき、両方ロスする確率は p²
-- p = 5% でも p² = 0.25% にまで下がる
-- 帯域影響は微小（拍ごとに 40 B 増えるだけ）
+連送なら（独立ロス確率 p のとき）：
+- 2 連送: 両方ロスする確率は p²。p = 5% で p² = 0.25%
+- 4 連送: p⁴。p = 5% で 0.00063%
+- 帯域影響は微小（拍ごとに 40 B × 連送数）
 
-3 連送以上はオーバーヘッドが冗長すぎる。実機テストで 2 連送が十分な保険になった。
+ただし上の確率は **独立ロスを仮定** した理論値で、実測のパケットロスは時間相関する（同一状態で連続して落ちる）ため見かけほどは下がらない。これに対し連送数（暫定 4）に加えて `OrcNetConfig.beatGapMs` で連送間隔を空けて対処する。
+
+当初は 2 連送で十分という見立てだったが、**2026-05-25 に ESP32-S3 SoftAP で
+連続ロスが観測された** ため、`beatRedundancy = 4` に増量。radio が「同一状態で
+連発するとロスする」癖が疑われたため、追加で `OrcNetConfig.beatGapMs` を 0 → 1〜5 ms
+に設定して連送間隔を空ける運用を検討中（現状は `beatGapMs = 0` で切り分け継続）。
+
+確定値は実機計測（受信ロス率 vs 平均遅延の trade-off）で決定する。確定後に本節を
+書き直す予定。
 
 ### `beatLookaheadMs = 50` の根拠（先読み 50 ms）
 
@@ -102,7 +114,7 @@ struct OrcSenderData {
 
 - `ctrlSeq`: CTRL 送信のたびに `++ctrlSeq`。楽器側が「同じ CTRL を 2 回受け取った」のを
   検出するために使う（ただし CTRL は冪等なので重複処理しても問題ない）
-- `beatSeq`: BEAT 送信のたびに `++beatSeq`。2 連送する場合は **同じ `beatSeq`** で 2 回送る
+- `beatSeq`: BEAT 送信のたびに `++beatSeq`。連送する場合（`beatRedundancy`、暫定 4）は **同じ `beatSeq`** で複数回送る
 
 `beatNo`（楽譜上の拍番号、`uint16_t`）と `beatSeq`（送信回数、`uint32_t`）は別物。
 
@@ -189,8 +201,8 @@ if (data.beat.event) {
 data.beat.event = false;   // event を読み取り後にクリア
 ```
 
-これにより同じ拍を 2 回送信することはない（ただし `beatRedundancy` で同一パケットを
-2 回送ることはある）。
+これにより同じ拍を重複検出して送信することはない（ただし `beatRedundancy` で同一パケットを
+複数回連送することはある。暫定 4）。
 
 #### ヘッダ組み立て
 
@@ -238,7 +250,7 @@ data.orcNet.pendingBeatRedundancy = cfg_.beatRedundancy;
 data.orcNet.hasPendingBeat = true;
 ```
 
-完成したパケットを `pendingBeat` に積み、`pendingBeatRedundancy = 2`（連送回数）を指定し、
+完成したパケットを `pendingBeat` に積み、`pendingBeatRedundancy = cfg_.beatRedundancy`（連送回数、暫定 4）を指定し、
 `hasPendingBeat = true` でフラグ立て。
 
 これにより次に呼ばれる `OrcNetModule::updateOutput()` でパケットが UDP に流される。

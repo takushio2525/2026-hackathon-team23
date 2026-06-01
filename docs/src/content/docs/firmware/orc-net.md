@@ -39,7 +39,7 @@ BEAT の組み立ても同じ。OrcNetModule は **完成品の `CtrlPacket` を
 ```cpp
 enum class WifiMode : uint8_t {
     SoftAp,  // 自身が AP を起動する側 (node_01)
-    Sta,     // 既存 SoftAP に接続する側 (楽器ノード: test_v2 は node_02-04 / production 想定は node_02-05)
+    Sta,     // 既存 SoftAP に接続する側 (楽器ノード: test_v2 は node_02-04 / production 想定は node_02-06)
 };
 
 struct OrcNetConfig {
@@ -50,8 +50,15 @@ struct OrcNetConfig {
     uint16_t    udpPort;
     uint8_t     channel;              // SoftAp 時のみ参照
     uint32_t    reconnectIntervalMs;
+    uint8_t     beatGapMs;            // BEAT 連送 (redundancy>1) の各回送信の間に挿む delay [ms]。0=旧挙動 (タイトループ連送)。送信側ノードでのみ意味を持つ
 };
 ```
+
+> 📝 **`beatGapMs` の暫定運用**: ESP32-S3 SoftAP で「radio が同一状態で連発するとロスする」
+> 癖の切り分け対策として 2026-05-25 に追加。現状は `0`（旧挙動）でコミットされており、
+> 1-5 ms を実機で試して確定値を入れる段取り。詳しくは
+> [orc-sender.md の BEAT 連送節](/firmware/orc-sender/#beat-連送-redundant-transmission)
+> 参照。
 
 ### 指揮者ノードの設定
 
@@ -64,6 +71,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,        // 2.4 GHz CH6 を使う
     /*reconnectIntervalMs=*/ 2000,     // SoftAP 側は使わない
+    /*beatGapMs=*/           0,        // 0 = タイトループ連送 (旧挙動)。一時的に切り分け用
 };
 ```
 
@@ -78,6 +86,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,
     /*reconnectIntervalMs=*/ 2000,
+    /*beatGapMs=*/           0,        // 楽器側 (Sta) では実質未使用 (受信のみ)
 };
 ```
 
@@ -274,7 +283,7 @@ void OrcNetModule::pollReceive(OrcNetData& net) {
 4. **type 不一致 → 破棄**: `PKT_NOTE` を楽器側が受信してもどこにも書かれない
 
 `while (parsePacket() > 0)` で **1 周期内に届いた全パケットを処理する**。蓄積を許さない設計。
-これにより BEAT の冗長送信（2 連送）が連続到達した場合でも、`lastBeat` には最後のものが残る。
+これにより BEAT の冗長送信（`beatRedundancy` 連送、暫定 4）が連続到達した場合でも、`lastBeat` には最後のものが残る。
 楽器側の `OrcReceiverModule` 側で `beatNo` による重複排除を行う。
 
 ## updateOutput() — 送信処理
@@ -325,8 +334,8 @@ for (uint8_t i = 0; i < reps; ++i) {
 
 理由：
 - BEAT は **イベント駆動** で、ロスすると次のチャンスまで楽器が無音になる
-- 2 連送なら片方ロスしても通る（独立ロス確率を仮定すれば p² まで下がる）
-- 楽器側は `beatNo` で重複排除するので、2 回受け取っても発音は 1 回
+- N 連送（`beatRedundancy`、暫定 4）なら一部ロスしても通る（独立ロス確率を仮定すれば pᴺ まで下がる）
+- 楽器側は `beatNo` で重複排除するので、何回受け取っても発音は 1 回
 
 ### 送信フラグの責任
 

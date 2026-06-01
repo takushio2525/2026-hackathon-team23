@@ -24,7 +24,7 @@
 
 enum class WifiMode : uint8_t {
     SoftAp,  // 自身が AP を起動する側 (node_01)
-    Sta,     // 既存 SoftAP に接続する側 (node_02-05)
+    Sta,     // 既存 SoftAP に接続する側 (test_v2 は node_02-04 / production 想定は node_02-06)
 };
 
 struct OrcNetConfig {
