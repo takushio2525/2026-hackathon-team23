@@ -9,6 +9,9 @@
 bool OrcNetModule::init() {
     bool ok = (cfg_.mode == WifiMode::SoftAp) ? startSoftAp() : connectSta();
     if (ok) started_ = true;
+    // 起動直後のリンク状態を控えておく。これをしないと最初の updateInput() で
+    // 「false→true 遷移」と誤認して不要な再 join が 1 回走る。
+    wasLinkUp_ = isLinkUp();
     return ok;
 }
 
@@ -74,6 +77,21 @@ void OrcNetModule::updateInput(SystemData& data) {
             WiFi.begin(cfg_.ssid, cfg_.pass);
         }
     }
+
+    // Sta 側: WiFi が down→up に復帰した瞬間に UDP マルチキャスト購読を貼り直す。
+    // 再接続でリンクが戻っても購読は無効化されたままになり得るため、リンク復活後も
+    // BEAT/CTRL を受信できなくなる。遷移を検出して udp を一度閉じ beginMulticast し直す。
+    // SoftAp 側は isLinkUp() が started_ 依存で常時 true のままなので、この遷移は
+    // 起きず無影響 (購読の貼り直しは走らない)。
+    if (cfg_.mode == WifiMode::Sta && linkUp && !wasLinkUp_ && started_) {
+        udp_.stop();
+        // 失敗時のフォールバック begin(port) はマルチキャスト宛を受けられないため
+        // 実質気休めだが、既存 connectSta() と挙動を揃えておく。
+        if (!udp_.beginMulticast(cfg_.multicastIp, cfg_.udpPort)) {
+            udp_.begin(cfg_.udpPort);
+        }
+    }
+    wasLinkUp_ = linkUp;
 
     if (!started_) return;
     pollReceive(data.orcNet);

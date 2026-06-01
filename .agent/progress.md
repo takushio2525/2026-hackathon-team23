@@ -3,6 +3,21 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+## 2026-06 — test_v2 低遅延化フェーズ
+
+- 2026-06-01: **test_v2 低遅延化・パケロス削減・堅牢化を実装**（`shiozawa-test_v2-latency`
+  ブランチ、計画書 `.agent/test_v2-latency-plan.md` 6節 A/B/C）。A=指揮者 config 2ファイル
+  (`node_01`/`node_01_devkitc` の ProjectConfig.h) で `beatLookaheadMs` 50→30・`beatGapMs`
+  0→2。B=共通 OrcNetModule に `wasLinkUp_` を足し、Sta 側 WiFi down→up 復帰時に
+  `udp_.stop()→beginMulticast()` でマルチキャスト購読を貼り直す（init 末尾で wasLinkUp_
+  初期化＝起動直後の偽遷移で無駄な再joinを防ぐ。SoftAp 側は isLinkUp が常時 true で無影響）。
+  C=Processing の getLineOut バッファ 1024→512・setup 冒頭に frameRate(90) 明示。4ノード
+  とも `pio run` SUCCESS（node_01_devkitc RAM14.0%/Flash21.6%、node_02-04 RAM20.6%/
+  Flash20.9%＝jitter 時と同サイズ）。実機 upload と評価はユーザー（鉄則: main 不触・push せず・
+  コンパイルまで）。残課題: B の WiFiS3 再join 実機確認、5台構成(node_05/06)は編曲＝音楽判断で
+  master 確認待ち保留。計画書7節（楽器 Receiver/applyPattern/NoteSender/OrcProtocol/
+  score_data）は不変。
+
 ## 2026-05 — ドキュメント刷新フェーズ
 
 - 2026-05-27: **test_v2 Processing 側に「全パート同じ音色」モードを追加** (ユーザー指示「一旦発音を

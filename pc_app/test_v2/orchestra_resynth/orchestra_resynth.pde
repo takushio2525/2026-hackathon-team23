@@ -119,13 +119,14 @@ String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1);
 void settings(){ size(900, 560); }
 
 void setup(){
+  frameRate(90);   // draw()/drainPackets() を ~11ms 周期に (既定60fps=16.7ms より受信処理の粒度を短縮)
   surface.setTitle("orchestra_resynth — test_v2 (輪唱 / きらきら星)");
   uiFont = loadJapaneseFont(13);
   if (uiFont != null) textFont(uiFont);
   else textFont(createFont("SansSerif", 13));
 
   minim = new Minim(this);
-  out = minim.getLineOut(Minim.STEREO, 1024, 44100);
+  out = minim.getLineOut(Minim.STEREO, 512, 44100);   // バッファ 512 = 約11.6ms (1024 の半分・低遅延化)
 
   rescanInstruments();
   refreshPorts();
