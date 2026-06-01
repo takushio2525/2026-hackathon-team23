@@ -5,6 +5,20 @@
 
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
+- 2026-06-01: **test_v3 ゲームモード Phase 2 firmware（共通＋node_01＋node_02）を実装**（案A確定、
+  `shiozawa-test_v3-game`）。2-1 共通 `fb86bd8`: CtrlPayload 旧 reserved[4]→mode/navCursor/targetBpm/score
+  フィールド化＋PKT_UI(type=4)/UiPayload/UiPacket 新設（20B static_assert 維持・api.md 同期）。2-2 node_01
+  +devkitc `ef5d818`: ConductorState に Menu/Result、GameData 新設、applyPattern に IMU ナビ（dynAcc 左右=
+  カーソル/縦=決定・Armed ゲート+不応期）・Calibrating→Menu・ゲーム経過拍カウント/ガイド強度フェード/拍間隔誤差の
+  重み付き採点(0-100)/規定拍で Result、OrcSender が予約バイト送出、ProjectConfig に NAV_*/GAME_* 定数（拍検出は
+  既存 state==Conducting ガードで排他。devkitc は3ファイル `/bin/cp -f` 同期）。2-3 node_02 `b98cd55`:
+  OrcReceiver が予約バイトを data.ctrl へ展開、新規 UiRelayModule が UI フレームを USB シリアルへ低頻度中継
+  （変化時＋最大5Hz＋1s heartbeat・NOTE 20B 不変・同 Serial に別フレーム混在で PC は magic 再同期・SERIAL_DEBUG=1 では
+  非送出）、CtrlData 拡張・UI_RELAY_CONFIG・main gOutputs 登録。全5ノード pio run SUCCESS（node_01 RAM13.8%/
+  Flash21.0%、devkitc 14.0%/21.7%、node_02 20.7%/21.1%、node_03/04 20.6%/20.9%）。残=Phase 2-4 Processing
+  （役割自動判定・type1/4 解釈・4画面＋アナライザ・メトロノームフェード）は master 指示待ち。実機 upload/評価＋
+  IMU ナビ軸調整はユーザー。
+
 - 2026-06-01: **test_v3 ゲームモード 設計メモを作成**（`shiozawa-test_v3-game`、`.agent/test_v3-game-design.md`、
   Phase 1 残り＝設計）。(a) CTRL 予約4B を mode/navCursor/targetBpm/score にフィールド化（画面は state を
   Menu=4/Result=5 へ拡張して PC が (state,mode) から導出）、(b) node_01 IMU ナビ（dynAcc の左右(X)/上下(Y)
