@@ -1,0 +1,296 @@
+%================================================================
+% 作業ログ 2026-06-01（test_v3 ゲームモードの実装・test_v2 低遅延化）
+%   先週（test_v1 パケロス対応中）からの 1 週間で，test_v2 を低遅延化・堅牢化し，
+%   その応用として test_v3「ゲームモード」を新規実装したところまでをまとめる．
+%   今回から進捗ガントチャート（計画と現在地）を追加．
+%
+%   ビルド:
+%     cd work/shiozawa/work-0601/作業ログ0601
+%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログ0601.tex
+%================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図・色 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[table]{xcolor}
+\usepackage{amssymb}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+% --- 進捗ガントチャート用（グリッド表）---
+\definecolor{barDone}{gray}{0.55} % 完了
+\definecolor{barProg}{gray}{0.78} % 進行中
+\definecolor{barPlan}{gray}{0.90} % 予定
+\definecolor{nowCol}{gray}{0.30}  % 今週の見出し
+\newcolumntype{G}{>{\centering\arraybackslash}p{2.0em}}
+\newcommand{\bD}{\cellcolor{barDone}}
+\newcommand{\bP}{\cellcolor{barProg}}
+\newcommand{\bQ}{\cellcolor{barPlan}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：塩澤 匠生
+
+報告日：2026年6月1日
+
+プロジェクト名：タクトーン~ IMUジェスチャーで奏でるArduinoオーケストラ~ \\
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：50\%（実装フェーズの後半．test\_v2 の 3 声輪唱が安定し，その応用として
+        test\_v3「ゲームモード」の実装に着手）
+  \item マイルストーン達成状況：
+    \begin{itemize}
+      \item test\_v2 の低遅延化・パケロス分散・WiFi 再 join 堅牢化：達成（PR \#21）
+      \item test\_v3 ゲームモードの firmware（共通／node\_01／node\_02）：達成（PR \#22，実機評価は次週）
+      \item test\_v3 の Processing 画面（メニュー／ゲーム／結果／アナライザ）：進行中
+    \end{itemize}
+  \item 今週の主要成果：
+    \begin{itemize}
+      \item test\_v2 を低遅延化（発音先読み 50→30ms・音声バッファ短縮）し，連送の時間分散と
+            WiFi 復帰時の再 join で取りこぼしに強くした
+      \item test\_v3 ゲームモードを新規実装：IMU ナビ（左右の振り＝メニュー移動／縦振り＝決定），
+            テンポ維持精度の採点（0〜100 点），メトロノームガイドの自動フェード
+      \item 楽器ノードに UI 中継パケット（新 type=4）を追加し，PC 側 Processing がゲーム画面を描けるようにした
+    \end{itemize}
+  \item 重大課題（影響度：中）：
+    \begin{itemize}
+      \item {}[IMU ナビの判定軸・符号・しきい値は実機の振り方に依存するため，実機書き込みでの
+            調整が必要（設定値で差し替え可能にしてある）]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 2. 進捗ガントチャート（計画と現在地）
+%================================================================
+\section{進捗ガントチャート（計画と現在地）}
+
+チームのガントチャート（\texttt{meetings/ガントチャーver1ト.xlsx}）のフェーズ区分（110 基本設計／
+120 詳細設計／200 実装／300 テスト／400 ストレッチ）に，現在の進み具合を重ねたもの．
+「今」の縦位置は本報告時点（6 月第 1 週）．
+
+\medskip
+{\footnotesize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}p{8.5em}|*{12}{G}@{}}
+ & & & & & & \multicolumn{1}{c}{$\downarrow$今} & & & & & & \\
+作業項目（フェーズ）
+ & \cellcolor{barPlan}\tiny 4/15 & \cellcolor{barPlan}\tiny 4/22 & \cellcolor{barPlan}\tiny 4/29
+ & \cellcolor{barPlan}\tiny 5/6 & \cellcolor{barPlan}\tiny 5/13 & \cellcolor{barPlan}\tiny 5/20
+ & \cellcolor{nowCol}\tiny\textcolor{white}{5/27} & \cellcolor{barPlan}\tiny 6/3 & \cellcolor{barPlan}\tiny 6/10
+ & \cellcolor{barPlan}\tiny 6/17 & \cellcolor{barPlan}\tiny 6/24 & \cellcolor{barPlan}\tiny 7/1 \\
+\midrule
+企画・テーマ決定        & \bD & \bD &     &     &     &     &     &     &     &     &     &     \\
+110 基本設計            &     &     & \bD & \bD &     &     &     &     &     &     &     &     \\
+120 詳細設計            &     &     &     &     & \bD &     &     &     &     &     &     &     \\
+\textbf{200 実装}       &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad test\_v2 輪唱・同期 &     &     &     & \bD & \bD & \bD & \bD &     &     &     &     &     \\
+\quad test\_v3 ゲーム(firmware) &  &     &     &     &     & \bD & \bD &     &     &     &     &     \\
+\quad test\_v3 Processing &   &     &     &     &     &     & \bP & \bP &     &     &     &     \\
+\textbf{300 テスト}     &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad 単体・結合・システム &   &     &     &     &     &     &     &     & \bQ & \bQ & \bQ &     \\
+\quad 評価（精度・遅延） &     &     &     &     &     &     &     &     & \bQ & \bQ & \bQ &     \\
+400 ストレッチ（強弱ほか） &  &     &     &     &     &     &     & \bQ & \bQ &     &     &     \\
+発表会                  &     &     &     &     &     &     &     &     &     &     &     & \multicolumn{1}{c}{$\bigstar$} \\
+\bottomrule
+\end{tabular}
+}
+
+\medskip
+凡例：\colorbox{barDone}{~~}~完了 \quad \colorbox{barProg}{~~}~進行中 \quad
+\colorbox{barPlan}{~~}~予定 \quad $\bigstar$~発表会（7/1）
+
+\medskip
+※ test\_v3 のゲームモードは計画上の 400 ストレッチに相当する追加機能だが，
+自由演奏（200 実装）が安定したため前倒しで着手した．テスト（300）は次フェーズ．
+
+\sectionrule
+
+%================================================================
+% 3. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{8.5em}p{5em}p{5em}p{4em}p{3em}X@{}}
+\toprule
+作業項目 & 開始日 & 予定完了日 & 状態 & 進捗 & コメント \\
+\midrule
+test\_v2 低遅延化・堅牢化 & 2026-05-27 & 2026-06-01 & 完了 & 100\% & 発音先読み 50→30ms・連送の時間分散・WiFi 再 join．PR \#21 \\
+test\_v3 ゲームモード設計 & 2026-05-30 & 2026-06-01 & 完了 & 100\% & CTRL 予約 4B を mode／navCursor／targetBpm／score にフィールド化 \\
+test\_v3 firmware 実装 & 2026-06-01 & 2026-06-01 & 完了 & 100\% & IMU ナビ・採点・UI 中継．全 5 ノード \texttt{pio run} 成功．PR \#22 \\
+test\_v3 Processing 画面 & 2026-06-02 & 2026-06-09 & 進行中 & 30\% & メニュー／ゲーム／結果／アナライザの画面遷移を実装中 \\
+実機評価・IMU ナビ調整 & 2026-06-02 & — & 未着手 & — & 振りの軸・符号・しきい値を実機でチューニング \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 4. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{8em}Xp{2.5em}p{2.5em}Xp{3em}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 状態 \\
+\midrule
+IMU ナビの判定が実機依存 & 振り方（軸・大きさ）が個人やボード取付向きで変わるため，机上の値では誤判定し得る & 中 & 高 & しきい値・軸・符号を設定値（config）に出し，実機書き込みで調整できるようにした & 対応中 \\
+UDP マルチキャストのパケロス & マルチキャストは ACK・再送が無く，取りこぼしが音抜けになる & 中 & 中 & 連送 4 発を 2ms 間隔で時間分散し，WiFi 復帰時にマルチキャスト購読を貼り直す堅牢化を実装（先週からの継続） & 改善 \\
+5 台構成（金管 4＋ドラム）の輪唱位相 & 等間隔で 4 声以上重ねると周期が一巡せず位相が破綻する & 低 & 低 & 不等間隔の位相か曲の周期延長＝編曲（音楽判断）が必要 & 保留 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト，優先度＝対応の緊急性
+
+\sectionrule
+
+%================================================================
+% 5. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証(再現性重視)}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：ゲームモードの設計レビュー（CTRL 予約バイトのフィールド割当，IMU ナビの判定方式，
+        UI 中継パケットの設計）と firmware の実装支援
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}[同期経路（BEAT／NOTE／CTRL の 20 バイト固定）を壊さずにゲーム用の情報を載せる方法]
+      \item {}[左右・縦の振りだけでメニュー操作と決定を行う，誤爆しにくい判定方式]
+      \item {}[楽器ノードから PC へ画面用の情報を低頻度で中継する仕組み]
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item {}[既存 CTRL の予約 4 バイトを mode／navCursor／targetBpm／score に割り当て，20 バイトを維持する案]
+      \item {}[動的加速度の左右成分でカーソル移動・縦成分で決定とし，一度戻るまで再発火しない不応期を設ける案]
+      \item {}[新 type=4 パケットで CTRL 内容を変化時＋最大 5Hz で USB シリアルへ中継する案]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法・ファクトチェック}
+
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item {}[全 5 ノードを \texttt{pio run} でビルドし，RAM／Flash 使用率を確認（node\_01 RAM13.8\%／Flash21.0\% ほか，
+            いずれも従来と同程度）]
+      \item {}[同期経路（BEAT／NOTE／CTRL の 20 バイト構造）が不変であることをコードと \texttt{static\_assert} で確認]
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用（自由演奏は test\_v2 と同一挙動を維持しつつ，ゲームモードを上に重ねる構成）．
+            ただし IMU ナビと採点の手応えは実機でしか確認できないため，軸・しきい値の調整と評価は実機作業に委ねる
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item {}[test\_v3 の Processing 側 4 画面（メニュー／自由演奏／ゲーム／結果）＋アナライザを実装し，
+            ゲームの一連の流れを通す]
+      \item {}[実機書き込みで IMU ナビの軸・しきい値を調整し，採点の手応えを確認する]
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item {}[メニュー→ゲーム→結果の遷移が PC 画面で破綻なく動く]
+      \item {}[自由演奏モードが test\_v2 と同等の安定性で鳴る]
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item {}[6 月中旬までに Processing 画面と実機調整を終え，テストフェーズ（300）へ移行]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item {}[ゲームモードは追加機能（ストレッチ）であり，遅れても自由演奏のみで発表は成立する位置づけ．コア機能の上に重ねている]
+  \item {}[実機未テストのファームウェアへの机上修正は同期挙動を逆転させるリスクがあるため，必ず実機書き込みでの確認を経て取り込む]
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 8. 付録
+%================================================================
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item ソースコード：\texttt{firmware/test\_v3/}（共通ライブラリ＋node\_01〜node\_04），\texttt{pc\_app/test\_v3/}
+      \item GitHub リポジトリ：\url{https://github.com/takushio2525/2026-hackathon-team23}
+      \item 関連 PR：\#21（test\_v2 低遅延化），\#22（test\_v3 ゲームモード）
+      \item 設計判断記録：ADR-0002（プロトコル選定），ADR-0003（IMU 採用），ADR-0006（同期誤差 20ms）
+    \end{itemize}
+  \item 添付範囲：
+    \begin{itemize}
+      \item 差分（test\_v2 の低遅延化と test\_v3 ゲームモード firmware を実装した直近時点のスナップショット）
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\end{document}
