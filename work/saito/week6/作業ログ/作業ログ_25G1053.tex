@@ -1,31 +1,16 @@
-%================================================================
-% 作業ログ テンプレート
-%   教員配布の「作業ログ_配布.pdf」と同じ章構成・要素・階層を LaTeX で再現。
-%   実際の作業ログを書くときは本ファイルをコピーして書き換える。
-%
-%   ビルド:
-%     cd report/作業ログテンプレート
-%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
-%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログテンプレート.tex
-%   出力: 作業ログテンプレート.pdf（配布原本とは別ファイル）
-%================================================================
 \documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
 
-% --- 余白 ---
 \usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
 
-% --- 表・箇条書き・図 ---
 \usepackage{array}
 \usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage{enumitem}
 \usepackage{graphicx}
 
-% --- 段落間隔（Wordのような見た目に寄せる）---
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.6em}
 
-% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
 \usepackage{titlesec}
 \titleformat{\section}
   {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
@@ -34,23 +19,17 @@
 \titlespacing*{\section}{0pt}{1.2em}{0.6em}
 \titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
 
-% --- 章末水平線（手で \sectionrule と書いて区切る）---
 \newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
 
-% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
 \renewcommand{\labelitemi}{\textbullet}
 \renewcommand{\labelitemii}{\textopenbullet}
 \setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
 \setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
 
-% \textopenbullet が無い環境向けのフォールバック（jsarticle標準では○が出る）
 \providecommand{\textopenbullet}{\ensuremath{\circ}}
 
 \begin{document}
 
-%================================================================
-% ヘッダ
-%================================================================
 {\LARGE\bfseries 作業ログ}\par\bigskip
 
 報告者：齋藤　翔太
@@ -61,9 +40,6 @@
 
 \sectionrule
 
-%================================================================
-% 1. 進捗サマリー
-%================================================================
 \section{進捗サマリー（要約）}
 
 \begin{itemize}
@@ -90,9 +66,6 @@
 
 \sectionrule
 
-%================================================================
-% 2. 作業ログ（詳細トラッキング）
-%================================================================
 \section{作業ログ（詳細トラッキング）}
 
 {\footnotesize
@@ -152,9 +125,6 @@ Arduino統合用楽譜データの作成
 
 \sectionrule
 
-%================================================================
-% 3. 担当箇所の計画前GCと現在のGC
-%================================================================
 \section{担当箇所の計画前GCと現在のGC}
 
 担当箇所について，計画前に設定したGCから現時点で予定日程の変更はない．
@@ -170,9 +140,6 @@ Arduino統合用楽譜データの作成
 
 \sectionrule
 
-%================================================================
-% 4. 課題管理
-%================================================================
 \section{課題管理}
 
 {\footnotesize
@@ -197,9 +164,6 @@ ROM埋込確認の未実施
 
 \sectionrule
 
-%================================================================
-% 5. AI利用状況と検証
-%================================================================
 \section{AI利用状況と検証（再現性重視）}
 
 \subsection{利用内容}
@@ -268,9 +232,6 @@ ROM埋込確認の未実施
 
 \sectionrule
 
-%================================================================
-% 6. 次回計画
-%================================================================
 \section{次回計画}
 
 \begin{itemize}
@@ -293,9 +254,6 @@ ROM埋込確認の未実施
 \sectionrule
 
 
-%================================================================
-% 7. 付録
-%================================================================
 \section{付録}
 
 \begin{itemize}
