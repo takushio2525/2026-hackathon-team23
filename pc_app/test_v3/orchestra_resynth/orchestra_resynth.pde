@@ -1,50 +1,39 @@
 /* ==========================================================================
-   orchestra_resynth — test_v2 の PC 側プログラム (Processing)
+   orchestra_resynth — test_v3 ゲームモード対応 PC 側プログラム (Processing)
 
-   firmware/test_v2 の楽器ノード (Arduino UNO R4 WiFi) から USB Serial で送られて
-   くる NOTE パケット (楽器番号 / 高さ / 長さ / 声部 / velocity) を受け、
-   sound_lab で解析した音色定義 (data/*.json) を使ってポリフォニックに加算合成する。
+   firmware/test_v3 の楽器ノード (Arduino UNO R4 WiFi) から USB Serial で送られて
+   くる NOTE パケット (type=3, 20B) と UI 状態パケット (type=4, 20B) を受信し、
+   NOTE は加算合成で発音、UI は画面を自動判定して描画する。
 
-   ・楽器番号 (instrumentId) で data/ 内の何番目の楽器定義を使うか決まる
-     (ファイル名昇順で 0,1,2,3…)。輪唱の声部 2/3/4 はそれぞれ楽器番号 0/1/2 を送る
-     (firmware 側 ProjectConfig.h で固定。data/ には予備を入れて 4 種類置いてある)。
-   ・複数音を重ねて鳴らせる (輪唱の 3 声部 = 3 音同時)。消音は NOTE の durationMs から自動。
-   ・PC アプリは 1 個でよい。本番は 1 Mac : 1 ノード (1 声部) の想定だが、
-     テスト用に「1 Mac に複数ノードを USB 接続 → このアプリで複数シリアルポートを同時に開く」
-     ことができる (画面のポート一覧をクリックで開閉)。
-   ・楽曲は指揮者ノードの拍番号で進むので、Processing をいつ起動しても「曲の現在位置」から
-     鳴り始める (= 途中参加 OK)。
-
-   合成方式 (instrument_player.pde と同じ): 倍音ごとに振幅・周波数比・時間エンベロープを
-   持つ加算合成 + 非調和性 (f_n = n·f0·√(1+B·n²)) + スペクトル整形ノイズ + 全体振幅エンベロープ
-   + ビブラート / トレモロ。
-
-   必要ライブラリ: Minim (スケッチ → ライブラリをインポート → ライブラリを追加 → "Minim")
-
-   操作:
-     - 画面下の「シリアルポート」一覧をクリック → そのポートを開く / もう一度クリックで閉じる
-       (複数ポートを同時に開ける)
-     - 'r' : シリアルポート一覧を再列挙   /   'i' : data/ の楽器定義を再スキャン
-     - 't' : テスト音 (C・E・G を楽器 0/1/2 で同時に鳴らす — Arduino なしで音出し確認)
-     - '0'〜'3' : その番号の楽器で C4 を 1 発鳴らす (楽器の聴き比べ)
-     - 'a' : 振幅包絡の方式切替 (実エンベロープ ↔ ADSR 4 値)
-     - '+' / '-' : マスター音量   /   Space : 全音停止
+   test_v3 の主要変更点 (test_v2 からの差分):
+     ・type=4 (PKT_UI) の解釈: 指揮者の state/mode/navCursor/targetBpm/score を受け取る
+     ・役割自動判定: UIフレーム受信 or partId==0x02 → メイン操作UI、それ以外 → アナライザ
+     ・データ駆動の画面遷移: (state, mode) から毎フレーム画面を再判定 (手動 Node 選択廃止)
+     ・画面群: ポート選択→メニュー→自由演奏/ゲーム演奏→結果 + アナライザ
+     ・メトロノームクリック: ゲーム画面で targetBpm から PC ローカル計算、フェード付き
 
    パケット仕様 (受信, 20 バイト固定, リトルエンディアン):
      0  magic       uint16  0x4F52 ("OR")
      2  version     uint8   0x01
-     3  type        uint8   3=NOTE (1=CTRL / 2=BEAT は USB には流れないが来ても無視)
-     4  seq         uint32
-     8  timestampMs uint32
-     12 partId      uint8   test_v2 は 0x02-0x04 / production 想定は 0x02-0x06 (ADR-0004 改訂版で楽器 5 台 = 金管 4 + ドラム 1)
-     13 noteNumber  uint8   MIDI ノート番号 (60=C4, 高さ)
+     3  type        uint8   3=NOTE / 4=UI (1=CTRL / 2=BEAT は USB には流れない)
+     --- type=3 (NOTE) ---
+     12 partId      uint8   0x02-0x04
+     13 noteNumber  uint8   MIDI ノート番号
      14 velocity    uint8   0-127
-     15 gate        uint8   1=NoteOn (0=NoteOff は来ないが来たら一致音を release)
-     16 durationMs  uint16  発音予定長 (長さ)
-     18 instrumentId uint8  0..N-1 (楽器番号 — data/*.json をファイル名昇順ソートしたときの index)
-     19 reserved    uint8   0
+     15 gate        uint8   1=NoteOn
+     16 durationMs  uint16
+     18 instrumentId uint8
+     19 reserved    uint8
+     --- type=4 (UI) ---
+     12 state       uint8   0-5 (Idle/Calibrating/Conducting/Fallback/Menu/Result)
+     13 mode        uint8   0=自由演奏 / 1=ゲーム
+     14 navCursor   uint8   メニューカーソル位置
+     15 targetBpm   uint8   目標テンポ (生 BPM)
+     16 score       uint8   0-100 / 0xFF=未確定
+     17 partId      uint8   中継元ノード ID
+     18 bpmQ8       uint16  実振り BPM ×8
 
-   フォーマット仕様: ../../../sound_lab/library_format.md
+   必要ライブラリ: Minim
    ========================================================================== */
 
 import processing.serial.*;
@@ -58,15 +47,46 @@ import java.io.File;
 // ── 設定 ──────────────────────────────────────────────────
 final int  SERIAL_BAUD   = 115200;
 final int  PACKET_SIZE   = 20;
-final byte MAGIC_LO      = (byte) 0x52;   // 'R'
-final byte MAGIC_HI      = (byte) 0x4F;   // 'O'
+final byte MAGIC_LO      = (byte) 0x52;
+final byte MAGIC_HI      = (byte) 0x4F;
 final int  TYPE_CTRL     = 1;
 final int  TYPE_BEAT     = 2;
 final int  TYPE_NOTE     = 3;
-final int  MAX_POLYPHONY = 24;            // 同時発音数の上限 (超えたら最古を強制 release)
+final int  TYPE_UI       = 4;
+final int  MAX_POLYPHONY = 24;
 
-float   masterVolume  = 0.55f;            // 全声部合算のスケール (clip を抑える)
+float   masterVolume  = 0.55f;
 boolean useSimpleADSR = false;
+
+// 指揮者の状態 (OrcProtocol.h と整合)
+final int ST_IDLE        = 0;
+final int ST_CALIBRATING = 1;
+final int ST_CONDUCTING  = 2;
+final int ST_FALLBACK    = 3;
+final int ST_MENU        = 4;
+final int ST_RESULT      = 5;
+
+// ゲーム定数 (firmware ProjectConfig.h と整合)
+final int GAME_LENGTH_BEATS      = 24;
+final int GAME_GUIDE_FULL_BEATS  = 8;
+final int GAME_GUIDE_ZERO_BEATS  = 16;
+
+// 役割
+final int ROLE_UNKNOWN  = 0;
+final int ROLE_MAIN_UI  = 1;
+final int ROLE_ANALYZER = 2;
+
+// 画面
+final int SCR_PORT_SELECT = 0;
+final int SCR_WAITING     = 1;
+final int SCR_MENU        = 2;
+final int SCR_FREE_PLAY   = 3;
+final int SCR_GAME_PLAY   = 4;
+final int SCR_RESULT      = 5;
+final int SCR_ANALYZER    = 6;
+
+// メニュー項目
+final String[] MENU_ITEMS = { "自由演奏", "ゲーム" };
 
 // ── オーディオ ────────────────────────────────────────────
 Minim       minim;
@@ -76,14 +96,11 @@ AudioOutput out;
 ArrayList<File>        instrumentFiles = new ArrayList<File>();
 ArrayList<InstrModel>  models          = new ArrayList<InstrModel>();
 ArrayList<String>      modelLabels     = new ArrayList<String>();
-// [一時] 輪唱の聞き分けを優しくするため、全パートを同じ音色 (piano.json) で鳴らすモード。
-// 'p' キーで切替。false なら従来通り NOTE.instrumentId で楽器を引く。
 boolean      forceSingleInstrument    = true;
 final String FORCED_INSTRUMENT_FILE   = "piano.json";
-int          forcedInstrumentIdx      = -1;   // rescanInstruments() が更新
+int          forcedInstrumentIdx      = -1;
 
 // ── シリアルポート ────────────────────────────────────────
-// 各ポートはフレーム同期状態を個別に持つ。serialEvent(Serial) でどのポートか引く。
 class PortConn {
   String  name;
   Serial  port;
@@ -93,24 +110,40 @@ class PortConn {
   int     rxCount = 0;
   PortConn(String n) { name = n; }
 }
-String[]                  availablePorts = new String[0];  // Serial.list() の生 (全 OS ポート)
-String[]                  displayPorts   = new String[0];  // 一覧 UI に出すフィルタ済リスト
-boolean                   usbOnly        = true;            // true なら usbmodem/usbserial 系のみ表示 ('f' で切替)
-float                     portScrollY    = 0;               // ポート一覧の縦スクロール量 (px)
+String[]                  availablePorts = new String[0];
+String[]                  displayPorts   = new String[0];
+boolean                   usbOnly        = true;
+float                     portScrollY    = 0;
 HashMap<String,PortConn>  openByName     = new HashMap<String,PortConn>();
 HashMap<Serial,PortConn>  bySerial       = new HashMap<Serial,PortConn>();
-// serialEvent (Serial スレッド) は 20 B 揃ったパケットをここに積むだけ。
-// 発音処理 (Voice 操作) は draw() スレッドで drainPackets() がまとめて行う。
 ConcurrentLinkedQueue<byte[]> packetQueue = new ConcurrentLinkedQueue<byte[]>();
 
-// ── 発音中ボイス (最古が先頭) ─────────────────────────────
+// ── 発音中ボイス ──────────────────────────────────────────
 ArrayList<ResynthVoice> activeVoices = new ArrayList<ResynthVoice>();
 
 // ── 表示用 ────────────────────────────────────────────────
 int      totalReceived = 0;
-String[] lastEventByPart = new String[256];   // partId -> 直近イベントのラベル
+String[] lastEventByPart = new String[256];
 int      lastNoteAtMs   = 0;
 PFont    uiFont;
+
+// ── UI 状態 (type=4 から更新) ─────────────────────────────
+int nodeRole     = ROLE_UNKNOWN;
+int uiState      = ST_IDLE;
+int uiMode       = 0;
+int uiNavCursor  = 0;
+int uiTargetBpm  = 0;
+int uiScore      = 0xFF;
+int uiBpmQ8      = 0;
+int uiPartId     = 0;
+int lastUiAtMs   = 0;
+
+// ── メトロノーム (ゲーム画面でローカル計算) ────────────────
+int   gameStartMs     = 0;
+int   lastMetroBeat   = -1;
+int   currentScreen   = SCR_PORT_SELECT;
+int   prevScreen      = -1;
+ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
 final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1); }
@@ -119,24 +152,23 @@ String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1);
 void settings(){ size(900, 560); }
 
 void setup(){
-  frameRate(90);   // draw()/drainPackets() を ~11ms 周期に (既定60fps=16.7ms より受信処理の粒度を短縮)
-  surface.setTitle("orchestra_resynth — test_v2 (輪唱 / きらきら星)");
+  frameRate(90);
+  surface.setTitle("タクトーン — test_v3 ゲームモード");
   uiFont = loadJapaneseFont(13);
   if (uiFont != null) textFont(uiFont);
   else textFont(createFont("SansSerif", 13));
 
   minim = new Minim(this);
-  out = minim.getLineOut(Minim.STEREO, 512, 44100);   // バッファ 512 = 約11.6ms (1024 の半分・低遅延化)
+  out = minim.getLineOut(Minim.STEREO, 512, 44100);
 
   rescanInstruments();
   refreshPorts();
 
-  println("=== orchestra_resynth (test_v2) ===");
-  println("data/ から楽器定義 " + models.size() + " 個をロードしました。");
-  println("[click] ポート開閉  /  [wheel] スクロール  /  [r] ポート再列挙  /  [f] USB-onlyフィルタ切替  /  [i] 楽器再スキャン  /  [p] 全パート同じ音色 ON/OFF  /  [t] テスト音  /  [0-3] 楽器ごとの試聴  /  [Space] 停止");
+  println("=== orchestra_resynth (test_v3 ゲームモード) ===");
+  println("楽器定義 " + models.size() + " 個ロード。");
+  println("[click] ポート開閉  /  [r] ポート再列挙・画面リセット  /  [f] USBフィルタ  /  [t] テスト音  /  [Space] 停止");
 }
 
-// OS の日本語対応フォントを優先順位付きで探す (orchestra_player.pde と同じ手法)
 PFont loadJapaneseFont(float sizePx){
   String[] candidates = {
     "Hiragino Sans", "Hiragino Kaku Gothic ProN", "HiraginoSans-W3",
@@ -147,7 +179,7 @@ PFont loadJapaneseFont(float sizePx){
   for (String c : candidates)
     for (String a : avail)
       if (a.equalsIgnoreCase(c)){ println("UI font: " + c); return createFont(c, sizePx, true); }
-  println("(!) 日本語対応フォントが見つかりませんでした。文字が化ける可能性があります。");
+  println("(!) 日本語対応フォントが見つかりませんでした。");
   return null;
 }
 
@@ -168,20 +200,14 @@ void rescanInstruments(){
       JSONObject root = loadJSONObject(f.getAbsolutePath());
       InstrModel m = new InstrModel(root, out.sampleRate());
       models.add(m);
-      modelLabels.add(f.getName() + "  —  " + root.getString("name","instrument") +
-                      " (" + m.noteName + " / " + nf(m.fundamentalHz,0,1) + " Hz / " +
-                      m.harmonicCount + " 倍音, " + (m.sustaining ? "持続音" : "減衰音") + ")");
+      modelLabels.add(f.getName() + "  —  " + root.getString("name","instrument"));
       println("loaded[" + (models.size()-1) + "] " + f.getName());
     } catch (Exception e){
       models.add(null);
-      modelLabels.add(f.getName() + "   [読込失敗] " + e);
-      println("[エラー] " + f.getName() + " を読めませんでした: " + e);
+      modelLabels.add(f.getName() + "  [読込失敗]");
+      println("[エラー] " + f.getName() + ": " + e);
     }
   }
-  if (models.isEmpty())
-    println("[警告] data/ に *.json がありません。sound_lab で作った楽器定義を data/ に置いて 'i' を押してください。");
-
-  // [一時] 全パートを同じ音色に固定するモード用。data/piano.json の index を覚える。
   forcedInstrumentIdx = -1;
   for (int i = 0; i < instrumentFiles.size(); i++){
     if (instrumentFiles.get(i).getName().equalsIgnoreCase(FORCED_INSTRUMENT_FILE) && models.get(i) != null){
@@ -189,13 +215,8 @@ void rescanInstruments(){
       break;
     }
   }
-  println("single-instrument モード: " + (forceSingleInstrument ? "ON" : "OFF")
-        + " / 固定先=" + FORCED_INSTRUMENT_FILE
-        + " (" + (forcedInstrumentIdx >= 0 ? "idx=" + forcedInstrumentIdx : "未検出") + ")");
 }
 
-// 楽器番号 → 使えるモデル (範囲外は末尾にクランプ。1 個も無ければ null)
-// forceSingleInstrument=true なら instrumentId を無視して FORCED_INSTRUMENT_FILE を引く。
 InstrModel modelForId(int id){
   if (models.isEmpty()) return null;
   int idx;
@@ -203,7 +224,7 @@ InstrModel modelForId(int id){
   else                                                   idx = constrain(id, 0, models.size()-1);
   InstrModel m = models.get(idx);
   if (m != null) return m;
-  for (InstrModel mm : models) if (mm != null) return mm;   // フォールバック
+  for (InstrModel mm : models) if (mm != null) return mm;
   return null;
 }
 
@@ -211,19 +232,8 @@ InstrModel modelForId(int id){
 void refreshPorts(){
   availablePorts = Serial.list();
   rebuildDisplayPorts();
-  println("");
-  println("Available serial ports (usbOnly=" + usbOnly + "):");
-  if (availablePorts.length == 0) println("  (none) — デバイスを挿してから 'r' で再列挙");
-  for (int i=0;i<availablePorts.length;i++){
-    boolean shown = isUsbSerialName(availablePorts[i]);
-    println("  [" + i + "] " + availablePorts[i]
-        + (openByName.containsKey(availablePorts[i]) ? "  <OPEN>" : "")
-        + (usbOnly && !shown ? "  (hidden by USB-only filter)" : ""));
-  }
+  println("Serial ports (usbOnly=" + usbOnly + "): " + availablePorts.length + " 個");
 }
-
-// USB シリアル系の名前判定。macOS の usbmodem*/usbserial*、Linux の ttyUSB*/ttyACM*、
-// Windows の COM* もマッチさせる (Windows は将来移植時の保険)。
 boolean isUsbSerialName(String name){
   if (name == null) return false;
   String n = name.toLowerCase();
@@ -231,21 +241,14 @@ boolean isUsbSerialName(String name){
       || n.contains("ttyusb")   || n.contains("ttyacm")
       || n.startsWith("com")    || n.contains("/com");
 }
-
-// availablePorts (生リスト) から displayPorts (UI 表示用) を作る。
-// usbOnly が true のときは USB シリアル系だけに絞る。
-// 既に開いているポートはフィルター対象でも常に残す (close 操作を奪わないため)。
 void rebuildDisplayPorts(){
-  if (!usbOnly){
-    displayPorts = availablePorts;
-  } else {
+  if (!usbOnly){ displayPorts = availablePorts; }
+  else {
     ArrayList<String> kept = new ArrayList<String>();
-    for (String n : availablePorts){
+    for (String n : availablePorts)
       if (isUsbSerialName(n) || openByName.containsKey(n)) kept.add(n);
-    }
     displayPorts = kept.toArray(new String[0]);
   }
-  // スクロール量を新リスト長に合わせてクランプ (後段で h を知らないので 0 に寄せるだけ)
   if (displayPorts.length == 0) portScrollY = 0;
 }
 void togglePort(String name){
@@ -270,16 +273,20 @@ void closePort(String name){
   if (pc == null) return;
   if (pc.port != null){
     bySerial.remove(pc.port);
-    try { pc.port.stop(); } catch (Exception e){ /* 無視 */ }
+    try { pc.port.stop(); } catch (Exception e){ /* ignore */ }
   }
   println("Closed: " + name);
+  if (openByName.isEmpty()){
+    nodeRole = ROLE_UNKNOWN;
+    uiState = ST_IDLE;
+    uiScore = 0xFF;
+  }
 }
 void closeAllPorts(){
   for (String n : new ArrayList<String>(openByName.keySet())) closePort(n);
 }
 
 // ── シリアル受信 (Serial スレッド) ─────────────────────────
-// Voice には触らず、20 B 揃ったら packetQueue に積むだけ。
 void serialEvent(Serial p){
   PortConn pc = bySerial.get(p);
   if (pc == null){ while (p.available() > 0) p.read(); return; }
@@ -288,7 +295,7 @@ void serialEvent(Serial p){
     if (!pc.inFrame){
       if (pc.rxIdx == 0){
         if ((byte)b == MAGIC_LO){ pc.rxBuf[0] = (byte)b; pc.rxIdx = 1; }
-      } else { // rxIdx == 1
+      } else {
         if ((byte)b == MAGIC_HI){ pc.rxBuf[1] = (byte)b; pc.rxIdx = 2; pc.inFrame = true; }
         else { pc.rxIdx = ((byte)b == MAGIC_LO) ? 1 : 0; if (pc.rxIdx == 1) pc.rxBuf[0] = (byte)b; }
       }
@@ -315,23 +322,52 @@ void drainPackets(){
 }
 void handlePacket(byte[] buf){
   totalReceived++;
-  if (u8(buf[2]) != 0x01) return;          // version
+  if (u8(buf[2]) != 0x01) return;
   int type = u8(buf[3]);
-  if (type != TYPE_NOTE) return;            // CTRL/BEAT は USB には来ない想定 — 無視
+
+  // type=4 (UI): 指揮者の状態を受信 → 役割をメイン操作UIに確定
+  if (type == TYPE_UI){
+    uiState     = u8(buf[12]);
+    uiMode      = u8(buf[13]);
+    uiNavCursor = u8(buf[14]);
+    uiTargetBpm = u8(buf[15]);
+    uiScore     = u8(buf[16]);
+    uiPartId    = u8(buf[17]);
+    uiBpmQ8     = u16le(buf[18], buf[19]);
+    lastUiAtMs  = millis();
+    if (nodeRole != ROLE_MAIN_UI){
+      nodeRole = ROLE_MAIN_UI;
+      println("役割自動判定: メイン操作 UI (UIフレーム受信)");
+    }
+    return;
+  }
+
+  if (type != TYPE_NOTE) return;
+
   int partId       = u8(buf[12]);
   int noteNumber   = u8(buf[13]);
   int velocity     = u8(buf[14]);
   int gate         = u8(buf[15]);
   int durationMs   = u16le(buf[16], buf[17]);
   int instrumentId = u8(buf[18]);
+
+  // 役割自動判定 (NOTE の partId から)
+  if (nodeRole == ROLE_UNKNOWN){
+    if (partId == 0x02){
+      nodeRole = ROLE_MAIN_UI;
+      println("役割自動判定: メイン操作 UI (partId=0x02)");
+    } else {
+      nodeRole = ROLE_ANALYZER;
+      println("役割自動判定: アナライザ (partId=0x" + hex(partId, 2) + ")");
+    }
+  }
+
   if (gate == 1){
     triggerNote(partId, instrumentId, noteNumber, velocity, durationMs);
-    lastEventByPart[partId] = "instr=" + instrumentId + " " + noteName(noteNumber) +
-                              " v=" + velocity + " dur=" + durationMs + "ms";
+    lastEventByPart[partId] = noteName(noteNumber) + " v=" + velocity + " dur=" + durationMs + "ms";
     lastNoteAtMs = millis();
   } else {
     releaseMatching(partId, noteNumber);
-    lastEventByPart[partId] = "NoteOff " + noteName(noteNumber);
   }
 }
 
@@ -339,7 +375,6 @@ void handlePacket(byte[] buf){
 void triggerNote(int partId, int instrumentId, int midi, int velocity, int durationMs){
   InstrModel m = modelForId(instrumentId);
   if (m == null) return;
-  // 同時発音上限を超えていたら最古の active を強制 release してリソースを確保
   int guard = 0;
   while (countNonReleasing() >= MAX_POLYPHONY && guard++ < MAX_POLYPHONY){
     for (ResynthVoice v : activeVoices){ if (!v.releasing){ v.noteOff(); break; } }
@@ -348,14 +383,13 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
   ResynthVoice v = new ResynthVoice(m, midi, g, useSimpleADSR);
   v.partId        = partId;
   v.instrumentIdx = constrain(instrumentId, 0, max(0, models.size()-1));
-  v.scheduledOffMs = millis() + max(40, durationMs);   // durationMs 後に自動で noteOff
+  v.scheduledOffMs = millis() + max(40, durationMs);
   v.patch(out);
   activeVoices.add(v);
 }
 int countNonReleasing(){
   int n = 0; for (ResynthVoice v : activeVoices) if (!v.releasing) n++; return n;
 }
-// gate=0 互換: partId + noteNumber が一致する発音中ボイスを全部 release
 void releaseMatching(int partId, int midi){
   for (ResynthVoice v : activeVoices)
     if (!v.releasing && v.partId == partId && v.midiNote == midi) v.noteOff();
@@ -363,22 +397,75 @@ void releaseMatching(int partId, int midi){
 void stopAll(){
   for (ResynthVoice v : activeVoices) v.unpatch(out);
   activeVoices.clear();
+  for (MetroClick mc : metroClicks) mc.unpatch(out);
+  metroClicks.clear();
 }
-
-// テスト音 (Arduino なしで音を確認する用)
 void playTestChord(){
-  int[] chord = {60, 64, 67};   // C4 E4 G4
+  int[] chord = {60, 64, 67};
   for (int i=0;i<chord.length;i++) triggerNote(0x02+i, i, chord[i], 100, 900);
 }
 void playTestNoteOnInstrument(int idx){
   triggerNote(0x02, idx, 60, 100, 1000);
 }
 
+// ── 画面判定 (データ駆動・毎フレーム) ─────────────────────
+int determineScreen(){
+  if (openByName.isEmpty()) return SCR_PORT_SELECT;
+  if (nodeRole == ROLE_ANALYZER) return SCR_ANALYZER;
+  if (nodeRole == ROLE_MAIN_UI){
+    switch (uiState){
+      case ST_MENU:        return SCR_MENU;
+      case ST_CONDUCTING:  return uiMode == 1 ? SCR_GAME_PLAY : SCR_FREE_PLAY;
+      case ST_RESULT:      return SCR_RESULT;
+      default:             return SCR_WAITING;
+    }
+  }
+  return SCR_WAITING;
+}
+
+void onScreenChange(int from, int to){
+  if (to == SCR_GAME_PLAY){
+    gameStartMs = millis();
+    lastMetroBeat = -1;
+  }
+}
+
+// ── ガイド強度 (firmware と同じ式) ────────────────────────
+float gameGuideIntensity(int beatCount){
+  if (beatCount < GAME_GUIDE_FULL_BEATS) return 1.0f;
+  if (beatCount >= GAME_GUIDE_ZERO_BEATS) return 0.0f;
+  float span = (float)(GAME_GUIDE_ZERO_BEATS - GAME_GUIDE_FULL_BEATS);
+  return 1.0f - (float)(beatCount - GAME_GUIDE_FULL_BEATS) / span;
+}
+
+// ── メトロノーム (ゲーム画面・PC ローカル計算) ────────────
+void updateMetronome(){
+  for (Iterator<MetroClick> it = metroClicks.iterator(); it.hasNext();){
+    MetroClick mc = it.next();
+    if (mc.done){ mc.unpatch(out); it.remove(); }
+  }
+  if (currentScreen != SCR_GAME_PLAY) return;
+  if (uiTargetBpm <= 0) return;
+
+  int elapsed = millis() - gameStartMs;
+  float intervalMs = 60000.0f / (float)uiTargetBpm;
+  int beatNum = (int)(elapsed / intervalMs);
+
+  if (beatNum > lastMetroBeat && beatNum < GAME_LENGTH_BEATS){
+    float guide = gameGuideIntensity(beatNum);
+    if (guide > 0.01f){
+      MetroClick mc = new MetroClick(guide * masterVolume);
+      mc.patch(out);
+      metroClicks.add(mc);
+    }
+    lastMetroBeat = beatNum;
+  }
+}
+
 // ── 描画ループ ────────────────────────────────────────────
 void draw(){
   drainPackets();
 
-  // durationMs 到達したボイスを release に移し、release 完了したものを unpatch
   int now = millis();
   for (ResynthVoice v : activeVoices) if (!v.releasing && now >= v.scheduledOffMs) v.noteOff();
   for (Iterator<ResynthVoice> it = activeVoices.iterator(); it.hasNext();){
@@ -386,15 +473,27 @@ void draw(){
     if (v.done){ v.unpatch(out); it.remove(); }
   }
 
-  drawBackground();
-  drawHeader();
-  drawScope();
-  drawStatus();
-  drawInstrumentList();
-  drawPortList();
+  updateMetronome();
+
+  currentScreen = determineScreen();
+  if (currentScreen != prevScreen){
+    onScreenChange(prevScreen, currentScreen);
+    prevScreen = currentScreen;
+  }
+
+  switch (currentScreen){
+    case SCR_PORT_SELECT: drawPortSelectScreen(); break;
+    case SCR_WAITING:     drawWaitingScreen();    break;
+    case SCR_MENU:        drawMenuScreen();       break;
+    case SCR_FREE_PLAY:   drawFreePlayScreen();   break;
+    case SCR_GAME_PLAY:   drawGamePlayScreen();   break;
+    case SCR_RESULT:      drawResultScreen();     break;
+    case SCR_ANALYZER:    drawAnalyzerScreen();   break;
+    default:              drawWaitingScreen();     break;
+  }
 }
 
-// ── UI パーツ ─────────────────────────────────────────────
+// ── 共通 UI 部品 ─────────────────────────────────────────
 void drawBackground(){
   for (int y=0;y<height;y++){
     float t = y/(float)height;
@@ -409,21 +508,7 @@ void glassPanel(float x, float y, float w, float h){
 }
 boolean mouseOver(float x, float y, float w, float h){ return mouseX>=x && mouseX<=x+w && mouseY>=y && mouseY<=y+h; }
 
-void drawHeader(){
-  glassPanel(16, 14, width-32, 56);
-  fill(30,27,75); textSize(17); textAlign(LEFT);
-  text("orchestra_resynth — test_v2  (輪唱 / きらきら星)", 30, 38);
-  textSize(11); fill(99,102,241);
-  text("楽器定義 " + models.size() + " 個ロード  /  開いているポート " + openByName.size() + " 個  /  発音中 " +
-       activeVoices.size() + " / " + MAX_POLYPHONY + "  /  マスター音量 " + nf(masterVolume,1,2), 30, 56);
-  textAlign(RIGHT); fill(120,120,160);
-  text("[click]ポート開閉  [wheel]スクロール  [r]再列挙  [f]USBフィルタ  [i]楽器再スキャン  [t]テスト音  [0-3]試聴  [a]包絡  [+/-]音量  [Space]停止", width-30, 56);
-  textAlign(LEFT);
-}
-
-// out.left の波形スコープ
-void drawScope(){
-  float x=16, y=78, w=width-32, h=84;
+void drawScope(float x, float y, float w, float h){
   glassPanel(x,y,w,h);
   fill(99,102,241); textSize(10); text("出力波形", x+12, y+16);
   stroke(129,140,248); noFill();
@@ -434,60 +519,230 @@ void drawScope(){
   noStroke();
 }
 
-void drawStatus(){
-  float x=16, y=170, w=width-32, h=88;
-  glassPanel(x,y,w,h);
+void drawScreenTitle(String title, String subtitle){
+  glassPanel(16, 14, width-32, 56);
+  fill(30,27,75); textSize(17); textAlign(LEFT);
+  text(title, 30, 38);
+  textSize(11); fill(99,102,241);
+  text(subtitle, 30, 56);
+  textAlign(LEFT);
+}
+
+// ── ポート選択画面 ────────────────────────────────────────
+void drawPortSelectScreen(){
+  drawBackground();
+  drawScreenTitle("タクトーン — test_v3 ゲームモード",
+      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [i]楽器再スキャン  [t]テスト音  [p]音色切替  [Space]停止");
+  drawPortListAt(90);
+}
+
+// ── 接続待ち画面 ──────────────────────────────────────────
+void drawWaitingScreen(){
+  drawBackground();
+  String title;
+  switch (uiState){
+    case ST_CALIBRATING: title = "キャリブレーション中..."; break;
+    case ST_FALLBACK:    title = "Fallback — 復帰待ち"; break;
+    default:             title = nodeRole == ROLE_UNKNOWN ? "データ待ち..." : "待機中"; break;
+  }
+  drawScreenTitle("タクトーン — test_v3", "ポート " + openByName.size() + " 個接続中  /  " + title);
+
+  glassPanel(width/2-200, height/2-60, 400, 120);
+  fill(60,57,110); textSize(22); textAlign(CENTER, CENTER);
+  text(title, width/2, height/2-20);
+  textSize(12); fill(120,120,160);
+  text("指揮者のキャリブレーション完了を待っています", width/2, height/2+20);
+  textAlign(LEFT);
+}
+
+// ── メニュー画面 ──────────────────────────────────────────
+void drawMenuScreen(){
+  drawBackground();
+  drawScreenTitle("タクトーン — メニュー", "指揮者の IMU 操作でカーソルが動きます。縦振りで決定。");
+
+  float bw = 320, bh = 80, bx = width/2 - bw/2, startY = 160;
+  for (int i = 0; i < MENU_ITEMS.length; i++){
+    float by = startY + i * (bh + 24);
+    boolean selected = (uiNavCursor == i);
+    noStroke();
+    if (selected){
+      fill(99,102,241); rect(bx-4, by-4, bw+8, bh+8, 20);
+    }
+    glassPanel(bx, by, bw, bh);
+    fill(selected ? color(30,27,75) : color(120,120,160));
+    textSize(selected ? 28 : 22); textAlign(CENTER, CENTER);
+    text((selected ? "▶ " : "") + MENU_ITEMS[i], bx + bw/2, by + bh/2);
+  }
+  textAlign(LEFT);
+
+  fill(120,120,160); textSize(12); textAlign(CENTER);
+  text("左右振り = カーソル移動  /  縦振り = 決定", width/2, startY + MENU_ITEMS.length*(bh+24) + 30);
+  textAlign(LEFT);
+}
+
+// ── 自由演奏画面 ──────────────────────────────────────────
+void drawFreePlayScreen(){
+  drawBackground();
+  float bpm = uiBpmQ8 / 8.0f;
+  drawScreenTitle("自由演奏",
+      "BPM: " + nf(bpm, 1, 1) + "  /  発音中 " + activeVoices.size() + " / " + MAX_POLYPHONY +
+      "  /  音量 " + nf(masterVolume, 1, 2));
+
+  drawScope(16, 78, width-32, 100);
+
+  // 受信状況
+  float sy = 190;
+  glassPanel(16, sy, width-32, 100);
   fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("受信状況", x+12, y+18);
-  fill(60,57,110); textSize(11);
-  text("受信パケット合計: " + totalReceived +
-       (lastNoteAtMs>0 ? "   (最後の NOTE から " + (millis()-lastNoteAtMs) + " ms)" : ""), x+12, y+38);
-  // 声部ごとの直近イベント (partId 0x02..0x05)
-  float ry = y+56; int col=0;
-  for (int p=0x02; p<=0x05; p++){
+  text("受信状況", 28, sy+18);
+  fill(60,57,110);
+  text("受信パケット: " + totalReceived +
+       (lastNoteAtMs > 0 ? "   (最後の NOTE から " + (millis()-lastNoteAtMs) + " ms)" : ""), 28, sy+38);
+  float ry = sy+56; int col=0;
+  for (int p=0x02; p<=0x04; p++){
     String ev = lastEventByPart[p];
-    fill(ev!=null ? color(40,37,90) : color(150,150,180));
-    text("声部 0x" + hex(p,2) + ": " + (ev!=null ? ev : "(まだ受信なし)"), x+12 + col*((w-24)/2), ry);
+    fill(ev != null ? color(40,37,90) : color(150,150,180));
+    text("声部 0x" + hex(p,2) + ": " + (ev != null ? ev : "(未受信)"), 28 + col*((width-64)/2), ry);
     col++; if (col>=2){ col=0; ry += 16; }
   }
+
+  // BPM 大表示
+  glassPanel(16, 300, width-32, 120);
+  fill(30,27,75); textSize(60); textAlign(CENTER, CENTER);
+  text(nf(bpm, 1, 1), width/2, 345);
+  textSize(14); fill(99,102,241);
+  text("BPM", width/2, 390);
   textAlign(LEFT);
+
+  drawBottomHelp("[r]リセット  [t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
 }
 
-// data/ 内の楽器定義一覧 (どの番号がどの楽器か)
-void drawInstrumentList(){
-  float x=16, y=266, w=width-32, h=110;
-  glassPanel(x,y,w,h);
+// ── ゲーム演奏画面 ────────────────────────────────────────
+void drawGamePlayScreen(){
+  drawBackground();
+  float bpm = uiBpmQ8 / 8.0f;
+  int elapsed = millis() - gameStartMs;
+  float intervalMs = uiTargetBpm > 0 ? 60000.0f / (float)uiTargetBpm : 600;
+  int elapsedBeats = min((int)(elapsed / intervalMs), GAME_LENGTH_BEATS);
+  float guide = gameGuideIntensity(elapsedBeats);
+  String scoreStr = (uiScore == 0xFF) ? "採点中" : "" + uiScore;
+
+  drawScreenTitle("ゲーム演奏",
+      "目標: " + uiTargetBpm + " BPM  /  現在: " + nf(bpm, 1, 1) + " BPM  /  スコア: " + scoreStr);
+
+  // ガイド強度バー
+  float barX = 16, barY = 78, barW = width-32, barH = 30;
+  glassPanel(barX, barY, barW, barH);
+  fill(99,102,241, (int)(guide * 200 + 55));
+  noStroke();
+  rect(barX+4, barY+4, (barW-8)*guide, barH-8, 8);
   fill(30,27,75); textSize(11); textAlign(LEFT);
-  String forcedTag = forceSingleInstrument
-      ? "  [p:ON 全パート→" + FORCED_INSTRUMENT_FILE + (forcedInstrumentIdx>=0 ? " (idx=" + forcedInstrumentIdx + ")" : " (未検出)") + "]"
-      : "  [p:OFF instrumentId に従う]";
-  text("楽器定義 (data/*.json) — 番号 = 楽器番号 (Arduino が送る instrumentId)" + forcedTag, x+12, y+18);
-  if (models.isEmpty()){
-    fill(150,150,180);
-    text("data/ に *.json がありません。sound_lab で作った楽器定義を置いて 'i' を押してください。", x+12, y+40);
-    textAlign(LEFT); return;
+  text("ガイド: " + nf(guide*100, 1, 0) + "%", barX+12, barY+20);
+  textAlign(LEFT);
+
+  drawScope(16, 118, width-32, 90);
+
+  // 拍進捗
+  float py = 218;
+  glassPanel(16, py, width-32, 60);
+  fill(30,27,75); textSize(14); textAlign(LEFT);
+  text("経過: " + elapsedBeats + " / " + GAME_LENGTH_BEATS + " 拍", 28, py+24);
+  // 拍ドット
+  float dotStartX = 28, dotY = py+44, dotR = 10, dotGap = 2;
+  for (int i = 0; i < GAME_LENGTH_BEATS; i++){
+    float dx = dotStartX + i * (dotR + dotGap);
+    if (dx + dotR > width - 28) break;
+    noStroke();
+    if (i < elapsedBeats) fill(99,102,241);
+    else if (i < GAME_GUIDE_FULL_BEATS) fill(99,102,241, 80);
+    else if (i < GAME_GUIDE_ZERO_BEATS) fill(220,180,60, 80);
+    else fill(200,200,200, 60);
+    ellipse(dx + dotR/2, dotY, dotR, dotR);
   }
-  float rowY0 = y+28, rowH=18;
-  for (int i=0;i<modelLabels.size();i++){
-    float ry = rowY0 + i*rowH;
-    if (ry > y+h-6) break;
-    fill(i<models.size() && models.get(i)!=null ? color(40,37,90) : color(231,68,68));
-    textSize(11);
-    text(nf(i,1) + ".  " + modelLabels.get(i), x+22, ry+13);
+
+  // スコア表示
+  glassPanel(16, 290, width-32, 130);
+  fill(30,27,75); textSize(50); textAlign(CENTER, CENTER);
+  text(scoreStr, width/2, 340);
+  textSize(14); fill(99,102,241);
+  text("スコア", width/2, 390);
+  textAlign(LEFT);
+
+  // 目標テンポ
+  glassPanel(width/2-100, 430, 200, 40);
+  fill(60,57,110); textSize(14); textAlign(CENTER, CENTER);
+  text("目標: " + uiTargetBpm + " BPM", width/2, 450);
+  textAlign(LEFT);
+
+  drawBottomHelp("[Space]停止  [+/-]音量");
+}
+
+// ── 結果画面 ──────────────────────────────────────────────
+void drawResultScreen(){
+  drawBackground();
+  drawScreenTitle("ゲーム結果", "");
+
+  glassPanel(width/2-180, height/2-120, 360, 240);
+  fill(30,27,75); textSize(20); textAlign(CENTER);
+  text("スコア", width/2, height/2-70);
+
+  if (uiScore != 0xFF){
+    textSize(80);
+    if (uiScore >= 80) fill(40,180,80);
+    else if (uiScore >= 50) fill(220,180,40);
+    else fill(220,80,60);
+    text("" + uiScore, width/2, height/2+10);
+    textSize(20); fill(120,120,160);
+    text("/ 100", width/2, height/2+50);
+  } else {
+    textSize(40); fill(120,120,160);
+    text("---", width/2, height/2+10);
   }
+
+  textSize(13); fill(120,120,160);
+  text("指揮者の操作でメニューに戻ります", width/2, height/2+100);
   textAlign(LEFT);
 }
 
-// シリアルポート一覧 (クリックで開閉)
-// 縦方向にスクロール可能 (mouseWheel) で、表示は usbOnly フィルタ済の displayPorts を使う。
-// クリック判定もスクロール量を反映するため、座標計算は drawPortList と mousePressed で共有する。
-float portRowX, portRowW, portRowY0, portRowH;       // リストの 1 行ぶんの座標 (スクロール無視)
-float portViewY, portViewH;                          // リスト描画領域の Y / 高さ (スクロールクリップ範囲)
-int   portRowCount;                                  // displayPorts.length のキャッシュ
-void drawPortList(){
-  // ポート開閉直後 / フィルタ切替時の追従のため毎フレーム再構築 (availablePorts は 'r' でのみ更新)
+// ── アナライザ画面 ────────────────────────────────────────
+void drawAnalyzerScreen(){
+  drawBackground();
+  String status = (millis() - lastNoteAtMs < 2000) ? "演奏中" : "待機中";
+  drawScreenTitle("アナライザ", status + "  /  受信 " + totalReceived + "  /  発音中 " + activeVoices.size());
+
+  drawScope(16, 78, width-32, 200);
+
+  // 受信状況
+  float sy = 290;
+  glassPanel(16, sy, width-32, 80);
+  fill(30,27,75); textSize(11); textAlign(LEFT);
+  text("直近イベント", 28, sy+18);
+  fill(60,57,110);
+  float ry = sy+36; int col=0;
+  for (int p=0x02; p<=0x04; p++){
+    String ev = lastEventByPart[p];
+    if (ev == null) continue;
+    text("0x" + hex(p,2) + ": " + ev, 28 + col*((width-64)/2), ry);
+    col++; if (col>=2){ col=0; ry += 16; }
+  }
+
+  drawBottomHelp("[t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+}
+
+void drawBottomHelp(String helpText){
+  fill(120,120,160); textSize(10); textAlign(CENTER);
+  text(helpText, width/2, height-8);
+  textAlign(LEFT);
+}
+
+// ── ポート一覧 ───────────────────────────────────────────
+float portRowX, portRowW, portRowY0, portRowH;
+float portViewY, portViewH;
+int   portRowCount;
+
+void drawPortListAt(float startY){
   rebuildDisplayPorts();
-  float x=16, y=384, w=width-32, h=height-y-12;
+  float x=16, y=startY, w=width-32, h=height-y-12;
   glassPanel(x,y,w,h);
   fill(30,27,75); textSize(11); textAlign(LEFT);
   String filterTag = usbOnly ? "USB のみ" : "全ポート";
@@ -506,43 +761,39 @@ void drawPortList(){
   }
   if (displayPorts.length == 0){
     fill(220,160,60); textSize(11);
-    text("USB-only フィルタで全部隠れています。'f' で全表示に切り替えるか USB デバイスを挿してください。", x+12, y+40);
+    text("USB-only フィルタで全部隠れています。'f' で全表示に切り替えてください。", x+12, y+40);
     textAlign(LEFT); return;
   }
 
-  // スクロール範囲をクランプ (totalH > viewH のときだけスクロール余地がある)
   float totalH = portRowCount * portRowH;
   float maxScroll = max(0, totalH - portViewH);
   portScrollY = constrain(portScrollY, 0, maxScroll);
 
-  // リスト領域をクリッピング (スクロール時に枠外へはみ出さない)
   clip(portRowX - 2, portViewY - 2, portRowW + 4, portViewH + 4);
   for (int i=0;i<displayPorts.length;i++){
     float ry = portRowY0 + i*portRowH - portScrollY;
-    if (ry + portRowH < portViewY) continue;           // 上に消えた行はスキップ
-    if (ry > portViewY + portViewH)  break;            // 下にはみ出たら以降不要
+    if (ry + portRowH < portViewY) continue;
+    if (ry > portViewY + portViewH)  break;
     boolean isOpen = openByName.containsKey(displayPorts[i]);
     boolean isHover = mouseOver(portRowX, ry, portRowW, portRowH-2)
-                   && mouseOver(portRowX, portViewY, portRowW, portViewH); // 領域外ホバーは無視
+                   && mouseOver(portRowX, portViewY, portRowW, portViewH);
     noStroke();
     if (isOpen) fill(isHover ? color(80,180,120) : color(96,200,140));
     else        fill(isHover ? color(255,255,255,235) : color(255,255,255,140));
     rect(portRowX, ry, portRowW, portRowH-2, 7);
     fill(isOpen ? 255 : color(60,57,110)); textSize(11);
-    String tag = isOpen ? ("● OPEN  受信 " + openByName.get(displayPorts[i]).rxCount + " 個") : "○ closed (クリックで開く)";
+    String tag = isOpen ? ("● OPEN  受信 " + openByName.get(displayPorts[i]).rxCount + " 個") : "○ closed";
     text("[" + i + "] " + displayPorts[i] + "    " + tag, portRowX+10, ry+16);
   }
   noClip();
 
-  // スクロールバー (右端の細い縦バー)。スクロール余地があるときだけ描画。
   if (maxScroll > 0){
     float barX = portRowX + portRowW - 4;
     float barW = 4;
-    float barTrackH = portViewH;
     noStroke(); fill(0, 0, 0, 30);
-    rect(barX, portViewY, barW, barTrackH, 2);
-    float thumbH = max(20, barTrackH * (portViewH / totalH));
-    float thumbY = portViewY + (barTrackH - thumbH) * (portScrollY / maxScroll);
+    rect(barX, portViewY, barW, portViewH, 2);
+    float thumbH = max(20, portViewH * (portViewH / totalH));
+    float thumbY = portViewY + (portViewH - thumbH) * (portScrollY / maxScroll);
     fill(99,102,241, 180);
     rect(barX, thumbY, barW, thumbH, 2);
   }
@@ -551,8 +802,9 @@ void drawPortList(){
 
 // ── マウス / キーボード ───────────────────────────────────
 void mousePressed(){
+  if (currentScreen != SCR_PORT_SELECT) return;
   if (portRowCount <= 0) return;
-  if (!mouseOver(portRowX, portViewY, portRowW, portViewH)) return;  // リスト領域外は無視
+  if (!mouseOver(portRowX, portViewY, portRowW, portViewH)) return;
   for (int i=0;i<portRowCount;i++){
     float ry = portRowY0 + i*portRowH - portScrollY;
     if (ry + portRowH < portViewY) continue;
@@ -561,12 +813,10 @@ void mousePressed(){
   }
 }
 
-// マウスホイールで一覧をスクロール。リスト領域内のホイールだけ拾う。
 void mouseWheel(processing.event.MouseEvent e){
+  if (currentScreen != SCR_PORT_SELECT) return;
   if (portRowCount <= 0) return;
-  if (!mouseOver(portRowX, portViewY, portRowW, portViewH)) return;
-  portScrollY += e.getCount() * portRowH;  // 1 ノッチ = 1 行
-  // 範囲クランプは drawPortList 側でも行うが、即時にもクランプして UI 反応を素直にする
+  portScrollY += e.getCount() * portRowH;
   float totalH = portRowCount * portRowH;
   float maxScroll = max(0, totalH - portViewH);
   portScrollY = constrain(portScrollY, 0, maxScroll);
@@ -574,11 +824,16 @@ void mouseWheel(processing.event.MouseEvent e){
 
 void keyPressed(){
   char c = Character.toLowerCase(key);
-  if (c=='r'){ refreshPorts(); return; }
+  if (c=='r'){
+    closeAllPorts();
+    refreshPorts();
+    println("ポートリセット。ポートを選択してください。");
+    return;
+  }
   if (c=='i'){ rescanInstruments(); return; }
   if (c=='p'){
     forceSingleInstrument = !forceSingleInstrument;
-    println("single-instrument モード: " + (forceSingleInstrument ? "ON (全パート " + FORCED_INSTRUMENT_FILE + ")" : "OFF (instrumentId に従う)"));
+    println("single-instrument: " + (forceSingleInstrument ? "ON (" + FORCED_INSTRUMENT_FILE + ")" : "OFF"));
     return;
   }
   if (c=='t'){ playTestChord(); return; }
@@ -591,7 +846,7 @@ void keyPressed(){
     usbOnly = !usbOnly;
     rebuildDisplayPorts();
     portScrollY = 0;
-    println("ポートフィルタ: " + (usbOnly ? "USB のみ" : "全ポート") + " (表示 " + displayPorts.length + " / 全 " + availablePorts.length + ")");
+    println("ポートフィルタ: " + (usbOnly ? "USB のみ" : "全ポート"));
     return;
   }
 }
@@ -605,9 +860,36 @@ void dispose(){
 
 
 /* ==========================================================================
+   MetroClick — メトロノームの短いクリック音 (Minim UGen)
+   880Hz の正弦波を 50ms だけ鳴らす。ゲーム画面でガイド強度に応じた音量で生成。
+   ========================================================================== */
+class MetroClick extends UGen {
+  float freq = 880;
+  float phase = 0;
+  float tSec = 0;
+  float duration = 0.05f;
+  float gain;
+  boolean done = false;
+
+  MetroClick(float g){ this.gain = g; }
+
+  protected void uGenerate(float[] channels){
+    if (done){ for (int i=0; i<channels.length; i++) channels[i]=0; return; }
+    float env;
+    if (tSec < 0.005f) env = tSec / 0.005f;
+    else env = max(0, 1.0f - (tSec - 0.005f) / (duration - 0.005f));
+    float s = sin(phase) * env * gain * 0.25f;
+    for (int i=0; i<channels.length; i++) channels[i] = s;
+    phase += TWO_PI * freq / sampleRate();
+    if (phase >= TWO_PI) phase -= TWO_PI;
+    tSec += 1.0f / sampleRate();
+    if (tSec >= duration) done = true;
+  }
+}
+
+
+/* ==========================================================================
    InstrModel — sound_lab の JSON を解釈して合成に必要な配列を保持。
-   (instrument_player.pde の同名クラスを移植。スペクトル整形ノイズのループバッファは
-    ここで一度だけ作り、その楽器の全ボイスで共有する。)
    ========================================================================== */
 class InstrModel {
   float fundamentalHz;  int midiNote;  String noteName;
@@ -720,8 +1002,6 @@ float[] toFloatArray(JSONArray a){
 
 /* ==========================================================================
    ResynthVoice — 1 音ぶんの加算合成ボイス (Minim UGen)。
-   (instrument_player.pde の同名クラスを移植 + 自動オフ時刻 scheduledOffMs を追加。)
-   生成時は「鳴っている」状態で、scheduledOffMs に達したら draw() が noteOff() を呼ぶ。
    ========================================================================== */
 class ResynthVoice extends UGen {
   InstrModel m;
@@ -730,7 +1010,6 @@ class ResynthVoice extends UGen {
   float gain;
   boolean simpleADSR;
 
-  // test_v2 で追加: どの声部 / 楽器番号か、いつ自動 noteOff するか
   int   partId = -1;
   int   instrumentIdx = -1;
   int   scheduledOffMs = Integer.MAX_VALUE;
@@ -843,6 +1122,6 @@ class ResynthVoice extends UGen {
     for (int i=0;i<channels.length;i++) channels[i] = s;
     tSec += 1.0f/sr;
     if (releasing && (tSec - releaseStartT) >= relSec()) done = true;
-    else if (!done && a <= 1e-4f && tSec > 0.15f) done = true;   // 減衰音が自然に死んだ
+    else if (!done && a <= 1e-4f && tSec > 0.15f) done = true;
   }
 }
