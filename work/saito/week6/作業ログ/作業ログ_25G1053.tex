@@ -126,7 +126,7 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\linewidth]{Figs/week6.pdf}
+  \includegraphics[width=\linewidth]{Figs/GC_week6.png}
   \caption{担当箇所のGC（現在）}
   \label{fig:saito-gc-current}
 \end{figure}
@@ -141,16 +141,11 @@
 \toprule
 課題 & 発生原因 & 影響度 & 優先度 & 対策 & 期限 & 状態 \\
 \midrule
-4声輪唱の実音未確認
-  & 確認用スケッチの作成後，試聴結果をまだ記録していない．
-  & 中 & 高
-  & Processingで再生し，音の重なりを確認する．
-  & 次回作業時 & 未対応 \\
-ROM埋込確認の未実施
-  & 楽譜データがファームウェアへ未統合である．
+Arduino側への反映・実機確認の未実施
+  & 現時点ではProcessing上でドラム伴奏を確認済みだが，ファームウェア側への反映と実機確認はまだ行っていない．
   & 中 & 中
-  & ファームウェアへの統合後にビルドおよび実機確認を行う．
-  & 統合後 & 未対応 \\
+  & 確認済みの\texttt{DRUM\_SCORE}をArduino用の\texttt{ScoreEvent}配列へ反映し，ビルドおよび実機再生を確認する．
+  & 統合作業時 & 未対応 \\
 \bottomrule
 \end{tabularx}
 }
