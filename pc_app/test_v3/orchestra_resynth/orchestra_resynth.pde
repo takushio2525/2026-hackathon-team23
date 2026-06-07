@@ -147,6 +147,13 @@ int   currentScreen   = SCR_PORT_SELECT;
 int   prevScreen      = -1;
 ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
+// 指揮棒軌跡
+final int TRAIL_LEN = 30;
+float[] trailX = new float[TRAIL_LEN];
+float[] trailY = new float[TRAIL_LEN];
+int trailCount = 0;
+int trailIdx = 0;
+
 final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1); }
 
@@ -508,6 +515,8 @@ void draw(){
     case SCR_ANALYZER:    drawAnalyzerScreen();   break;
     default:              drawWaitingScreen();     break;
   }
+
+  drawBatonTrail();
 }
 
 // ── 共通 UI 部品 ─────────────────────────────────────────
@@ -592,29 +601,33 @@ void drawMenuScreen(){
   drawBackground();
   drawPageTitle("タクトーン — メニュー", "指揮者の IMU 操作でカーソルが動きます。縦振りで決定。");
 
-  float bw = 300, bh = 100, bx = width/2 - bw/2, startY = 160;
+  float modeW = 270, modeH = 135, modeY = 200;
+  float gap = 60;
+  float totalW = 2 * modeW + gap;
+  float startX = width/2 - totalW/2;
+
   for (int i = 0; i < MENU_ITEMS.length; i++){
-    float by = startY + i * (bh + 30);
+    float bx = startX + i * (modeW + gap);
     boolean selected = (uiNavCursor == i);
     int baseCol = (i == 0) ? color(64, 159, 255) : color(24, 156, 104);
-    boolean hover = mouseOver(bx, by, bw, bh);
+    boolean hover = mouseOver(bx, modeY, modeW, modeH);
     noStroke();
-    fill(23, 52, 84, 45); rect(bx + 8, by + 10, bw, bh, 18);
+    fill(23, 52, 84, 45); rect(bx + 8, modeY + 10, modeW, modeH, 18);
     fill(selected ? baseCol : (hover ? lighten(baseCol, 24) : color(226, 231, 236)));
-    rect(bx, by, bw, bh, 18);
+    rect(bx, modeY, modeW, modeH, 18);
     stroke(selected ? color(255) : color(186, 196, 206));
     strokeWeight(3); noFill();
-    rect(bx + 4, by + 4, bw - 8, bh - 8, 14);
+    rect(bx + 4, modeY + 4, modeW - 8, modeH - 8, 14);
     strokeWeight(1); noStroke();
     fill(selected ? color(255) : color(60, 70, 80));
     textAlign(CENTER, CENTER);
     textSize(selected ? 30 : 24);
-    text((selected ? "▶ " : "") + MENU_ITEMS[i], bx + bw/2, by + bh/2);
+    text((selected ? "▶ " : "") + MENU_ITEMS[i], bx + modeW/2, modeY + modeH/2);
   }
   textAlign(LEFT, BASELINE);
 
   fill(61, 86, 111); textSize(13); textAlign(CENTER, BASELINE);
-  text("左右振り = カーソル移動  /  縦振り = 決定", width/2, startY + MENU_ITEMS.length * (bh + 30) + 20);
+  text("← 左右振り = カーソル移動  /  ↓ 縦振り = 決定 →", width/2, modeY + modeH + 40);
   textAlign(LEFT, BASELINE);
 }
 
@@ -775,6 +788,47 @@ void drawHelpPanel(String helpText){
   fill(28, 54, 80); textSize(13); textAlign(LEFT, BASELINE);
   text(helpText, hx + 22, hy + 28);
   textAlign(LEFT, BASELINE);
+}
+
+// ── 指揮棒軌跡 ──────────────────────────────────────────
+void drawBatonTrail(){
+  if (currentScreen == SCR_PORT_SELECT) return;
+  if (uiBpmQ8 <= 0 || uiState != ST_CONDUCTING) return;
+
+  float bpm = uiBpmQ8 / 8.0f;
+  float periodMs = 60000.0f / bpm;
+  int period = max(1, (int)periodMs);
+  float t = (float)(millis() % period) / periodMs;
+  float angle = TWO_PI * t;
+
+  float cx = width / 2.0f;
+  float arcY = 30;
+  float arcW = width * 0.5f;
+  float dotX = cx + sin(angle) * arcW / 2;
+  float dotY = arcY + 12 - cos(angle) * 6;
+
+  trailX[trailIdx] = dotX;
+  trailY[trailIdx] = dotY;
+  trailIdx = (trailIdx + 1) % TRAIL_LEN;
+  if (trailCount < TRAIL_LEN) trailCount++;
+
+  boolean pulse = (millis() - lastNoteAtMs) < 120;
+
+  noStroke();
+  for (int i = 0; i < trailCount; i++){
+    int idx = (trailIdx - 1 - i + TRAIL_LEN * 2) % TRAIL_LEN;
+    float alpha = (1.0f - (float)i / TRAIL_LEN) * (pulse ? 160 : 60);
+    float r = max(2, (pulse ? 5 : 3) - i * 0.08f);
+    fill(64, 159, 255, alpha);
+    ellipse(trailX[idx], trailY[idx], r, r);
+  }
+
+  float dotR = pulse ? 10 : 7;
+  float dotAlpha = pulse ? 240 : 160;
+  fill(64, 159, 255, dotAlpha);
+  ellipse(dotX, dotY, dotR, dotR);
+  fill(255, 255, 255, dotAlpha * 0.5f);
+  ellipse(dotX, dotY, dotR * 0.4f, dotR * 0.4f);
 }
 
 // ── ポート一覧 ───────────────────────────────────────────
