@@ -70,6 +70,7 @@ final int ST_RESULT      = 5;
 final int GAME_LENGTH_BEATS      = 24;
 final int GAME_GUIDE_FULL_BEATS  = 8;
 final int GAME_GUIDE_ZERO_BEATS  = 16;
+final int UI_TIMEOUT_MS          = 5000;
 
 // 役割
 final int ROLE_UNKNOWN  = 0;
@@ -137,6 +138,7 @@ int uiScore      = 0xFF;
 int uiBpmQ8      = 0;
 int uiPartId     = 0;
 int lastUiAtMs   = 0;
+boolean masterResetDetected = false;
 
 // ── メトロノーム (ゲーム画面でローカル計算) ────────────────
 int   gameStartMs     = 0;
@@ -149,7 +151,7 @@ final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B
 String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1); }
 
 // ────────────────────────────────────────────────────────────
-void settings(){ size(900, 560); }
+void settings(){ size(1000, 560); }
 
 void setup(){
   frameRate(90);
@@ -339,6 +341,7 @@ void handlePacket(byte[] buf){
       nodeRole = ROLE_MAIN_UI;
       println("役割自動判定: メイン操作 UI (UIフレーム受信)");
     }
+    masterResetDetected = false;
     return;
   }
 
@@ -423,8 +426,8 @@ int determineScreen(){
   return SCR_WAITING;
 }
 
-void onScreenChange(int from, int to){
-  if (to == SCR_GAME_PLAY){
+void onScreenChange(int fromScr, int toScr){
+  if (toScr == SCR_GAME_PLAY){
     gameStartMs = millis();
     lastMetroBeat = -1;
   }
@@ -466,6 +469,20 @@ void updateMetronome(){
 void draw(){
   drainPackets();
 
+  // マスター ESP32 リセット検知 (UIパケット 5秒タイムアウト)
+  if (lastUiAtMs > 0 && !openByName.isEmpty() && nodeRole == ROLE_MAIN_UI){
+    if (millis() - lastUiAtMs > UI_TIMEOUT_MS){
+      uiState = ST_IDLE;
+      uiScore = 0xFF;
+      gameStartMs = 0;
+      lastMetroBeat = -1;
+      stopAll();
+      masterResetDetected = true;
+      lastUiAtMs = 0;
+      println("(!) マスターリセット検知: UIパケットタイムアウト (" + UI_TIMEOUT_MS + "ms)");
+    }
+  }
+
   int now = millis();
   for (ResynthVoice v : activeVoices) if (!v.releasing && now >= v.scheduledOffMs) v.noteOff();
   for (Iterator<ResynthVoice> it = activeVoices.iterator(); it.hasNext();){
@@ -495,45 +512,56 @@ void draw(){
 
 // ── 共通 UI 部品 ─────────────────────────────────────────
 void drawBackground(){
-  for (int y=0;y<height;y++){
-    float t = y/(float)height;
-    int c = lerpColor(color(224,231,255), lerpColor(color(252,231,243), color(219,234,254), t), t);
-    stroke(c); line(0,y,width,y);
-  }
+  background(238, 247, 255);
+  noStroke();
+  fill(255, 221, 100, 120); ellipse(72, 70, 150, 150);
+  fill(82, 194, 255, 95);   ellipse(934, 92, 220, 220);
+  fill(132, 224, 146, 95);  ellipse(884, 526, 260, 180);
+  fill(255, 125, 132, 80);  ellipse(76, 520, 230, 160);
+  stroke(210, 228, 240, 90); strokeWeight(1);
+  for (int gx = 0; gx <= width; gx += 50) line(gx, 0, gx, height);
+  for (int gy = 0; gy <= height; gy += 50) line(0, gy, width, gy);
   noStroke();
 }
-void glassPanel(float x, float y, float w, float h){
-  noStroke(); fill(255,255,255,150); rect(x,y,w,h,16);
-  stroke(255,255,255,200); noFill(); rect(x,y,w,h,16); noStroke();
+void drawPanel(float x, float y, float w, float h){
+  noStroke();
+  fill(23, 60, 95, 34); rect(x + 8, y + 10, w, h, 18);
+  fill(255); rect(x, y, w, h, 18);
+  stroke(134, 184, 218); strokeWeight(3); noFill();
+  rect(x, y, w, h, 18);
+  strokeWeight(1); noStroke();
 }
 boolean mouseOver(float x, float y, float w, float h){ return mouseX>=x && mouseX<=x+w && mouseY>=y && mouseY<=y+h; }
-
-void drawScope(float x, float y, float w, float h){
-  glassPanel(x,y,w,h);
-  fill(99,102,241); textSize(10); text("出力波形", x+12, y+16);
-  stroke(129,140,248); noFill();
-  float cy = y + h*0.5f;
-  beginShape();
-  for (int i=0;i<out.bufferSize();i++) vertex(x + 8 + (w-16)*i/(float)(out.bufferSize()-1), cy - out.left.get(i)*(h*0.40f));
-  endShape();
-  noStroke();
+int lighten(int c, int amount){
+  return color(min(255, red(c)+amount), min(255, green(c)+amount), min(255, blue(c)+amount));
 }
 
-void drawScreenTitle(String title, String subtitle){
-  glassPanel(16, 14, width-32, 56);
-  fill(30,27,75); textSize(17); textAlign(LEFT);
-  text(title, 30, 38);
-  textSize(11); fill(99,102,241);
-  text(subtitle, 30, 56);
-  textAlign(LEFT);
+void drawScope(float x, float y, float w, float h){
+  drawPanel(x, y, w, h);
+  fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
+  text("出力波形", x + 22, y + 24);
+  stroke(24, 111, 196); strokeWeight(2.5); noFill();
+  float cy = y + h * 0.55f;
+  beginShape();
+  for (int i = 0; i < out.bufferSize(); i++)
+    vertex(x + 20 + (w - 40) * i / (float)(out.bufferSize() - 1), cy - out.left.get(i) * (h * 0.35f));
+  endShape();
+  strokeWeight(1); noStroke();
+}
+
+void drawPageTitle(String title, String subtitle){
+  fill(18, 54, 88); textSize(34); textAlign(LEFT, BASELINE);
+  text(title, 168, 52);
+  fill(61, 86, 111); textSize(15);
+  text(subtitle, 170, 78);
 }
 
 // ── ポート選択画面 ────────────────────────────────────────
 void drawPortSelectScreen(){
   drawBackground();
-  drawScreenTitle("タクトーン — test_v3 ゲームモード",
-      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [i]楽器再スキャン  [t]テスト音  [p]音色切替  [Space]停止");
-  drawPortListAt(90);
+  drawPageTitle("タクトーン — test_v3",
+      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [t]テスト音  [p]音色切替");
+  drawPortListAt(96);
 }
 
 // ── 接続待ち画面 ──────────────────────────────────────────
@@ -545,76 +573,86 @@ void drawWaitingScreen(){
     case ST_FALLBACK:    title = "Fallback — 復帰待ち"; break;
     default:             title = nodeRole == ROLE_UNKNOWN ? "データ待ち..." : "待機中"; break;
   }
-  drawScreenTitle("タクトーン — test_v3", "ポート " + openByName.size() + " 個接続中  /  " + title);
+  drawPageTitle("タクトーン — test_v3", "ポート " + openByName.size() + " 個接続中  /  " + title);
 
-  glassPanel(width/2-200, height/2-60, 400, 120);
-  fill(60,57,110); textSize(22); textAlign(CENTER, CENTER);
-  text(title, width/2, height/2-20);
-  textSize(12); fill(120,120,160);
-  text("指揮者のキャリブレーション完了を待っています", width/2, height/2+20);
-  textAlign(LEFT);
+  drawPanel(width/2 - 220, height/2 - 80, 440, 160);
+  fill(18, 54, 88); textSize(24); textAlign(CENTER, CENTER);
+  text(title, width/2, height/2 - 30);
+  fill(61, 86, 111); textSize(14);
+  text("指揮者のキャリブレーション完了を待っています", width/2, height/2 + 10);
+  if (masterResetDetected){
+    fill(197, 83, 31); textSize(13);
+    text("指揮者の再起動を検知しました。再接続中...", width/2, height/2 + 40);
+  }
+  textAlign(LEFT, BASELINE);
 }
 
 // ── メニュー画面 ──────────────────────────────────────────
 void drawMenuScreen(){
   drawBackground();
-  drawScreenTitle("タクトーン — メニュー", "指揮者の IMU 操作でカーソルが動きます。縦振りで決定。");
+  drawPageTitle("タクトーン — メニュー", "指揮者の IMU 操作でカーソルが動きます。縦振りで決定。");
 
-  float bw = 320, bh = 80, bx = width/2 - bw/2, startY = 160;
+  float bw = 300, bh = 100, bx = width/2 - bw/2, startY = 160;
   for (int i = 0; i < MENU_ITEMS.length; i++){
-    float by = startY + i * (bh + 24);
+    float by = startY + i * (bh + 30);
     boolean selected = (uiNavCursor == i);
+    int baseCol = (i == 0) ? color(64, 159, 255) : color(24, 156, 104);
+    boolean hover = mouseOver(bx, by, bw, bh);
     noStroke();
-    if (selected){
-      fill(99,102,241); rect(bx-4, by-4, bw+8, bh+8, 20);
-    }
-    glassPanel(bx, by, bw, bh);
-    fill(selected ? color(30,27,75) : color(120,120,160));
-    textSize(selected ? 28 : 22); textAlign(CENTER, CENTER);
+    fill(23, 52, 84, 45); rect(bx + 8, by + 10, bw, bh, 18);
+    fill(selected ? baseCol : (hover ? lighten(baseCol, 24) : color(226, 231, 236)));
+    rect(bx, by, bw, bh, 18);
+    stroke(selected ? color(255) : color(186, 196, 206));
+    strokeWeight(3); noFill();
+    rect(bx + 4, by + 4, bw - 8, bh - 8, 14);
+    strokeWeight(1); noStroke();
+    fill(selected ? color(255) : color(60, 70, 80));
+    textAlign(CENTER, CENTER);
+    textSize(selected ? 30 : 24);
     text((selected ? "▶ " : "") + MENU_ITEMS[i], bx + bw/2, by + bh/2);
   }
-  textAlign(LEFT);
+  textAlign(LEFT, BASELINE);
 
-  fill(120,120,160); textSize(12); textAlign(CENTER);
-  text("左右振り = カーソル移動  /  縦振り = 決定", width/2, startY + MENU_ITEMS.length*(bh+24) + 30);
-  textAlign(LEFT);
+  fill(61, 86, 111); textSize(13); textAlign(CENTER, BASELINE);
+  text("左右振り = カーソル移動  /  縦振り = 決定", width/2, startY + MENU_ITEMS.length * (bh + 30) + 20);
+  textAlign(LEFT, BASELINE);
 }
 
 // ── 自由演奏画面 ──────────────────────────────────────────
 void drawFreePlayScreen(){
   drawBackground();
   float bpm = uiBpmQ8 / 8.0f;
-  drawScreenTitle("自由演奏",
+  drawPageTitle("自由演奏",
       "BPM: " + nf(bpm, 1, 1) + "  /  発音中 " + activeVoices.size() + " / " + MAX_POLYPHONY +
       "  /  音量 " + nf(masterVolume, 1, 2));
 
-  drawScope(16, 78, width-32, 100);
+  drawScope(28, 96, width - 56, 100);
 
   // 受信状況
-  float sy = 190;
-  glassPanel(16, sy, width-32, 100);
-  fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("受信状況", 28, sy+18);
-  fill(60,57,110);
+  float sy = 206;
+  drawPanel(28, sy, width - 56, 100);
+  fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
+  text("受信状況", 50, sy + 24);
+  fill(28, 54, 80); textSize(12);
   text("受信パケット: " + totalReceived +
-       (lastNoteAtMs > 0 ? "   (最後の NOTE から " + (millis()-lastNoteAtMs) + " ms)" : ""), 28, sy+38);
-  float ry = sy+56; int col=0;
-  for (int p=0x02; p<=0x04; p++){
+       (lastNoteAtMs > 0 ? "   (最後の NOTE から " + (millis()-lastNoteAtMs) + " ms)" : ""), 50, sy + 44);
+  float ry = sy + 64; int col = 0;
+  for (int p = 0x02; p <= 0x04; p++){
     String ev = lastEventByPart[p];
-    fill(ev != null ? color(40,37,90) : color(150,150,180));
-    text("声部 0x" + hex(p,2) + ": " + (ev != null ? ev : "(未受信)"), 28 + col*((width-64)/2), ry);
-    col++; if (col>=2){ col=0; ry += 16; }
+    fill(ev != null ? color(28, 54, 80) : color(150, 160, 180));
+    text("声部 0x" + hex(p, 2) + ": " + (ev != null ? ev : "(未受信)"), 50 + col * ((width - 120) / 2), ry);
+    col++; if (col >= 2){ col = 0; ry += 18; }
   }
 
   // BPM 大表示
-  glassPanel(16, 300, width-32, 120);
-  fill(30,27,75); textSize(60); textAlign(CENTER, CENTER);
-  text(nf(bpm, 1, 1), width/2, 345);
-  textSize(14); fill(99,102,241);
-  text("BPM", width/2, 390);
-  textAlign(LEFT);
+  drawPanel(28, 316, width - 56, 130);
+  fill(18, 54, 88); textSize(60); textAlign(CENTER, CENTER);
+  text(nf(bpm, 1, 1), width/2, 365);
+  fill(61, 86, 111); textSize(16);
+  text("BPM", width/2, 410);
+  textAlign(LEFT, BASELINE);
 
-  drawBottomHelp("[r]リセット  [t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+  drawHelpPanel("[r]リセット  [t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
 }
 
 // ── ゲーム演奏画面 ────────────────────────────────────────
@@ -627,112 +665,116 @@ void drawGamePlayScreen(){
   float guide = gameGuideIntensity(elapsedBeats);
   String scoreStr = (uiScore == 0xFF) ? "採点中" : "" + uiScore;
 
-  drawScreenTitle("ゲーム演奏",
+  drawPageTitle("ゲーム演奏",
       "目標: " + uiTargetBpm + " BPM  /  現在: " + nf(bpm, 1, 1) + " BPM  /  スコア: " + scoreStr);
 
   // ガイド強度バー
-  float barX = 16, barY = 78, barW = width-32, barH = 30;
-  glassPanel(barX, barY, barW, barH);
-  fill(99,102,241, (int)(guide * 200 + 55));
+  float barX = 28, barY = 96, barW = width - 56, barH = 32;
+  drawPanel(barX, barY, barW, barH);
+  fill(64, 159, 255, (int)(guide * 200 + 55));
   noStroke();
-  rect(barX+4, barY+4, (barW-8)*guide, barH-8, 8);
-  fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("ガイド: " + nf(guide*100, 1, 0) + "%", barX+12, barY+20);
-  textAlign(LEFT);
+  rect(barX + 6, barY + 6, (barW - 12) * guide, barH - 12, 10);
+  fill(18, 54, 88); textSize(12); textAlign(LEFT, BASELINE);
+  text("ガイド: " + nf(guide * 100, 1, 0) + "%", barX + 14, barY + 22);
 
-  drawScope(16, 118, width-32, 90);
+  drawScope(28, 138, width - 56, 80);
 
   // 拍進捗
-  float py = 218;
-  glassPanel(16, py, width-32, 60);
-  fill(30,27,75); textSize(14); textAlign(LEFT);
-  text("経過: " + elapsedBeats + " / " + GAME_LENGTH_BEATS + " 拍", 28, py+24);
-  // 拍ドット
-  float dotStartX = 28, dotY = py+44, dotR = 10, dotGap = 2;
+  float py = 228;
+  drawPanel(28, py, width - 56, 60);
+  fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
+  text("経過: " + elapsedBeats + " / " + GAME_LENGTH_BEATS + " 拍", 50, py + 24);
+  float dotStartX = 50, dotY = py + 44, dotR = 10, dotGap = 2;
   for (int i = 0; i < GAME_LENGTH_BEATS; i++){
     float dx = dotStartX + i * (dotR + dotGap);
-    if (dx + dotR > width - 28) break;
+    if (dx + dotR > width - 50) break;
     noStroke();
-    if (i < elapsedBeats) fill(99,102,241);
-    else if (i < GAME_GUIDE_FULL_BEATS) fill(99,102,241, 80);
-    else if (i < GAME_GUIDE_ZERO_BEATS) fill(220,180,60, 80);
-    else fill(200,200,200, 60);
+    if (i < elapsedBeats) fill(64, 159, 255);
+    else if (i < GAME_GUIDE_FULL_BEATS) fill(64, 159, 255, 80);
+    else if (i < GAME_GUIDE_ZERO_BEATS) fill(220, 180, 60, 80);
+    else fill(200, 200, 200, 60);
     ellipse(dx + dotR/2, dotY, dotR, dotR);
   }
 
   // スコア表示
-  glassPanel(16, 290, width-32, 130);
-  fill(30,27,75); textSize(50); textAlign(CENTER, CENTER);
-  text(scoreStr, width/2, 340);
-  textSize(14); fill(99,102,241);
-  text("スコア", width/2, 390);
-  textAlign(LEFT);
+  drawPanel(28, 298, width - 56, 130);
+  fill(18, 54, 88); textSize(50); textAlign(CENTER, CENTER);
+  text(scoreStr, width/2, 348);
+  fill(61, 86, 111); textSize(16);
+  text("スコア", width/2, 398);
+  textAlign(LEFT, BASELINE);
 
   // 目標テンポ
-  glassPanel(width/2-100, 430, 200, 40);
-  fill(60,57,110); textSize(14); textAlign(CENTER, CENTER);
-  text("目標: " + uiTargetBpm + " BPM", width/2, 450);
-  textAlign(LEFT);
+  drawPanel(width/2 - 110, 438, 220, 40);
+  fill(28, 54, 80); textSize(14); textAlign(CENTER, CENTER);
+  text("目標: " + uiTargetBpm + " BPM", width/2, 458);
+  textAlign(LEFT, BASELINE);
 
-  drawBottomHelp("[Space]停止  [+/-]音量");
+  drawHelpPanel("[Space]停止  [+/-]音量");
 }
 
 // ── 結果画面 ──────────────────────────────────────────────
 void drawResultScreen(){
   drawBackground();
-  drawScreenTitle("ゲーム結果", "");
+  drawPageTitle("ゲーム結果", "");
 
-  glassPanel(width/2-180, height/2-120, 360, 240);
-  fill(30,27,75); textSize(20); textAlign(CENTER);
-  text("スコア", width/2, height/2-70);
+  drawPanel(width/2 - 200, height/2 - 120, 400, 240);
+  fill(18, 54, 88); textSize(22); textAlign(CENTER, BASELINE);
+  text("スコア", width/2, height/2 - 70);
 
   if (uiScore != 0xFF){
-    textSize(80);
-    if (uiScore >= 80) fill(40,180,80);
-    else if (uiScore >= 50) fill(220,180,40);
-    else fill(220,80,60);
-    text("" + uiScore, width/2, height/2+10);
-    textSize(20); fill(120,120,160);
-    text("/ 100", width/2, height/2+50);
+    textSize(80); textAlign(CENTER, CENTER);
+    if (uiScore >= 80) fill(24, 156, 104);
+    else if (uiScore >= 50) fill(220, 180, 40);
+    else fill(220, 80, 60);
+    text("" + uiScore, width/2, height/2 + 10);
+    textSize(22); fill(61, 86, 111); textAlign(CENTER, BASELINE);
+    text("/ 100", width/2, height/2 + 55);
   } else {
-    textSize(40); fill(120,120,160);
-    text("---", width/2, height/2+10);
+    textSize(40); fill(120, 130, 150); textAlign(CENTER, CENTER);
+    text("---", width/2, height/2 + 10);
   }
 
-  textSize(13); fill(120,120,160);
-  text("指揮者の操作でメニューに戻ります", width/2, height/2+100);
-  textAlign(LEFT);
+  textSize(14); fill(61, 86, 111); textAlign(CENTER, BASELINE);
+  text("指揮者の操作でメニューに戻ります", width/2, height/2 + 100);
+  textAlign(LEFT, BASELINE);
 }
 
 // ── アナライザ画面 ────────────────────────────────────────
 void drawAnalyzerScreen(){
   drawBackground();
   String status = (millis() - lastNoteAtMs < 2000) ? "演奏中" : "待機中";
-  drawScreenTitle("アナライザ", status + "  /  受信 " + totalReceived + "  /  発音中 " + activeVoices.size());
+  drawPageTitle("アナライザ", status + "  /  受信 " + totalReceived + "  /  発音中 " + activeVoices.size());
 
-  drawScope(16, 78, width-32, 200);
+  drawScope(28, 96, width - 56, 200);
 
   // 受信状況
-  float sy = 290;
-  glassPanel(16, sy, width-32, 80);
-  fill(30,27,75); textSize(11); textAlign(LEFT);
-  text("直近イベント", 28, sy+18);
-  fill(60,57,110);
-  float ry = sy+36; int col=0;
-  for (int p=0x02; p<=0x04; p++){
+  float sy = 306;
+  drawPanel(28, sy, width - 56, 100);
+  fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
+  text("直近イベント", 50, sy + 24);
+  fill(28, 54, 80); textSize(12);
+  float ry = sy + 44; int col = 0;
+  for (int p = 0x02; p <= 0x04; p++){
     String ev = lastEventByPart[p];
     if (ev == null) continue;
-    text("0x" + hex(p,2) + ": " + ev, 28 + col*((width-64)/2), ry);
-    col++; if (col>=2){ col=0; ry += 16; }
+    text("0x" + hex(p, 2) + ": " + ev, 50 + col * ((width - 120) / 2), ry);
+    col++; if (col >= 2){ col = 0; ry += 18; }
   }
 
-  drawBottomHelp("[t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+  drawHelpPanel("[t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
 }
 
-void drawBottomHelp(String helpText){
-  fill(120,120,160); textSize(10); textAlign(CENTER);
-  text(helpText, width/2, height-8);
-  textAlign(LEFT);
+void drawHelpPanel(String helpText){
+  float hx = 28, hy = height - 66, hw = width - 56, hh = 48;
+  fill(255); noStroke();
+  rect(hx, hy, hw, hh, 16);
+  stroke(134, 184, 218); strokeWeight(2); noFill();
+  rect(hx, hy, hw, hh, 16);
+  strokeWeight(1); noStroke();
+  fill(28, 54, 80); textSize(13); textAlign(LEFT, BASELINE);
+  text(helpText, hx + 22, hy + 28);
+  textAlign(LEFT, BASELINE);
 }
 
 // ── ポート一覧 ───────────────────────────────────────────
@@ -742,27 +784,28 @@ int   portRowCount;
 
 void drawPortListAt(float startY){
   rebuildDisplayPorts();
-  float x=16, y=startY, w=width-32, h=height-y-12;
-  glassPanel(x,y,w,h);
-  fill(30,27,75); textSize(11); textAlign(LEFT);
+  float x = 28, y = startY, w = width - 56, h = height - y - 16;
+  drawPanel(x, y, w, h);
+  fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
   String filterTag = usbOnly ? "USB のみ" : "全ポート";
-  text("シリアルポート [" + filterTag + " / 表示 " + displayPorts.length + " / 全 " + availablePorts.length + "] "
-       + "— クリックで開閉 / ホイールでスクロール / [f] フィルタ切替 / [r] 再列挙",
-       x+12, y+18);
+  text("シリアルポート [" + filterTag + " / 表示 " + displayPorts.length + " / 全 " + availablePorts.length + "]",
+       x + 22, y + 24);
+  fill(61, 86, 111); textSize(12);
+  text("クリックで開閉 / ホイールでスクロール / [f] フィルタ切替 / [r] 再列挙", x + 22, y + 42);
 
-  portRowX = x+12; portRowW = w-24; portRowY0 = y+28; portRowH = 24;
-  portViewY = portRowY0; portViewH = (y + h) - portRowY0 - 4;
+  portRowX = x + 16; portRowW = w - 32; portRowY0 = y + 54; portRowH = 40;
+  portViewY = portRowY0; portViewH = (y + h) - portRowY0 - 8;
   portRowCount = displayPorts.length;
 
   if (availablePorts.length == 0){
-    fill(220,160,60); textSize(11);
-    text("シリアルポートが見つかりません。Arduino を USB 接続して 'r' で再列挙してください。", x+12, y+40);
-    textAlign(LEFT); return;
+    fill(197, 83, 31); textSize(13);
+    text("シリアルポートが見つかりません。Arduino を USB 接続して 'r' で再列挙してください。", x + 22, y + 70);
+    textAlign(LEFT, BASELINE); return;
   }
   if (displayPorts.length == 0){
-    fill(220,160,60); textSize(11);
-    text("USB-only フィルタで全部隠れています。'f' で全表示に切り替えてください。", x+12, y+40);
-    textAlign(LEFT); return;
+    fill(197, 83, 31); textSize(13);
+    text("USB-only フィルタで全部隠れています。'f' で全表示に切り替えてください。", x + 22, y + 70);
+    textAlign(LEFT, BASELINE); return;
   }
 
   float totalH = portRowCount * portRowH;
@@ -770,34 +813,36 @@ void drawPortListAt(float startY){
   portScrollY = constrain(portScrollY, 0, maxScroll);
 
   clip(portRowX - 2, portViewY - 2, portRowW + 4, portViewH + 4);
-  for (int i=0;i<displayPorts.length;i++){
-    float ry = portRowY0 + i*portRowH - portScrollY;
+  for (int i = 0; i < displayPorts.length; i++){
+    float ry = portRowY0 + i * portRowH - portScrollY;
     if (ry + portRowH < portViewY) continue;
     if (ry > portViewY + portViewH)  break;
     boolean isOpen = openByName.containsKey(displayPorts[i]);
-    boolean isHover = mouseOver(portRowX, ry, portRowW, portRowH-2)
+    boolean isHover = mouseOver(portRowX, ry, portRowW, portRowH - 4)
                    && mouseOver(portRowX, portViewY, portRowW, portViewH);
-    noStroke();
-    if (isOpen) fill(isHover ? color(80,180,120) : color(96,200,140));
-    else        fill(isHover ? color(255,255,255,235) : color(255,255,255,140));
-    rect(portRowX, ry, portRowW, portRowH-2, 7);
-    fill(isOpen ? 255 : color(60,57,110)); textSize(11);
+    int baseFill = isOpen ? color(24, 156, 104) : (isHover ? color(210, 240, 255) : color(255));
+    fill(baseFill);
+    stroke(isOpen ? color(17, 118, 78) : color(120, 183, 224));
+    strokeWeight(2);
+    rect(portRowX, ry, portRowW, portRowH - 4, 12);
+    strokeWeight(1); noStroke();
+    fill(isOpen ? color(255) : color(23, 52, 84)); textSize(14);
     String tag = isOpen ? ("● OPEN  受信 " + openByName.get(displayPorts[i]).rxCount + " 個") : "○ closed";
-    text("[" + i + "] " + displayPorts[i] + "    " + tag, portRowX+10, ry+16);
+    text("[" + i + "] " + displayPorts[i] + "    " + tag, portRowX + 16, ry + 24);
   }
   noClip();
 
   if (maxScroll > 0){
-    float barX = portRowX + portRowW - 4;
-    float barW = 4;
+    float sbX = portRowX + portRowW - 6;
+    float sbW = 6;
     noStroke(); fill(0, 0, 0, 30);
-    rect(barX, portViewY, barW, portViewH, 2);
+    rect(sbX, portViewY, sbW, portViewH, 3);
     float thumbH = max(20, portViewH * (portViewH / totalH));
     float thumbY = portViewY + (portViewH - thumbH) * (portScrollY / maxScroll);
-    fill(99,102,241, 180);
-    rect(barX, thumbY, barW, thumbH, 2);
+    fill(64, 159, 255, 180);
+    rect(sbX, thumbY, sbW, thumbH, 3);
   }
-  textAlign(LEFT);
+  textAlign(LEFT, BASELINE);
 }
 
 // ── マウス / キーボード ───────────────────────────────────
