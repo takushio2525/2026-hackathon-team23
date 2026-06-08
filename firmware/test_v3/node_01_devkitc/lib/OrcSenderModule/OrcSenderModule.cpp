@@ -50,9 +50,20 @@ void OrcSenderModule::updateOutput(SystemData& data) {
         pkt.payload.state     = (uint8_t)data.conductor.state;
         // test_v3 ゲームモード: 旧 reserved[4] に mode/navCursor/targetBpm/score を載せる
         pkt.payload.mode      = data.game.mode;
-        pkt.payload.navCursor = data.game.navCursor;
         pkt.payload.targetBpm = data.game.targetBpm;
-        pkt.payload.score     = data.game.score;
+        // Conducting 時: navCursor/score バイトに IMU 加速度 2 軸 (int8, ±127) を載せる。
+        // Processing 側で 2D XY プロットに使う。Menu/Result 時は従来通りカーソル/得点。
+        if (data.conductor.state == ConductorState::Conducting) {
+            int ax = (int)(data.imu.dynAcc[0] * 40.0f);
+            int ay = (int)(data.imu.dynAcc[1] * 40.0f);
+            if (ax < -127) ax = -127; if (ax > 127) ax = 127;
+            if (ay < -127) ay = -127; if (ay > 127) ay = 127;
+            pkt.payload.navCursor = (uint8_t)(int8_t)ax;
+            pkt.payload.score     = (uint8_t)(int8_t)ay;
+        } else {
+            pkt.payload.navCursor = data.game.navCursor;
+            pkt.payload.score     = data.game.score;
+        }
 
         data.orcNet.pendingCtrl    = pkt;
         data.orcNet.hasPendingCtrl = true;
