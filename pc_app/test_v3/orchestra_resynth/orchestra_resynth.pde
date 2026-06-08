@@ -70,7 +70,7 @@ final int ST_RESULT      = 5;
 final int GAME_LENGTH_BEATS      = 24;
 final int GAME_GUIDE_FULL_BEATS  = 8;
 final int GAME_GUIDE_ZERO_BEATS  = 16;
-final int UI_TIMEOUT_MS          = 5000;
+final int UI_TIMEOUT_MS          = 2000;
 
 // 役割
 final int ROLE_UNKNOWN  = 0;
@@ -147,12 +147,14 @@ int   currentScreen   = SCR_PORT_SELECT;
 int   prevScreen      = -1;
 ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
-// 指揮棒軌跡
-final int TRAIL_LEN = 30;
-float[] trailX = new float[TRAIL_LEN];
-float[] trailY = new float[TRAIL_LEN];
-int trailCount = 0;
-int trailIdx = 0;
+// 指揮棒軌跡 (2D XY プロット: IMU 加速度 2 軸をリングバッファに蓄積)
+final int ACCEL_TRAIL_LEN = 80;
+float[] accelTrailX = new float[ACCEL_TRAIL_LEN];
+float[] accelTrailY = new float[ACCEL_TRAIL_LEN];
+int accelTrailIdx = 0;
+int accelTrailCount = 0;
+float currentAccelX = 0;
+float currentAccelY = 0;
 
 final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1); }
@@ -338,12 +340,18 @@ void handlePacket(byte[] buf){
   if (type == TYPE_UI){
     uiState     = u8(buf[12]);
     uiMode      = u8(buf[13]);
-    uiNavCursor = u8(buf[14]);
     uiTargetBpm = u8(buf[15]);
-    uiScore     = u8(buf[16]);
     uiPartId    = u8(buf[17]);
     uiBpmQ8     = u16le(buf[18], buf[19]);
     lastUiAtMs  = millis();
+    // Conducting 時: navCursor/score バイトは IMU 加速度データ (int8)
+    if (uiState == ST_CONDUCTING) {
+      currentAccelX = (float)((byte)buf[14]);
+      currentAccelY = (float)((byte)buf[16]);
+    } else {
+      uiNavCursor = u8(buf[14]);
+      uiScore     = u8(buf[16]);
+    }
     if (nodeRole != ROLE_MAIN_UI){
       nodeRole = ROLE_MAIN_UI;
       println("役割自動判定: メイン操作 UI (UIフレーム受信)");
@@ -437,6 +445,13 @@ void onScreenChange(int fromScr, int toScr){
   if (toScr == SCR_GAME_PLAY){
     gameStartMs = millis();
     lastMetroBeat = -1;
+  }
+  if (toScr == SCR_WAITING){
+    gameStartMs = 0;
+    lastMetroBeat = -1;
+    uiScore = 0xFF;
+    for (MetroClick mc : metroClicks) mc.unpatch(out);
+    metroClicks.clear();
   }
 }
 
@@ -790,45 +805,81 @@ void drawHelpPanel(String helpText){
   textAlign(LEFT, BASELINE);
 }
 
-// ── 指揮棒軌跡 ──────────────────────────────────────────
+// ── 指揮棒軌跡 (2D XY プロット: IMU 加速度の軌跡) ─────────
 void drawBatonTrail(){
   if (currentScreen == SCR_PORT_SELECT) return;
-  if (uiBpmQ8 <= 0 || uiState != ST_CONDUCTING) return;
 
-  float bpm = uiBpmQ8 / 8.0f;
-  float periodMs = 60000.0f / bpm;
-  int period = max(1, (int)periodMs);
-  float t = (float)(millis() % period) / periodMs;
-  float angle = TWO_PI * t;
-
-  float cx = width / 2.0f;
-  float arcY = 30;
-  float arcW = width * 0.5f;
-  float dotX = cx + sin(angle) * arcW / 2;
-  float dotY = arcY + 12 - cos(angle) * 6;
-
-  trailX[trailIdx] = dotX;
-  trailY[trailIdx] = dotY;
-  trailIdx = (trailIdx + 1) % TRAIL_LEN;
-  if (trailCount < TRAIL_LEN) trailCount++;
-
-  boolean pulse = (millis() - lastNoteAtMs) < 120;
-
-  noStroke();
-  for (int i = 0; i < trailCount; i++){
-    int idx = (trailIdx - 1 - i + TRAIL_LEN * 2) % TRAIL_LEN;
-    float alpha = (1.0f - (float)i / TRAIL_LEN) * (pulse ? 160 : 60);
-    float r = max(2, (pulse ? 5 : 3) - i * 0.08f);
-    fill(64, 159, 255, alpha);
-    ellipse(trailX[idx], trailY[idx], r, r);
+  // Conducting 中のみリングバッファに蓄積
+  if (uiState == ST_CONDUCTING) {
+    accelTrailX[accelTrailIdx] = currentAccelX;
+    accelTrailY[accelTrailIdx] = currentAccelY;
+    accelTrailIdx = (accelTrailIdx + 1) % ACCEL_TRAIL_LEN;
+    if (accelTrailCount < ACCEL_TRAIL_LEN) accelTrailCount++;
   }
 
-  float dotR = pulse ? 10 : 7;
-  float dotAlpha = pulse ? 240 : 160;
-  fill(64, 159, 255, dotAlpha);
-  ellipse(dotX, dotY, dotR, dotR);
-  fill(255, 255, 255, dotAlpha * 0.5f);
-  ellipse(dotX, dotY, dotR * 0.4f, dotR * 0.4f);
+  if (accelTrailCount < 2) return;
+
+  // 右上に 2D XY プロット領域を配置
+  float plotW = 170, plotH = 170;
+  float plotX = width - plotW - 14, plotY = 10;
+
+  // 背景パネル
+  noStroke();
+  fill(255, 255, 255, 210);
+  rect(plotX, plotY, plotW, plotH, 12);
+  stroke(134, 184, 218, 120); strokeWeight(1.5f); noFill();
+  rect(plotX, plotY, plotW, plotH, 12);
+  strokeWeight(1); noStroke();
+
+  float cx = plotX + plotW / 2;
+  float cy = plotY + plotH / 2;
+
+  // 十字線
+  stroke(200, 215, 228, 100); strokeWeight(1);
+  line(plotX + 10, cy, plotX + plotW - 10, cy);
+  line(cx, plotY + 10, cx, plotY + plotH - 10);
+  strokeWeight(1); noStroke();
+
+  // ±127 をプロット領域にマッピング
+  float scale = (plotW - 24) / 254.0f;
+  boolean pulse = (millis() - lastNoteAtMs) < 120;
+
+  // 軌跡を描画 (clip で領域内に制限)
+  clip(plotX + 2, plotY + 2, plotW - 4, plotH - 4);
+  for (int i = 1; i < accelTrailCount; i++){
+    int idxCurr = (accelTrailIdx - 1 - (i - 1) + ACCEL_TRAIL_LEN * 2) % ACCEL_TRAIL_LEN;
+    int idxPrev = (accelTrailIdx - 1 - i       + ACCEL_TRAIL_LEN * 2) % ACCEL_TRAIL_LEN;
+    float alpha = (1.0f - (float)i / accelTrailCount) * (pulse ? 220 : 140);
+    float sw = max(1.0f, (pulse ? 3.5f : 2.2f) - i * 0.025f);
+    stroke(64, 159, 255, (int)alpha);
+    strokeWeight(sw);
+    float x1 = cx + accelTrailX[idxPrev] * scale;
+    float y1 = cy - accelTrailY[idxPrev] * scale;
+    float x2 = cx + accelTrailX[idxCurr] * scale;
+    float y2 = cy - accelTrailY[idxCurr] * scale;
+    line(x1, y1, x2, y2);
+  }
+  noClip();
+  strokeWeight(1); noStroke();
+
+  // 最新位置のドット
+  int latest = (accelTrailIdx - 1 + ACCEL_TRAIL_LEN) % ACCEL_TRAIL_LEN;
+  float dotPX = cx + accelTrailX[latest] * scale;
+  float dotPY = cy - accelTrailY[latest] * scale;
+  dotPX = constrain(dotPX, plotX + 4, plotX + plotW - 4);
+  dotPY = constrain(dotPY, plotY + 4, plotY + plotH - 4);
+  float dotR = pulse ? 9 : 6;
+  float dotAlpha = pulse ? 240 : 180;
+  noStroke();
+  fill(64, 159, 255, (int)dotAlpha);
+  ellipse(dotPX, dotPY, dotR, dotR);
+  fill(255, 255, 255, (int)(dotAlpha * 0.5f));
+  ellipse(dotPX, dotPY, dotR * 0.4f, dotR * 0.4f);
+
+  // ラベル
+  fill(61, 86, 111, 180); textSize(10); textAlign(LEFT, BASELINE);
+  text("IMU XY", plotX + 8, plotY + 14);
+  textAlign(LEFT, BASELINE);
 }
 
 // ── ポート一覧 ───────────────────────────────────────────

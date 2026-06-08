@@ -5,6 +5,14 @@
 
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
+- 2026-06-08: **test_v3 マスターリセット復帰高速化・2D IMUグラフ・8分音符修正**。UI_TIMEOUT_MS 5000→2000、
+  onScreenChange に Waiting 遷移時ゲーム状態リセット追加。OrcSenderModule で Conducting 時に navCursor/score を
+  IMU 加速度 int8 で上書き、Processing に 2D XY プロット（80 フレームリングバッファ）。score_data.cpp の 8 分音符
+  durationQ8/subDurationQ8 を 120→128 に修正（0.03 拍のギャップ解消）。全 5 ノード pio run SUCCESS。
+
+- 2026-06-07: **test_v3 楽譜修正・メニュー横配置・指揮棒軌跡**（`20a0451`）。score_data.cpp フレーズ3/6 の
+  上昇パターンを全 C4 に修正、Processing メニュー画面を横並びに変更、drawBatonTrail() で BPM 振り子アニメ追加。
+
 - 2026-06-01: **test_v3 ゲームモード Phase 2 firmware（共通＋node_01＋node_02）を実装**（案A確定、
   `shiozawa-test_v3-game`）。2-1 共通 `fb86bd8`: CtrlPayload 旧 reserved[4]→mode/navCursor/targetBpm/score
   フィールド化＋PKT_UI(type=4)/UiPayload/UiPacket 新設（20B static_assert 維持・api.md 同期）。2-2 node_01
