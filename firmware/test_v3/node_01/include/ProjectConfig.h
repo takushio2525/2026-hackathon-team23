@@ -119,7 +119,7 @@ namespace logic_params {
     constexpr uint8_t  MENU_ITEM_COUNT         = 2;     // メニュー項目数 (0=自由演奏 / 1=ゲーム)
 
     // ── test_v3 ゲームモード: ゲーム進行・採点・ガイドフェード ──
-    constexpr uint16_t GAME_LENGTH_BEATS       = 24;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周。設定値)
+    constexpr uint16_t GAME_LENGTH_BEATS       = 32;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周 = 32 拍)
     constexpr uint8_t  GAME_TARGET_BPM         = 100;   // 目標テンポ (固定・設定値)
     // メトロノームガイド強度の固定スケジュール (経過拍ベース):
     //   beat <  FULL          : 強度 1.0 (はっきり刻む)

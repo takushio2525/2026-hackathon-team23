@@ -67,7 +67,7 @@ final int ST_MENU        = 4;
 final int ST_RESULT      = 5;
 
 // ゲーム定数 (firmware ProjectConfig.h と整合)
-final int GAME_LENGTH_BEATS      = 24;
+final int GAME_LENGTH_BEATS      = 32;
 final int GAME_GUIDE_FULL_BEATS  = 8;
 final int GAME_GUIDE_ZERO_BEATS  = 16;
 final int UI_TIMEOUT_MS          = 2000;
@@ -147,14 +147,14 @@ int   currentScreen   = SCR_PORT_SELECT;
 int   prevScreen      = -1;
 ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
-// 指揮棒軌跡 (2D XY プロット: IMU 加速度 2 軸をリングバッファに蓄積)
-final int ACCEL_TRAIL_LEN = 80;
-float[] accelTrailX = new float[ACCEL_TRAIL_LEN];
-float[] accelTrailY = new float[ACCEL_TRAIL_LEN];
-int accelTrailIdx = 0;
-int accelTrailCount = 0;
-float currentAccelX = 0;
-float currentAccelY = 0;
+// 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度 2 軸をリングバッファに蓄積)
+final int GYRO_TRAIL_LEN = 120;
+float[] gyroTrailX = new float[GYRO_TRAIL_LEN];
+float[] gyroTrailY = new float[GYRO_TRAIL_LEN];
+int gyroTrailIdx = 0;
+int gyroTrailCount = 0;
+float currentGyroX = 0;
+float currentGyroY = 0;
 
 final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1); }
@@ -344,10 +344,10 @@ void handlePacket(byte[] buf){
     uiPartId    = u8(buf[17]);
     uiBpmQ8     = u16le(buf[18], buf[19]);
     lastUiAtMs  = millis();
-    // Conducting 時: navCursor/score バイトは IMU 加速度データ (int8)
+    // Conducting 時: navCursor/score バイトはジャイロ角速度データ (int8, gyro/8)
     if (uiState == ST_CONDUCTING) {
-      currentAccelX = (float)((byte)buf[14]);
-      currentAccelY = (float)((byte)buf[16]);
+      currentGyroX = (float)((byte)buf[14]);
+      currentGyroY = (float)((byte)buf[16]);
     } else {
       uiNavCursor = u8(buf[14]);
       uiScore     = u8(buf[16]);
@@ -381,6 +381,7 @@ void handlePacket(byte[] buf){
   }
 
   if (gate == 1){
+    println("NOTE: part=0x" + hex(partId,2) + " note=" + noteNumber + "(" + noteName(noteNumber) + ") vel=" + velocity + " dur=" + durationMs + "ms gate=" + gate + " instr=" + instrumentId);
     triggerNote(partId, instrumentId, noteNumber, velocity, durationMs);
     lastEventByPart[partId] = noteName(noteNumber) + " v=" + velocity + " dur=" + durationMs + "ms";
     lastNoteAtMs = millis();
@@ -805,19 +806,19 @@ void drawHelpPanel(String helpText){
   textAlign(LEFT, BASELINE);
 }
 
-// ── 指揮棒軌跡 (2D XY プロット: IMU 加速度の軌跡) ─────────
+// ── 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度の軌跡) ───
 void drawBatonTrail(){
   if (currentScreen == SCR_PORT_SELECT) return;
 
   // Conducting 中のみリングバッファに蓄積
   if (uiState == ST_CONDUCTING) {
-    accelTrailX[accelTrailIdx] = currentAccelX;
-    accelTrailY[accelTrailIdx] = currentAccelY;
-    accelTrailIdx = (accelTrailIdx + 1) % ACCEL_TRAIL_LEN;
-    if (accelTrailCount < ACCEL_TRAIL_LEN) accelTrailCount++;
+    gyroTrailX[gyroTrailIdx] = currentGyroX;
+    gyroTrailY[gyroTrailIdx] = currentGyroY;
+    gyroTrailIdx = (gyroTrailIdx + 1) % GYRO_TRAIL_LEN;
+    if (gyroTrailCount < GYRO_TRAIL_LEN) gyroTrailCount++;
   }
 
-  if (accelTrailCount < 2) return;
+  if (gyroTrailCount < 2) return;
 
   // 右上に 2D XY プロット領域を配置
   float plotW = 170, plotH = 170;
@@ -846,26 +847,26 @@ void drawBatonTrail(){
 
   // 軌跡を描画 (clip で領域内に制限)
   clip(plotX + 2, plotY + 2, plotW - 4, plotH - 4);
-  for (int i = 1; i < accelTrailCount; i++){
-    int idxCurr = (accelTrailIdx - 1 - (i - 1) + ACCEL_TRAIL_LEN * 2) % ACCEL_TRAIL_LEN;
-    int idxPrev = (accelTrailIdx - 1 - i       + ACCEL_TRAIL_LEN * 2) % ACCEL_TRAIL_LEN;
-    float alpha = (1.0f - (float)i / accelTrailCount) * (pulse ? 220 : 140);
-    float sw = max(1.0f, (pulse ? 3.5f : 2.2f) - i * 0.025f);
+  for (int i = 1; i < gyroTrailCount; i++){
+    int idxCurr = (gyroTrailIdx - 1 - (i - 1) + GYRO_TRAIL_LEN * 2) % GYRO_TRAIL_LEN;
+    int idxPrev = (gyroTrailIdx - 1 - i       + GYRO_TRAIL_LEN * 2) % GYRO_TRAIL_LEN;
+    float alpha = (1.0f - (float)i / gyroTrailCount) * (pulse ? 220 : 140);
+    float sw = max(1.0f, (pulse ? 3.5f : 2.2f) - i * 0.020f);
     stroke(64, 159, 255, (int)alpha);
     strokeWeight(sw);
-    float x1 = cx + accelTrailX[idxPrev] * scale;
-    float y1 = cy - accelTrailY[idxPrev] * scale;
-    float x2 = cx + accelTrailX[idxCurr] * scale;
-    float y2 = cy - accelTrailY[idxCurr] * scale;
+    float x1 = cx + gyroTrailX[idxPrev] * scale;
+    float y1 = cy - gyroTrailY[idxPrev] * scale;
+    float x2 = cx + gyroTrailX[idxCurr] * scale;
+    float y2 = cy - gyroTrailY[idxCurr] * scale;
     line(x1, y1, x2, y2);
   }
   noClip();
   strokeWeight(1); noStroke();
 
   // 最新位置のドット
-  int latest = (accelTrailIdx - 1 + ACCEL_TRAIL_LEN) % ACCEL_TRAIL_LEN;
-  float dotPX = cx + accelTrailX[latest] * scale;
-  float dotPY = cy - accelTrailY[latest] * scale;
+  int latest = (gyroTrailIdx - 1 + GYRO_TRAIL_LEN) % GYRO_TRAIL_LEN;
+  float dotPX = cx + gyroTrailX[latest] * scale;
+  float dotPY = cy - gyroTrailY[latest] * scale;
   dotPX = constrain(dotPX, plotX + 4, plotX + plotW - 4);
   dotPY = constrain(dotPY, plotY + 4, plotY + plotH - 4);
   float dotR = pulse ? 9 : 6;
@@ -878,7 +879,7 @@ void drawBatonTrail(){
 
   // ラベル
   fill(61, 86, 111, 180); textSize(10); textAlign(LEFT, BASELINE);
-  text("IMU XY", plotX + 8, plotY + 14);
+  text("角速度", plotX + 8, plotY + 14);
   textAlign(LEFT, BASELINE);
 }
 

@@ -49,7 +49,7 @@ inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
 // 演奏 NOTE バーストを阻害しない。node_03/04 はアナライザのため UiRelayModule を載せない。
 inline const UiRelayConfig UI_RELAY_CONFIG = {
     /*partId=*/        0x02,
-    /*minIntervalMs=*/ 200,    // 変化送出の最小間隔 (5Hz 上限)
+    /*minIntervalMs=*/ 33,     // 変化送出の最小間隔 (30Hz: 角速度データの滑らかな軌跡描画用)
     /*heartbeatMs=*/   1000,   // 無変化でも 1s ごとに 1 発 (PC 途中接続でも状態を拾える)
 };
 
