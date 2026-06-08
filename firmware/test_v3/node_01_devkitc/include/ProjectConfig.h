@@ -1,12 +1,10 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_01_devkitc
-//   pio run -d firmware/test_v2/node_01_devkitc -t upload
-//   pio device monitor -d firmware/test_v2/node_01_devkitc
+//   pio run -d firmware/test_v2/node_01
+//   pio run -d firmware/test_v2/node_01 -t upload
+//   pio device monitor -d firmware/test_v2/node_01
 //
-// 指揮者ノード node_01_devkitc (ESP32-S3-DevKitC-1 版) のピン/定数/閾値を一元管理。
-// アンテナ切り分け用に node_01 (XIAO ESP32-S3 Sense / 外付け IPEX) と全く同じロジックを
-// 別ボードで動かす。ピン GPIO 番号は XIAO 版と同一なので、配線図だけ差し替えれば
-// 共通モジュールを修正せず流用できる。
+// 指揮者ノード node_01 のピン/定数/閾値を一元管理
+// 具体値はこの 1 ファイルでだけ管理し、モジュール本体にはハードコードしない
 #pragma once
 #include <Arduino.h>
 #include <IPAddress.h>
@@ -16,10 +14,7 @@
 #include "ImuModule.h"
 #include "OrcSenderModule.h"
 
-// ESP32-S3-DevKitC-1 左列ピンヘッダから I2C を取り出す配置。
-// 左列上から 3V3/3V3/RST/GPIO4/GPIO5/GPIO6/GPIO7/... の順なので、SDA=GPIO5/SCL=GPIO6
-// は左列 5・6 番目で物理的に連続している。ブレッドボード上で GY-521 を横に並べて
-// 配線できる。GPIO5/6 はストラッピングピンではないので I2C 用途で安全に使える。
+// XIAO ESP32-S3 Sense の I2C 既定ピン (D4=GPIO5, D5=GPIO6)
 constexpr uint8_t I2C_SDA_PIN = 5;
 constexpr uint8_t I2C_SCL_PIN = 6;
 
@@ -48,14 +43,9 @@ inline const OrcSenderConfig ORC_SENDER_CONFIG = {
 };
 
 inline const StatusLedConfig STATUS_LED_CONFIG = {
-    // DevKitC-1 の User LED は GPIO48 の WS2812 (ネオピクセル) なので digitalWrite では
-    // 光らない。LED_BUILTIN マクロが 48 を指すのでそのまま書き込んでも害はない (光らない
-    // だけ)。状態確認は SERIAL_DEBUG=1 の Serial ログで行う。
-    // 外部 LED で状態表示したい場合は、左列で空いている GPIO7 等に LED+抵抗を付けて
-    // pin を 7、activeLow を false に変更する。
-    /*pin=*/             LED_BUILTIN,   // = 48 (DevKitC では実 LED として点灯しない)
+    /*pin=*/             LED_BUILTIN,   // XIAO ESP32-S3 では GPIO21 (User LED)
     /*blinkIntervalMs=*/ 500,
-    /*activeLow=*/       false,         // WS2812 は無関係。外部 LED 追加時のデフォルトに合わせる
+    /*activeLow=*/       true,          // XIAO ESP32-S3 の User LED は LOW で点灯
 };
 
 // applyPattern() のロジック係数
@@ -129,7 +119,7 @@ namespace logic_params {
     constexpr uint8_t  MENU_ITEM_COUNT         = 2;     // メニュー項目数 (0=自由演奏 / 1=ゲーム)
 
     // ── test_v3 ゲームモード: ゲーム進行・採点・ガイドフェード ──
-    constexpr uint16_t GAME_LENGTH_BEATS       = 24;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周。設定値)
+    constexpr uint16_t GAME_LENGTH_BEATS       = 32;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周 = 32 拍)
     constexpr uint8_t  GAME_TARGET_BPM         = 100;   // 目標テンポ (固定・設定値)
     // メトロノームガイド強度の固定スケジュール (経過拍ベース):
     //   beat <  FULL          : 強度 1.0 (はっきり刻む)

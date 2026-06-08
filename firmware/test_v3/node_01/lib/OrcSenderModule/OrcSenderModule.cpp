@@ -51,15 +51,16 @@ void OrcSenderModule::updateOutput(SystemData& data) {
         // test_v3 ゲームモード: 旧 reserved[4] に mode/navCursor/targetBpm/score を載せる
         pkt.payload.mode      = data.game.mode;
         pkt.payload.targetBpm = data.game.targetBpm;
-        // Conducting 時: navCursor/score バイトに IMU 加速度 2 軸 (int8, ±127) を載せる。
-        // Processing 側で 2D XY プロットに使う。Menu/Result 時は従来通りカーソル/得点。
+        // Conducting 時: navCursor/score バイトにジャイロスコープ 2 軸 (int8, ±127) を載せる。
+        // gyro[]/8: ±2000dps → ±250。典型的な指揮振り 100-500dps が ±12〜±62 に収まる。
+        // 重力の影響がない角速度なので、傾けても静的オフセットが出ない。
         if (data.conductor.state == ConductorState::Conducting) {
-            int ax = (int)(data.imu.dynAcc[0] * 40.0f);
-            int ay = (int)(data.imu.dynAcc[1] * 40.0f);
-            if (ax < -127) ax = -127; if (ax > 127) ax = 127;
-            if (ay < -127) ay = -127; if (ay > 127) ay = 127;
-            pkt.payload.navCursor = (uint8_t)(int8_t)ax;
-            pkt.payload.score     = (uint8_t)(int8_t)ay;
+            int gx = (int)(data.imu.gyro[0] / 8.0f);
+            int gy = (int)(data.imu.gyro[1] / 8.0f);
+            if (gx < -127) gx = -127; if (gx > 127) gx = 127;
+            if (gy < -127) gy = -127; if (gy > 127) gy = 127;
+            pkt.payload.navCursor = (uint8_t)(int8_t)gx;
+            pkt.payload.score     = (uint8_t)(int8_t)gy;
         } else {
             pkt.payload.navCursor = data.game.navCursor;
             pkt.payload.score     = data.game.score;
