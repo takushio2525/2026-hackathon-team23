@@ -1,0 +1,309 @@
+%================================================================
+% 作業ログ 2026-06-09（test_v3 ゲームモード Processing UI・旋律修正）
+%   先週（6/8 週）は台風で休講・提出不要だったため，
+%   先週＋今週の 2 週間分をまとめた作業ログ．
+%   test_v3 Processing UI 刷新・マスターリセット検知・楽譜旋律修正・
+%   IMU モーション表示のジャイロ化まで．
+%
+%   ビルド:
+%     cd work/shiozawa/work-0609/作業ログ0609
+%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログ0609.tex
+%================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図・色 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[table]{xcolor}
+\usepackage{amssymb}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+% --- 進捗ガントチャート用（グリッド表）---
+\definecolor{barDone}{gray}{0.55} % 完了
+\definecolor{barProg}{gray}{0.78} % 進行中
+\definecolor{barPlan}{gray}{0.90} % 予定
+\definecolor{nowCol}{gray}{0.30}  % 今週の見出し
+\newcolumntype{G}{>{\centering\arraybackslash}p{2.0em}}
+\newcommand{\bD}{\cellcolor{barDone}}
+\newcommand{\bP}{\cellcolor{barProg}}
+\newcommand{\bQ}{\cellcolor{barPlan}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：塩澤 匠生
+
+報告日：2026年6月9日
+
+プロジェクト名：タクトーン~ IMUジェスチャーで奏でるArduinoオーケストラ~ \\
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：60\%（実装フェーズの仕上げ段階．Processing UI は大幅に進捗し，
+        firmware 側も旋律修正・復帰高速化・ジャイロ化で改善．実機での統合テストがまだ）
+  \item 進捗状況（この 2 週間の変化）：
+    \begin{itemize}
+      \item test\_v3 Processing UI：メニュー／自由演奏／ゲーム／結果の 4 画面遷移が動作．
+            梅澤 UI スタイル適用（淡い青背景＋白パネル），マスターリセット検知，指揮棒軌跡アニメーション，
+            2D IMU グラフまで実装
+      \item test\_v3 firmware：かえるのうた旋律を 24 拍→32 拍 4 フレーズに修正，
+            モーション表示を dynAcc→gyro に変更して安定化，マスターリセット復帰を 5 秒→2 秒に高速化，
+            8 分音符のギャップ（0.03 拍）を解消
+    \end{itemize}
+  \item 今週の主要成果：
+    \begin{itemize}
+      \item Processing 画面に梅澤 UI スタイル（淡い青背景＋装飾円＋グリッド，白パネル＋影＋青枠，
+            モードボタン）を適用し，ウィンドウを 1000$\times$560 に拡大
+      \item マスター ESP32 のリセット検知を実装（UI パケット 5 秒→2 秒タイムアウトで待機画面に戻し，
+            復帰時は自動追従）
+      \item 指揮棒の動きを BPM ベースの振り子アニメーションとして全画面に重ね描画し，
+            NOTE 受信時にパルス演出を追加
+      \item Conducting 時に IMU 加速度→ジャイロ（角速度$\div$8）の 2D XY プロットを右上に表示
+            （80→120 フレームリングバッファ）
+      \item かえるのうた旋律を正しい 32 拍 4 フレーズ（ドレミファミレドー／ミファソラソファミー／
+            グワッ$\times$4／ドドレレミミファファミレドー）に修正
+    \end{itemize}
+  \item 重大課題（影響度：中）：
+    \begin{itemize}
+      \item {}[全 5 ノードでビルドは通るが，実機での統合テスト（全ノード書き込み＋通しプレイ）が未実施．
+            特にジャイロ化後のモーション表示のスケール（$\div$8）と UI 中継 30Hz の体感を実機で要確認]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 2. 進捗ガントチャート（計画と現在地）
+%================================================================
+\section{進捗ガントチャート（計画と現在地）}
+
+チームのガントチャート（\texttt{meetings/ガントチャーver1ト.xlsx}）のフェーズ区分（110 基本設計／
+120 詳細設計／200 実装／300 テスト／400 ストレッチ）に，現在の進み具合を重ねたもの．
+「今」の縦位置は本報告時点（6 月第 2 週）．
+
+\medskip
+{\footnotesize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}p{8.5em}|*{12}{G}@{}}
+ & & & & & & & & & \multicolumn{1}{c}{$\downarrow$今} & & & \\
+作業項目（フェーズ）
+ & \cellcolor{barPlan}\tiny 4/15 & \cellcolor{barPlan}\tiny 4/22 & \cellcolor{barPlan}\tiny 4/29
+ & \cellcolor{barPlan}\tiny 5/6 & \cellcolor{barPlan}\tiny 5/13 & \cellcolor{barPlan}\tiny 5/20
+ & \cellcolor{barPlan}\tiny 5/27 & \cellcolor{barPlan}\tiny 6/3 & \cellcolor{nowCol}\tiny\textcolor{white}{6/10}
+ & \cellcolor{barPlan}\tiny 6/17 & \cellcolor{barPlan}\tiny 6/24 & \cellcolor{barPlan}\tiny 7/1 \\
+\midrule
+企画・テーマ決定        & \bD & \bD &     &     &     &     &     &     &     &     &     &     \\
+110 基本設計            &     &     & \bD & \bD &     &     &     &     &     &     &     &     \\
+120 詳細設計            &     &     &     &     & \bD &     &     &     &     &     &     &     \\
+\textbf{200 実装}       &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad test\_v2 輪唱・同期 &     &     &     & \bD & \bD & \bD & \bD &     &     &     &     &     \\
+\quad test\_v3 ゲーム(firmware) &  &     &     &     &     & \bD & \bD & \bD &     &     &     &     \\
+\quad test\_v3 Processing &   &     &     &     &     &     & \bD & \bD & \bP &     &     &     \\
+\textbf{300 テスト}     &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad 単体・結合・システム &   &     &     &     &     &     &     &     & \bQ & \bQ & \bQ &     \\
+\quad 評価（精度・遅延） &     &     &     &     &     &     &     &     & \bQ & \bQ & \bQ &     \\
+400 ストレッチ（強弱ほか） &  &     &     &     &     &     &     & \bQ & \bQ &     &     &     \\
+発表会                  &     &     &     &     &     &     &     &     &     &     &     & \multicolumn{1}{c}{$\bigstar$} \\
+\bottomrule
+\end{tabular}
+}
+
+\medskip
+凡例：\colorbox{barDone}{~~}~完了 \quad \colorbox{barProg}{~~}~進行中 \quad
+\colorbox{barPlan}{~~}~予定 \quad $\bigstar$~発表会（7/1）
+
+\medskip
+※ test\_v3 Processing は前回（6/1）の進行中から大幅に進み，4 画面遷移・UI スタイル・
+マスターリセット検知・IMU グラフまで実装済み．残りは実機テストでの調整．
+※ 300 テストフェーズは 6/10 週から予定通り開始する．
+
+\sectionrule
+
+%================================================================
+% 3. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{8.5em}p{5em}p{5em}p{4em}p{3em}X@{}}
+\toprule
+作業項目 & 開始日 & 予定完了日 & 状態 & 進捗 & コメント \\
+\midrule
+Processing UI 刷新 & 2026-06-07 & 2026-06-07 & 完了 & 100\% & 梅澤 UI スタイル適用（淡い青背景＋白パネル＋青枠），ウィンドウ 1000$\times$560 \\
+マスターリセット検知 & 2026-06-07 & 2026-06-07 & 完了 & 100\% & UI パケット 5 秒→2 秒タイムアウトで待機画面に遷移，復帰時自動追従 \\
+楽譜旋律修正 & 2026-06-07 & 2026-06-08 & 完了 & 100\% & 24 拍→32 拍 4 フレーズに拡張，正しいかえるのうた旋律に修正 \\
+8 分音符修正 & 2026-06-07 & 2026-06-08 & 完了 & 100\% & durationQ8/subDurationQ8 を 120→128 に修正（0.03 拍のギャップ解消） \\
+指揮棒軌跡アニメーション & 2026-06-07 & 2026-06-07 & 完了 & 100\% & BPM ベースの振り子を全画面に重ね描画，NOTE 受信時パルス演出 \\
+メニュー横配置 & 2026-06-07 & 2026-06-07 & 完了 & 100\% & 縦→横並びに変更（IMU 左右振りと直感的に対応） \\
+2D IMU グラフ & 2026-06-08 & 2026-06-08 & 完了 & 100\% & ジャイロ（角速度$\div$8）の XY プロットを右上に表示，120 フレームリングバッファ \\
+実機テスト & 2026-06-10 & — & これから & — & 全ノード書き込み，統合テスト，ジャイロスケール・UI 中継の体感確認 \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 4. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{8em}Xp{2.5em}p{2.5em}Xp{3em}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 状態 \\
+\midrule
+IMU モーション表示のスケール & dynAcc は重力成分が混入して振りの可視化に不向きだった & 中 & 高 & ジャイロ（角速度$\div$8）に変更して安定化．スケール値は実機で要調整 & 対応中 \\
+UDP マルチキャストのパケロス & マルチキャストは ACK・再送が無く，取りこぼしが音抜けになる & 中 & 中 & 連送 4 発の時間分散＋WiFi 復帰時の再 join で対策済み．実機テストで効果確認する & 継続 \\
+5 台構成（金管 4＋ドラム）の輪唱位相 & 等間隔で 4 声以上重ねると周期が一巡せず位相が破綻する & 低 & 低 & 不等間隔の位相か曲の周期延長＝編曲（音楽判断）が必要 & 保留 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト，優先度＝対応の緊急性
+
+\sectionrule
+
+%================================================================
+% 5. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証(再現性重視)}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：Processing UI 設計のレビュー，楽譜データ修正，IMU データの可視化方式の検討
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}[かえるのうたの旋律を正しい 32 拍 4 フレーズに修正する方法]
+      \item {}[dynAcc（重力混入）に代わる，指揮棒モーションの安定した可視化方式]
+      \item {}[マスター ESP32 のリセット検知と復帰時の画面遷移ロジック]
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item {}[24 拍 3 フレーズ→32 拍 4 フレーズへの拡張と各フレーズの MIDI 音程の具体案]
+      \item {}[ジャイロ（角速度$\div$8）を int8 で送り，Processing で 2D XY プロットする案]
+      \item {}[UI パケットのタイムアウト（5 秒→2 秒）で待機画面に戻し，復帰時に自動追従する案]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法・ファクトチェック}
+
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item {}[全 5 ノードを \texttt{pio run} でビルドし，コンパイル成功を確認（全コミットで SUCCESS）]
+      \item {}[GAME\_LENGTH\_BEATS を 24→32 に変更し，score\_data.cpp のフレーズ数と整合していることをコードで確認]
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用．ジャイロ化と旋律修正は机上では正しいが，実機でのモーション表示の体感と
+            8 分音符の聞こえ方は実機テストで最終確認する
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item {}[全ノードへ firmware を書き込み，実機での統合テストを行う．
+            4 画面遷移（メニュー→自由演奏→ゲーム→結果）が通しで動くことを確認する]
+      \item {}[ジャイロスケール（$\div$8）と UI 中継 30Hz の体感を実機で確認し，必要に応じて調整する]
+      \item {}[テストフェーズ（300）に移行し，精度・遅延の評価を開始する]
+      \item {}[発表準備（スライド・デモシナリオ）を開始する]
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item {}[実機で自由演奏モードが test\_v2 と同等の安定性で鳴る]
+      \item {}[実機でメニュー→ゲーム→結果の遷移が破綻なく動き，採点結果が表示される]
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item {}[6/17 までに実機テスト・調整を完了し，テストフェーズに本格移行]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item {}[先週（6/8 週）は台風により休講・作業ログ提出不要だったため，先週＋今週の 2 週間分をまとめて報告している]
+  \item {}[ゲームモードは追加機能（ストレッチ）であり，遅れても自由演奏のみで発表は成立する位置づけ]
+  \item {}[実機未テストのファームウェアへの机上修正は同期挙動を逆転させるリスクがあるため，必ず実機書き込みでの確認を経て取り込む]
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 8. 付録
+%================================================================
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item ソースコード：\texttt{firmware/test\_v3/}（共通ライブラリ＋node\_01〜node\_04），\texttt{pc\_app/test\_v3/}
+      \item GitHub リポジトリ：\url{https://github.com/takushio2525/2026-hackathon-team23}
+      \item 関連コミット：\texttt{4320239}，\texttt{20a0451}，\texttt{f85e63d}，\texttt{cfea5ea}
+    \end{itemize}
+  \item 添付範囲：
+    \begin{itemize}
+      \item 差分（test\_v3 Processing UI 刷新・旋律修正・ジャイロ化の直近 2 週間分のスナップショット）
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\end{document}
