@@ -148,7 +148,9 @@ int   prevScreen      = -1;
 ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
 // 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度 2 軸をリングバッファに蓄積)
-final int GYRO_TRAIL_LEN = 120;
+// サンプルは UI フレーム到着時 (約 30Hz) にのみ積む。draw() (90fps) で積むと
+// 同じ値が 3 回ずつ重複して軌跡の時間スケールが狂う。90 サンプル ≒ 3 秒分。
+final int GYRO_TRAIL_LEN = 90;
 float[] gyroTrailX = new float[GYRO_TRAIL_LEN];
 float[] gyroTrailY = new float[GYRO_TRAIL_LEN];
 int gyroTrailIdx = 0;
@@ -348,6 +350,7 @@ void handlePacket(byte[] buf){
     if (uiState == ST_CONDUCTING) {
       currentGyroX = (float)((byte)buf[14]);
       currentGyroY = (float)((byte)buf[16]);
+      pushGyroSample(currentGyroX, currentGyroY);   // 新フレーム到着時のみ軌跡に積む
     } else {
       uiNavCursor = u8(buf[14]);
       uiScore     = u8(buf[16]);
@@ -454,6 +457,11 @@ void onScreenChange(int fromScr, int toScr){
     for (MetroClick mc : metroClicks) mc.unpatch(out);
     metroClicks.clear();
   }
+  // 演奏画面 (自由/ゲーム) を離れたら指揮棒軌跡を消す。次の演奏で古い軌跡から
+  // 描き始めない (Menu に一瞬戻って再開したときの混入防止)。
+  boolean wasPlay = (fromScr == SCR_FREE_PLAY || fromScr == SCR_GAME_PLAY);
+  boolean isPlay  = (toScr   == SCR_FREE_PLAY || toScr   == SCR_GAME_PLAY);
+  if (wasPlay && !isPlay) clearGyroTrail();
 }
 
 // ── ガイド強度 (firmware と同じ式) ────────────────────────
@@ -807,16 +815,20 @@ void drawHelpPanel(String helpText){
 }
 
 // ── 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度の軌跡) ───
+// サンプル蓄積は handlePacket() (UI フレーム到着時 30Hz) で行う。ここは描画のみ。
+void pushGyroSample(float gx, float gy){
+  gyroTrailX[gyroTrailIdx] = gx;
+  gyroTrailY[gyroTrailIdx] = gy;
+  gyroTrailIdx = (gyroTrailIdx + 1) % GYRO_TRAIL_LEN;
+  if (gyroTrailCount < GYRO_TRAIL_LEN) gyroTrailCount++;
+}
+void clearGyroTrail(){
+  gyroTrailIdx = 0;
+  gyroTrailCount = 0;
+}
 void drawBatonTrail(){
-  if (currentScreen == SCR_PORT_SELECT) return;
-
-  // Conducting 中のみリングバッファに蓄積
-  if (uiState == ST_CONDUCTING) {
-    gyroTrailX[gyroTrailIdx] = currentGyroX;
-    gyroTrailY[gyroTrailIdx] = currentGyroY;
-    gyroTrailIdx = (gyroTrailIdx + 1) % GYRO_TRAIL_LEN;
-    if (gyroTrailCount < GYRO_TRAIL_LEN) gyroTrailCount++;
-  }
+  // 演奏中 (Conducting) 以外では出さない。Menu/Result に古い軌跡が残ると紛らわしい。
+  if (uiState != ST_CONDUCTING) return;
 
   if (gyroTrailCount < 2) return;
 
