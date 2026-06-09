@@ -1,6 +1,6 @@
 // Build (run from project root) — shared by node_01 and node_02:
-//   pio run -d firmware/test_v2/node_01     # 指揮者ノード (SoftAp)
-//   pio run -d firmware/test_v2/node_02     # 楽器 1 (Sta)
+//   pio run -d firmware/test_v3/node_01     # 指揮者ノード (SoftAp)
+//   pio run -d firmware/test_v3/node_02     # 楽器 1 (Sta)
 //
 // WiFi 接続維持 + UDP マルチキャスト送受信を集約する IModule 実装
 // 指揮者ノード(SoftAp)と楽器ノード(Sta)で共有する
@@ -24,7 +24,7 @@
 
 enum class WifiMode : uint8_t {
     SoftAp,  // 自身が AP を起動する側 (node_01)
-    Sta,     // 既存 SoftAP に接続する側 (test_v2 は node_02-04 / production 想定は node_02-06)
+    Sta,     // 既存 SoftAP に接続する側 (test_v2/v3 は node_02-04 / production 想定は node_02-06)
 };
 
 struct OrcNetConfig {

@@ -1,9 +1,9 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_02
-//   pio run -d firmware/test_v2/node_02 -t upload
-//   pio device monitor -d firmware/test_v2/node_02
+//   pio run -d firmware/test_v3/node_02
+//   pio run -d firmware/test_v3/node_02 -t upload
+//   pio device monitor -d firmware/test_v3/node_02
 //
-// 輪唱用の楽譜データ — 全声部 (node_02/03/04) で同一の「きらきら星 全曲」を持つ。
+// 輪唱用の楽譜データ — 全声部 (node_02/03/04) で同一の「かえるのうた」(32 拍) を持つ。
 // 1 拍 = 1 ScoreEvent。指揮者の BEAT を 1 個受けるたびに kScore のインデックスを
 // 1 個進める (= 拍番号で引く)。末尾まで来たら先頭に戻ってループする。
 //
@@ -12,8 +12,8 @@
 //   kScore[0] を鳴らし始める (node_02=0, node_03=8, node_04=16 拍ずらし)。
 //   applyPattern が firedBeatNo と headRestBeats から実インデックスを算出する。
 //
-// 細分音符 (8 分音符など) は ScoreEvent 1 行内に subNote として持たせる仕組みが
-// 残っているが、きらきら星は 4 分音符と 2 拍の伸ばしだけなので全行 subNote=0。
+// 細分音符 (8 分音符など) は ScoreEvent 1 行内に subNote として持たせる。
+// かえるのうたフレーズ 4 (ゲロゲロ部) で subNote=拍裏の 8 分音符として使用中。
 #pragma once
 #include <Arduino.h>
 

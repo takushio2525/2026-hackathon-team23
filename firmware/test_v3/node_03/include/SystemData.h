@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_03
-//   pio run -d firmware/test_v2/node_03 -t upload
-//   pio device monitor -d firmware/test_v2/node_03
+//   pio run -d firmware/test_v3/node_03
+//   pio run -d firmware/test_v3/node_03 -t upload
+//   pio device monitor -d firmware/test_v3/node_03
 //
 // 楽器ノード node_03 (輪唱の 1 声部) の全モジュール共有データ
 #pragma once

@@ -1,9 +1,9 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_03
-//   pio run -d firmware/test_v2/node_03 -t upload
-//   pio device monitor -d firmware/test_v2/node_03
+//   pio run -d firmware/test_v3/node_03
+//   pio run -d firmware/test_v3/node_03 -t upload
+//   pio device monitor -d firmware/test_v3/node_03
 //
-// 楽器ノード node_03 — 輪唱「きらきら星」の声部 2 (8 拍遅れて入る / 楽器番号 1)
+// 楽器ノード node_03 — 輪唱「かえるのうた」の声部 2 (8 拍遅れて入る / 楽器番号 1)
 // node_02/03/04 で差分はこのファイルだけ (楽譜 score_data.* は 3 台とも同一)。
 //   node_02: partId=0x02  headRestBeats=0   instrumentId=0
 //   node_03: partId=0x03  headRestBeats=8   instrumentId=1
