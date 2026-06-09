@@ -51,6 +51,8 @@ const char* stateName(ConductorState s) {
         case ConductorState::Calibrating: return "Calibrating";
         case ConductorState::Conducting:  return "Conducting";
         case ConductorState::Fallback:    return "Fallback";
+        case ConductorState::Menu:        return "Menu";
+        case ConductorState::Result:      return "Result";
     }
     return "?";
 }
