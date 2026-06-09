@@ -259,8 +259,8 @@ ScoreEvent[] DRUM_SCORE = {
   new ScoreEvent(35, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
   new ScoreEvent(36, KICK_DRUM, 100, 64, NOTE_ON, CLOSED_HI_HAT, 48, 0, 48),
   new ScoreEvent(37, SNARE_DRUM,  88, 64, NOTE_ON, CLOSED_HI_HAT, 44, 0, 48),
-  new ScoreEvent(38, KICK_DRUM,  94, 64, NOTE_ON, SNARE_DRUM, 76, 128, 64),
-  new ScoreEvent(39, KICK_DRUM, 108, 96, NOTE_ON, CRASH_CYMBAL, 84, 0, 256)
+  new ScoreEvent(38, KICK_DRUM,  94, 64, NOTE_ON, CLOSED_HI_HAT, 44, 0, 48),
+  new ScoreEvent(39, SNARE_DRUM,  86, 64, NOTE_ON, CLOSED_HI_HAT, 40, 0, 48)
 };
 
 class BrassNote implements Instrument {
