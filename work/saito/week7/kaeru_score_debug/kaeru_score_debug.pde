@@ -214,7 +214,7 @@ ScoreEvent[] BASS_SCORE = {
 
 // ドラム用のリズム伴奏。キックとスネアを交互に置き、各拍にハイハットを重ねる。
 // 8拍ごとの区切りと終止直前だけ少し強め、輪唱の流れを邪魔しないようにする。
-// MIDI 打楽器番号を用い、最後の拍はクラッシュシンバルで輪唱全体を締める。
+// MIDI 打楽器番号を用い、ホルンとチューバが終わる40拍目で一緒に締める。
 ScoreEvent[] DRUM_SCORE = {
   // 主旋律1の前半
   new ScoreEvent( 0, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
@@ -252,7 +252,7 @@ ScoreEvent[] DRUM_SCORE = {
   new ScoreEvent(30, KICK_DRUM, 102, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
   new ScoreEvent(31, SNARE_DRUM, 106, 64, NOTE_ON, CLOSED_HI_HAT, 64, 0, 48),
 
-  // 遅れて入った主旋律3の終止まで
+  // ホルンとチューバの終止まで
   new ScoreEvent(32, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
   new ScoreEvent(33, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
   new ScoreEvent(34, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
@@ -260,15 +260,7 @@ ScoreEvent[] DRUM_SCORE = {
   new ScoreEvent(36, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
   new ScoreEvent(37, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
   new ScoreEvent(38, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
-  new ScoreEvent(39, SNARE_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
-  new ScoreEvent(40, KICK_DRUM, 104, 64, NOTE_ON, CLOSED_HI_HAT, 56, 0, 48),
-  new ScoreEvent(41, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
-  new ScoreEvent(42, KICK_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
-  new ScoreEvent(43, SNARE_DRUM,  92, 64, NOTE_ON, CLOSED_HI_HAT, 50, 0, 48),
-  new ScoreEvent(44, KICK_DRUM, 108, 64, NOTE_ON, CLOSED_HI_HAT, 58, 0, 48),
-  new ScoreEvent(45, SNARE_DRUM,  98, 64, NOTE_ON, CLOSED_HI_HAT, 54, 0, 48),
-  new ScoreEvent(46, KICK_DRUM, 112, 64, NOTE_ON, CLOSED_HI_HAT, 62, 0, 48),
-  new ScoreEvent(47, KICK_DRUM, 116, 96, NOTE_ON, CRASH_CYMBAL, 96, 0, 192)
+  new ScoreEvent(39, SNARE_DRUM, 104, 96, NOTE_ON, CRASH_CYMBAL, 96, 0, 256)
 };
 
 class BrassNote implements Instrument {
