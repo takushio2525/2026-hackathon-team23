@@ -20,6 +20,10 @@ struct OrcReceiverConfig {
                                       // して過剰反映を防ぐ。初回 0.20 × 重複 0.05 で、4 連送
                                       // 合計の影響は ≈ 0.32 (初回 α 単独に近い吸い方)。
     uint8_t  clockSyncMinSamples;     // 5 (デバッグ表示用. Playing 遷移条件には使わない)
+    uint16_t clockSyncSnapThresholdMs; // offset サンプルが現 EMA からこれ以上飛んだら EMA を
+                                      // やめて即時採用 (スナップ)。指揮者リセットでマスタ時計が
+                                      // 巻き戻った直後でも 1 パケットで追従できる。SoftAP 直結
+                                      // LAN の正常遅延 (数十 ms) では届かない 1000 を推奨。
     uint16_t loopIntervalMs;          // 2 ms (発火判定粒度。短いほど発音ジッタが減る)
 };
 
