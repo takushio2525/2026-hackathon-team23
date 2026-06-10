@@ -51,20 +51,8 @@ void OrcSenderModule::updateOutput(SystemData& data) {
         // test_v3 ゲームモード: 旧 reserved[4] に mode/navCursor/targetBpm/score を載せる
         pkt.payload.mode      = data.game.mode;
         pkt.payload.targetBpm = data.game.targetBpm;
-        // Conducting 時: navCursor/score バイトにジャイロスコープ 2 軸 (int8, ±127) を載せる。
-        // gyro[]/8: ±2000dps → ±250。典型的な指揮振り 100-500dps が ±12〜±62 に収まる。
-        // 重力の影響がない角速度なので、傾けても静的オフセットが出ない。
-        if (data.conductor.state == ConductorState::Conducting) {
-            int gx = (int)(data.imu.gyro[0] / 8.0f);
-            int gy = (int)(data.imu.gyro[1] / 8.0f);
-            if (gx < -127) gx = -127; if (gx > 127) gx = 127;
-            if (gy < -127) gy = -127; if (gy > 127) gy = 127;
-            pkt.payload.navCursor = (uint8_t)(int8_t)gx;
-            pkt.payload.score     = (uint8_t)(int8_t)gy;
-        } else {
-            pkt.payload.navCursor = data.game.navCursor;
-            pkt.payload.score     = data.game.score;
-        }
+        pkt.payload.navCursor = data.game.navCursor;
+        pkt.payload.score     = data.game.score;
 
         data.orcNet.pendingCtrl    = pkt;
         data.orcNet.hasPendingCtrl = true;

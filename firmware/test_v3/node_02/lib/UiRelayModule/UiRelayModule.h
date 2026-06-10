@@ -7,9 +7,8 @@
 // 別フレームとして同じ Serial に流す (PC 側は magic で再同期するので混在しても解釈できる)。
 //
 // 送出頻度: 「内容が変化したとき + minIntervalMs の上限」+「heartbeatMs ごとの保険送出」。
-// Menu/Result 中の変化はユーザー操作ペース (低頻度)。Conducting 中は navCursor/score に
-// ジャイロが載って毎 CTRL 変化するため実質 minIntervalMs 周期の連続送出になるが、
-// 20B×30Hz=600B/s で USB 115200bps の 5% 程度、演奏 NOTE のバーストを阻害しない。
+// Menu/Result 中の変化はユーザー操作ペース、Conducting 中は bpmQ8 の変化時のみで
+// いずれも低頻度。USB 115200bps 上の演奏 NOTE のバーストを阻害しない。
 // SERIAL_DEBUG=1 のときはバイナリを流さない (人間可読モニタを汚さない)。
 #pragma once
 #include <Arduino.h>

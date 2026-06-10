@@ -12,9 +12,7 @@
   薄い区間ほど重い重みで累積。32 拍（かえるのうた 1 周）で 0–100 点に写像して `Result` へ
 - **メトロノームガイド**: ゲーム序盤 8 拍は LED（node_01）と PC クリック音がフルガイド、
   8〜16 拍で線形フェードアウト、以降はガイドなし（記憶でテンポ維持）
-- **CTRL 予約 4B をフィールド化**: `mode/navCursor/targetBpm/score` を指揮者→楽器に配信。
-  Conducting 中は `navCursor/score` に**ジャイロ角速度 2 軸（int8）**を載せ、PC の指揮棒
-  2D プロットに使う
+- **CTRL 予約 4B をフィールド化**: `mode/navCursor/targetBpm/score` を指揮者→楽器に配信
 - **PKT_UI (type=4)**: node_02 だけが受信 CTRL の中身を USB シリアルで PC に中継する
   （`UiRelayModule`）。UDP には流れないので同期経路（CTRL/BEAT/NOTE）に影響しない
 - **楽譜は「かえるのうた」32 拍**（`node_02/03/04/src/score_data.cpp`）。8 分音符は

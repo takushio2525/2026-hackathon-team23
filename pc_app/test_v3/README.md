@@ -17,8 +17,6 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
   ポート選択 → 待機 → メニュー → 自由演奏 / ゲーム演奏 → 結果、の各画面
 - **ゲーム画面**: 目標テンポ・ガイド強度バー・拍進捗・ライブスコアを表示し、
   メトロノームクリック音（ガイド強度に応じてフェードアウト）をローカル生成
-- **指揮棒 2D プロット**: Conducting 中に CTRL→UI 経由で届くジャイロ角速度 2 軸を
-  右上の XY プロットに軌跡表示（NOTE 発音でパルス演出）
 - **マスターリセット検知**: UI フレームが `UI_TIMEOUT_MS`（2 秒）途絶えると待機画面へ
   戻し、発音を止めて指揮者の再起動に追従する
 
@@ -62,8 +60,7 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 | 4 (UI) | 指揮者状態の中継（node_02 のみ） | state / mode / navCursor / targetBpm / score / partId / bpmQ8 |
 
 - UI の `state`: 0=Idle / 1=Calibrating / 2=Conducting / 3=Fallback / 4=Menu / 5=Result
-- **Conducting 中は `navCursor`/`score` バイトにジャイロ角速度 2 軸（int8）が透過する**
-  （指揮棒 2D プロット用。メニュー値/得点として有効なのは Menu/Result のときだけ）
+- `navCursor`/`score` がメニュー値/得点として有効なのは Menu/Result のときだけ
 - 詳細は `.agent/api.md` と `firmware/test_v3/common/lib/OrcProtocol/OrcProtocol.h`
 
 ## トラブルシュート

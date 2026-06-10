@@ -50,13 +50,10 @@ struct CtrlPayload {
     uint8_t  state;        // 0=Idle 1=Calibrating 2=Conducting 3=Fallback 4=Menu 5=Result
     // ── test_v3 ゲームモード: 旧 reserved[4] をフィールド化 ──
     // 画面は (state, mode) から PC が導出するのでここには持たない。カーソルだけ別バイト。
-    // 注意: state==Conducting の間、navCursor/score は OrcSenderModule がジャイロ角速度
-    // 2 軸 (int8, gyro[0]/8, gyro[1]/8) で上書きする (PC の指揮棒 2D プロット用)。
-    // メニュー値/得点として有効なのは Menu/Result のときだけ。
     uint8_t  mode;         // 0=自由演奏 / 1=ゲーム
-    uint8_t  navCursor;    // メニューカーソル位置 0..N (Menu/Result で有効。Conducting 中はジャイロ X)
+    uint8_t  navCursor;    // メニューカーソル位置 0..N (Menu/Result で有効)
     uint8_t  targetBpm;    // ゲーム目標テンポ (生 BPM 40-240, 0=未設定/自由演奏では無視)
-    uint8_t  score;        // ゲーム得点 0-100, 0xFF=未確定 (Menu/Result で有効。Conducting 中はジャイロ Y)
+    uint8_t  score;        // ゲーム得点 0-100, 0xFF=未確定 (Menu/Result で有効)
 };
 
 struct BeatPayload {
@@ -81,9 +78,9 @@ struct NotePayload {
 struct UiPayload {
     uint8_t  state;        // 0..5 (CtrlPayload.state と同義: Idle/Calibrating/Conducting/Fallback/Menu/Result)
     uint8_t  mode;         // 0=自由演奏 / 1=ゲーム
-    uint8_t  navCursor;    // メニューカーソル位置 (Conducting 中は CTRL 由来のジャイロ X が透過する)
+    uint8_t  navCursor;    // メニューカーソル位置 (Menu/Result で有効)
     uint8_t  targetBpm;    // ゲーム目標テンポ (生 BPM)
-    uint8_t  score;        // ゲーム得点 0-100 / 0xFF=未確定 (Conducting 中はジャイロ Y が透過する)
+    uint8_t  score;        // ゲーム得点 0-100 / 0xFF=未確定 (Menu/Result で有効)
     uint8_t  partId;       // 中継元の楽器ノード ID (PC の役割判定用: 0x02=メイン操作 UI)
     uint16_t bpmQ8;        // 実振り BPM ×8 (演奏画面のテンポ表示用)
 };
