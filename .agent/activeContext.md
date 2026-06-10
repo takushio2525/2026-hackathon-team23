@@ -5,35 +5,31 @@
 
 ## 現在の対象
 
-- **test_v3 品質向上ブランチ `shiozawa-test_v3-polish` を作成し PR を提出**（2026-06-10、7 コミット）。
-  机上レビューで見つけたバグ修正＋ロジック改善＋UI 改善。マージはまだ（実機検証待ち）。
-  1. **node_01 状態遷移修正**: Menu/Result に IMU 喪失監視追加（Fallback へ、復帰は
-     sStateBeforeFallback で元の状態へ）。Menu→Conducting で resetTempoTracking()
-     ＋ beatNo=0 リセット（毎セッション曲頭から）。Fallback 遷移時 sLastBeatMs=0。
-  2. **楽器クロック同期スナップ**: offset サンプルが現 EMA から 1000ms 超飛んだら即時採用
-     （clockSyncSnapThresholdMs）。指揮者リセットを 1 パケットで追従。スナップ時は
-     pending/hasFirstBeat/lastBeatNo も破棄。OrcReceiver/SystemData/applyPattern を
-     3 楽器ノード完全同一に統一（差分は ProjectConfig と UiRelay の有無のみに）。
-  3. **Processing**: ジャイロ軌跡の重複 push 修正（蓄積を handlePacket 30Hz 側へ、
-     LEN 120→90）、Conducting 外で軌跡非表示＋画面離脱でクリア。全画面に接続ステータス
-     （役割/UI 鮮度/声部別 NOTE インジケータ）＋ヘルプパネル整備。
-  4. **ビルド設定**: 指揮者 2 ノード -std=gnu++17（inline 変数警告 8 件解消）。
-  5. **ドキュメント**: README 2 本を test_v3 実態へ全面書き直し、api.md を現行値に同期
-     （ジャイロ透過・30Hz・beatLookahead 30・スナップ閾値）。
+- **test_v3 修正 5 タスクを main 直で実施・push 済み**（2026-06-10、コミット 4 つ）。
+  1. **ジャイロ 2D 表示削除**（`4b480a6`）: Processing の角速度プロット一式と
+     OrcSender の Conducting 時ジャイロ透過を除去。navCursor/score は常に本来の値に。
+  2. **メニューナビ重力基準化**（`9f9490c`）: 遅い LPF（α=0.01・dynNorm≥0.3 で凍結）で
+     重力ベクトル推定 → 振り加速度を重力軸/水平面成分に分解、NAV_DECISION_WINDOW_MS
+     (250ms) の窓積算で縦/横判定。NAV_VERT_DOMINANCE / NAV_LR_SIGN で実機調整可。
+  3. **状態遷移デッドタイム**（`b656884`）: STATE_TRANSITION_DEADTIME_MS (1000ms) の間
+     拍検出・ナビを無視（メニュー決定が 1 拍目に化ける／最終音符が Result 操作に化ける対策）。
+  4. **4 台輪唱**（`80ec121`）: node_05 新設（partId=0x05/headRest=24/instrumentId=3=チューバ）。
+     楽譜進行を CANON_CYCLE_BEATS=56（曲 32＋遅延 24）のサイクル窓方式に変更し、
+     node_05 が 1 周終わるまで node_02 は次周回を始めない。Processing 4 声部表示。
+     ドラム音色 (4_kick〜7_crash) は未使用。
+- 全 6 ノード pio run SUCCESS・警告 0（node_03/04/05 同一サイズ）、processing-java --build 成功。
 
 ## 次の一手
 
-- **PR レビューと実機検証（ユーザー作業）**: 全 5 ノード upload して動作確認後にマージ。
-  実機確認リスト（PR 本文）: ①Menu→演奏開始で曲頭から＆BPM 100 リセット、②指揮者リセット
-  後の楽器追従が 1 秒以内か、③Menu 中に IMU 線を抜いて Fallback 点滅→復帰で Menu に戻るか、
-  ④ジャイロ軌跡の滑らかさ（30Hz 化後）、⑤声部インジケータの動き。
-- 仕様判断の保留点（最終報告に列挙済み）: ゲーム途中中断ジェスチャなし／ライブスコア未送出
-  ／アナライザ FFT 未実装は要件外として見送り。
+- **実機検証（ユーザー作業）**: 実機確認リストは 2026-06-10 の最終報告参照。要点:
+  ①ナビの縦/横判定と NAV_LR_SIGN の向き、②デッドタイム 1000ms の体感、
+  ③4 台輪唱の終端（node_05 終了まで node_02 が待つか）、④Result の点数が見られるか。
+- 楽器ノードの実機が 4 台ない場合、node_05 ファームは手持ちの UNO R4 に上書きして検証。
 
 ## 現フェーズで Read すべき設計書
 
 - ゲームモード設計: `.agent/test_v3-game-design.md`
-- プロトコル仕様: `.agent/api.md`（UI type=4 表・ジャイロ透過注記を更新済み）
+- プロトコル仕様: `.agent/api.md`（ジャイロ透過は廃止済み・輪唱サイクル追記済み）
 
 ## ユーザーの好み
 
