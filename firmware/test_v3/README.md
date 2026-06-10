@@ -1,7 +1,7 @@
 # firmware/test_v3 — ゲームモード（かえるのうた輪唱 + テンポ採点）
 
-`firmware/test_v2`（きらきら星→かえるのうた輪唱）の続編。**指揮者 1 + 楽器 3** の
-4 ノード構成・マスタクロック同期・拍番号駆動の楽譜進行はそのままに、
+`firmware/test_v2`（きらきら星→かえるのうた輪唱）の続編。**指揮者 1 + 楽器 4** の
+5 ノード構成・マスタクロック同期・拍番号駆動の楽譜進行を踏襲し、
 **ゲームモード**を追加した版：
 
 - **2 モード構成**: ①自由演奏（実振り BPM で輪唱）／②ゲーム（目標テンポ 100 BPM を
@@ -15,19 +15,23 @@
 - **CTRL 予約 4B をフィールド化**: `mode/navCursor/targetBpm/score` を指揮者→楽器に配信
 - **PKT_UI (type=4)**: node_02 だけが受信 CTRL の中身を USB シリアルで PC に中継する
   （`UiRelayModule`）。UDP には流れないので同期経路（CTRL/BEAT/NOTE）に影響しない
-- **楽譜は「かえるのうた」32 拍**（`node_02/03/04/src/score_data.cpp`）。8 分音符は
+- **楽譜は「かえるのうた」32 拍**（`node_02〜05/src/score_data.cpp`）。8 分音符は
   `subNote`（拍裏の予約発火）で表現
+- **4 台輪唱**: 声部が 8 拍（1 フレーズ）ずつ遅れて入る。周回は輪唱サイクル
+  `CANON_CYCLE_BEATS=56` 拍（曲長 32 + 最終声部の遅延 24）を全声部で共有し、
+  最終声部（node_05）が 1 周を終えるまで先頭声部は次の周回を始めない
 
 | ディレクトリ | 内容 |
 |---|---|
 | [`common/`](common/) | 全ノード共通ライブラリ（`OrcProtocol`（PKT_UI 追加） / `OrcNetModule` / `StatusLedModule` / `ModuleCore`） |
 | [`node_01/`](node_01/) | 指揮者ノード（XIAO ESP32-S3 Sense + GY-521）。Menu/Result 状態・IMU ナビ・採点 |
 | [`node_01_devkitc/`](node_01_devkitc/) | 指揮者の ESP32-S3-DevKitC-1 派生（ロジック同一・ビルド設定のみ差分） |
-| [`node_02/`](node_02/) | 輪唱 声部 1（partId=0x02, headRestBeats=0, instrumentId=0）+ **UI 中継** |
-| [`node_03/`](node_03/) | 輪唱 声部 2（partId=0x03, headRestBeats=8, instrumentId=1） |
-| [`node_04/`](node_04/) | 輪唱 声部 3（partId=0x04, headRestBeats=16, instrumentId=2） |
+| [`node_02/`](node_02/) | 輪唱 声部 1（partId=0x02, headRestBeats=0, instrumentId=0=トランペット）+ **UI 中継** |
+| [`node_03/`](node_03/) | 輪唱 声部 2（partId=0x03, headRestBeats=8, instrumentId=1=ホルン） |
+| [`node_04/`](node_04/) | 輪唱 声部 3（partId=0x04, headRestBeats=16, instrumentId=2=トロンボーン） |
+| [`node_05/`](node_05/) | 輪唱 声部 4（partId=0x05, headRestBeats=24, instrumentId=3=チューバ） |
 
-声部の楽譜（`score_data.cpp`）は 3 台とも同一（= 輪唱）。差分は ProjectConfig.h と
+声部の楽譜（`score_data.cpp`）は 4 台とも同一（= 輪唱）。差分は ProjectConfig.h と
 node_02 のみ持つ `UiRelayModule` だけ。
 
 ## クイックスタート
@@ -40,10 +44,11 @@ pio run -d firmware/test_v3/node_01 -t upload
 pio run -d firmware/test_v3/node_02 -t upload   # 声部 1（メイン操作 UI 用）
 pio run -d firmware/test_v3/node_03 -t upload   # 声部 2
 pio run -d firmware/test_v3/node_04 -t upload   # 声部 3
+pio run -d firmware/test_v3/node_05 -t upload   # 声部 4（最終声部）
 
 # 3. Mac で Processing を起動し pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde を Run
 #    画面のポート一覧で繋いだ Arduino のポートをクリックして開く
-#    （node_02 を開いた Mac がメイン操作 UI、node_03/04 はアナライザとして自動判定）
+#    （node_02 を開いた Mac がメイン操作 UI、node_03〜05 はアナライザとして自動判定）
 ```
 
 ## 状態遷移（指揮者 node_01）

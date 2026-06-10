@@ -14,7 +14,7 @@
 
 struct NoteSenderConfig {
     uint32_t baudRate;     // 115200 (UNO R4 WiFi の Serial は USB CDC)
-    uint8_t  partId;       // 0x02-0x04: 輪唱のどの声部か
+    uint8_t  partId;       // 0x02-0x05: 輪唱のどの声部か
     uint8_t  instrumentId; // 0..N-1: PC 側 (orchestra_resynth) で読み込んだ楽器定義のインデックス
 };
 

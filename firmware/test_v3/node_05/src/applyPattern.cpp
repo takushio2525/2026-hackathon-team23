@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v3/node_02
-//   pio run -d firmware/test_v3/node_02 -t upload
-//   pio device monitor -d firmware/test_v3/node_02
+//   pio run -d firmware/test_v3/node_05
+//   pio run -d firmware/test_v3/node_05 -t upload
+//   pio device monitor -d firmware/test_v3/node_05
 //
 // 楽器ノード (輪唱の 1 声部) の判断ロジック
 // 設計方針: BPM はあくまで補助 (durationMs 計算で使用)。score の進行は

@@ -9,7 +9,7 @@
 | 0 | `0_trumpets.tweaked.instrument.json` | トランペット | node_02（主旋律1） |
 | 1 | `1_horns.tweaked.instrument.json` | ホルン | node_03（主旋律2） |
 | 2 | `2_trombones.tweaked.instrument.json` | トロンボーン | node_04（主旋律3） |
-| 3 | `3_tuba.tweaked.instrument.json` | チューバ | 低音伴奏用 |
+| 3 | `3_tuba.tweaked.instrument.json` | チューバ | node_05（主旋律4・最終声部） |
 | 4 | `4_kick.tweaked.instrument.json` | キック | ドラム用 |
 | 5 | `5_snare.tweaked.instrument.json` | スネア | ドラム用 |
 | 6 | `6_hi_hat.tweaked.instrument.json` | ハイハット | ドラム用 |

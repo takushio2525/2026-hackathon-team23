@@ -12,7 +12,7 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 ## test_v2 からの主要変更点
 
 - **役割の手動選択を廃止**: ポートを開くだけで、UI フレーム受信 or NOTE の partId から
-  「メイン操作 UI（node_02 接続）」「アナライザ（node_03/04 接続）」を自動判定
+  「メイン操作 UI（node_02 接続）」「アナライザ（node_03〜05 接続）」を自動判定
 - **データ駆動の画面遷移**: 指揮者の `(state, mode)` から毎フレーム画面を再判定する。
   ポート選択 → 待機 → メニュー → 自由演奏 / ゲーム演奏 → 結果、の各画面
 - **ゲーム画面**: 目標テンポ・ガイド強度バー・拍進捗・ライブスコアを表示し、
@@ -33,13 +33,13 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 
 ## 実行手順
 
-1. 指揮者ノード（`firmware/test_v3/node_01`）と楽器ノード（`node_02`〜`node_04`）を電源 ON
+1. 指揮者ノード（`firmware/test_v3/node_01`）と楽器ノード（`node_02`〜`node_05`）を電源 ON
 2. 楽器ノードを Mac に USB 接続する（本番想定は 1 Mac : 1 ノード）
 3. Processing IDE で `orchestra_resynth/orchestra_resynth.pde` を開いて Run
 4. ポート一覧で繋いだ Arduino のポートをクリックして開く（もう一度クリックで閉じる）
 5. 指揮者を振ってモードを選ぶと、PC の画面が自動で追従する
    - node_02 を開いた Mac: メニュー → 演奏/ゲーム画面が出る
-   - node_03/04 を開いた Mac: アナライザ画面（波形 + 受信状況）が出る
+   - node_03〜05 を開いた Mac: アナライザ画面（波形 + 受信状況）が出る
    - `pio device monitor` を開いているとポートが二重に開けないので閉じておく
 
 ### キー操作
@@ -69,7 +69,7 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
   閉じる。楽器ノードの `platformio.ini` が `SERIAL_DEBUG=0`（既定）か確認
   （`=1` だとバイナリが流れず人間可読テキストになる）
 - メニュー画面が出ない → 開いたポートが node_02 か確認（UI フレームは node_02 だけが
-  中継する）。node_03/04 はアナライザ画面になる
-- ノイズ / 割れる → `-` キーでマスター音量を下げる（3 声部合算で大きくなりがち）
+  中継する）。node_03〜05 はアナライザ画面になる
+- ノイズ / 割れる → `-` キーでマスター音量を下げる（4 声部合算で大きくなりがち）
 - 画面が「待機中」のまま → 指揮者の LED が Menu 点滅（約 1.7Hz）になっているか確認。
   Idle 1Hz 点滅のままなら SoftAP 起動失敗、2Hz ならキャリブレーション中

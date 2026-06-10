@@ -3,13 +3,14 @@
 //   pio run -d firmware/test_v3/node_04 -t upload
 //   pio device monitor -d firmware/test_v3/node_04
 //
-// 輪唱用の楽譜データ — 全声部 (node_02/03/04) で同一の「かえるのうた」(32 拍) を持つ。
+// 輪唱用の楽譜データ — 全声部 (node_02〜05) で同一の「かえるのうた」(32 拍) を持つ。
 // 1 拍 = 1 ScoreEvent。指揮者の BEAT を 1 個受けるたびに kScore のインデックスを
-// 1 個進める (= 拍番号で引く)。末尾まで来たら先頭に戻ってループする。
+// 1 個進める (= 拍番号で引く)。周回は輪唱サイクル (CANON_CYCLE_BEATS = 56 拍) の
+// 窓方式で、最終声部が 1 周を終えるまで先頭声部は次の周回を始めない。
 //
 // 輪唱 (canon) は「先頭に休符を入れて声部ごとにずらす」方式:
 //   各ノードの ProjectConfig.h の headRestBeats だけ頭の拍を読み飛ばしてから
-//   kScore[0] を鳴らし始める (node_02=0, node_03=8, node_04=16 拍ずらし)。
+//   kScore[0] を鳴らし始める (node_02=0, node_03=8, node_04=16, node_05=24 拍ずらし)。
 //   applyPattern が firedBeatNo と headRestBeats から実インデックスを算出する。
 //
 // 細分音符 (8 分音符など) は ScoreEvent 1 行内に subNote として持たせる。
