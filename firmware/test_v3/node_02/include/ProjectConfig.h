@@ -47,12 +47,11 @@ inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
 
 // test_v3 ゲームモード: 指揮者の UI 状態 (mode/画面/カーソル/score) を PC へ中継する設定。
 // node_02 = メイン操作 UI が付く PC。「変化時のみ + minIntervalMs 上限 + heartbeat 保険」で送る。
-// Conducting 中は CTRL の navCursor/score にジャイロが載って毎回変化するため、実質
-// minIntervalMs 周期 (30Hz) の連続送出になる (20B×30Hz=600B/s ≪ 115200bps、NOTE と干渉しない)。
-// Menu/Result では操作時のみ送出 + 1s heartbeat の低頻度。node_03/04 はアナライザのため載せない。
+// Menu/Result では操作時のみ、Conducting 中は bpmQ8 変化時のみで、いずれも低頻度
+// (+1s heartbeat)。node_03/04 はアナライザのため載せない。
 inline const UiRelayConfig UI_RELAY_CONFIG = {
     /*partId=*/        0x02,
-    /*minIntervalMs=*/ 33,     // 変化送出の最小間隔 (30Hz: 角速度データの滑らかな軌跡描画用)
+    /*minIntervalMs=*/ 33,     // 変化送出の最小間隔 (BPM 表示の追従を滑らかにする上限 30Hz)
     /*heartbeatMs=*/   1000,   // 無変化でも 1s ごとに 1 発 (PC 途中接続でも状態を拾える)
 };
 

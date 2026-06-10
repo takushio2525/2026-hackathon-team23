@@ -149,17 +149,6 @@ int   currentScreen   = SCR_PORT_SELECT;
 int   prevScreen      = -1;
 ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
-// 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度 2 軸をリングバッファに蓄積)
-// サンプルは UI フレーム到着時 (約 30Hz) にのみ積む。draw() (90fps) で積むと
-// 同じ値が 3 回ずつ重複して軌跡の時間スケールが狂う。90 サンプル ≒ 3 秒分。
-final int GYRO_TRAIL_LEN = 90;
-float[] gyroTrailX = new float[GYRO_TRAIL_LEN];
-float[] gyroTrailY = new float[GYRO_TRAIL_LEN];
-int gyroTrailIdx = 0;
-int gyroTrailCount = 0;
-float currentGyroX = 0;
-float currentGyroY = 0;
-
 final String[] NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 String noteName(int midi){ return NOTE_NAMES[((midi%12)+12)%12] + (midi/12 - 1); }
 
@@ -352,19 +341,12 @@ void handlePacket(byte[] buf){
   if (type == TYPE_UI){
     uiState     = u8(buf[12]);
     uiMode      = u8(buf[13]);
+    uiNavCursor = u8(buf[14]);
     uiTargetBpm = u8(buf[15]);
+    uiScore     = u8(buf[16]);
     uiPartId    = u8(buf[17]);
     uiBpmQ8     = u16le(buf[18], buf[19]);
     lastUiAtMs  = millis();
-    // Conducting 時: navCursor/score バイトはジャイロ角速度データ (int8, gyro/8)
-    if (uiState == ST_CONDUCTING) {
-      currentGyroX = (float)((byte)buf[14]);
-      currentGyroY = (float)((byte)buf[16]);
-      pushGyroSample(currentGyroX, currentGyroY);   // 新フレーム到着時のみ軌跡に積む
-    } else {
-      uiNavCursor = u8(buf[14]);
-      uiScore     = u8(buf[16]);
-    }
     if (nodeRole != ROLE_MAIN_UI){
       nodeRole = ROLE_MAIN_UI;
       updateRoleTitle();
@@ -470,11 +452,6 @@ void onScreenChange(int fromScr, int toScr){
     for (MetroClick mc : metroClicks) mc.unpatch(out);
     metroClicks.clear();
   }
-  // 演奏画面 (自由/ゲーム) を離れたら指揮棒軌跡を消す。次の演奏で古い軌跡から
-  // 描き始めない (Menu に一瞬戻って再開したときの混入防止)。
-  boolean wasPlay = (fromScr == SCR_FREE_PLAY || fromScr == SCR_GAME_PLAY);
-  boolean isPlay  = (toScr   == SCR_FREE_PLAY || toScr   == SCR_GAME_PLAY);
-  if (wasPlay && !isPlay) clearGyroTrail();
 }
 
 // ── ガイド強度 (firmware と同じ式) ────────────────────────
@@ -552,8 +529,6 @@ void draw(){
     case SCR_ANALYZER:    drawAnalyzerScreen();   break;
     default:              drawWaitingScreen();     break;
   }
-
-  drawBatonTrail();
 }
 
 // ── 共通 UI 部品 ─────────────────────────────────────────
@@ -885,87 +860,6 @@ void drawHelpPanel(String helpText){
   }
   fill(61, 86, 111);
   text(roleStr + "  /  ポート " + openByName.size(), sx, hy + 28);
-  textAlign(LEFT, BASELINE);
-}
-
-// ── 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度の軌跡) ───
-// サンプル蓄積は handlePacket() (UI フレーム到着時 30Hz) で行う。ここは描画のみ。
-void pushGyroSample(float gx, float gy){
-  gyroTrailX[gyroTrailIdx] = gx;
-  gyroTrailY[gyroTrailIdx] = gy;
-  gyroTrailIdx = (gyroTrailIdx + 1) % GYRO_TRAIL_LEN;
-  if (gyroTrailCount < GYRO_TRAIL_LEN) gyroTrailCount++;
-}
-void clearGyroTrail(){
-  gyroTrailIdx = 0;
-  gyroTrailCount = 0;
-}
-void drawBatonTrail(){
-  // 演奏中 (Conducting) 以外では出さない。Menu/Result に古い軌跡が残ると紛らわしい。
-  if (uiState != ST_CONDUCTING) return;
-
-  if (gyroTrailCount < 2) return;
-
-  // 右上に 2D XY プロット領域を配置
-  float plotW = 170, plotH = 170;
-  float plotX = width - plotW - 14, plotY = 10;
-
-  // 背景パネル
-  noStroke();
-  fill(255, 255, 255, 210);
-  rect(plotX, plotY, plotW, plotH, 12);
-  stroke(134, 184, 218, 120); strokeWeight(1.5f); noFill();
-  rect(plotX, plotY, plotW, plotH, 12);
-  strokeWeight(1); noStroke();
-
-  float cx = plotX + plotW / 2;
-  float cy = plotY + plotH / 2;
-
-  // 十字線
-  stroke(200, 215, 228, 100); strokeWeight(1);
-  line(plotX + 10, cy, plotX + plotW - 10, cy);
-  line(cx, plotY + 10, cx, plotY + plotH - 10);
-  strokeWeight(1); noStroke();
-
-  // ±127 をプロット領域にマッピング
-  float scale = (plotW - 24) / 254.0f;
-  boolean pulse = (millis() - lastNoteAtMs) < 120;
-
-  // 軌跡を描画 (clip で領域内に制限)
-  clip(plotX + 2, plotY + 2, plotW - 4, plotH - 4);
-  for (int i = 1; i < gyroTrailCount; i++){
-    int idxCurr = (gyroTrailIdx - 1 - (i - 1) + GYRO_TRAIL_LEN * 2) % GYRO_TRAIL_LEN;
-    int idxPrev = (gyroTrailIdx - 1 - i       + GYRO_TRAIL_LEN * 2) % GYRO_TRAIL_LEN;
-    float alpha = (1.0f - (float)i / gyroTrailCount) * (pulse ? 220 : 140);
-    float sw = max(1.0f, (pulse ? 3.5f : 2.2f) - i * 0.020f);
-    stroke(64, 159, 255, (int)alpha);
-    strokeWeight(sw);
-    float x1 = cx + gyroTrailX[idxPrev] * scale;
-    float y1 = cy - gyroTrailY[idxPrev] * scale;
-    float x2 = cx + gyroTrailX[idxCurr] * scale;
-    float y2 = cy - gyroTrailY[idxCurr] * scale;
-    line(x1, y1, x2, y2);
-  }
-  noClip();
-  strokeWeight(1); noStroke();
-
-  // 最新位置のドット
-  int latest = (gyroTrailIdx - 1 + GYRO_TRAIL_LEN) % GYRO_TRAIL_LEN;
-  float dotPX = cx + gyroTrailX[latest] * scale;
-  float dotPY = cy - gyroTrailY[latest] * scale;
-  dotPX = constrain(dotPX, plotX + 4, plotX + plotW - 4);
-  dotPY = constrain(dotPY, plotY + 4, plotY + plotH - 4);
-  float dotR = pulse ? 9 : 6;
-  float dotAlpha = pulse ? 240 : 180;
-  noStroke();
-  fill(64, 159, 255, (int)dotAlpha);
-  ellipse(dotPX, dotPY, dotR, dotR);
-  fill(255, 255, 255, (int)(dotAlpha * 0.5f));
-  ellipse(dotPX, dotPY, dotR * 0.4f, dotR * 0.4f);
-
-  // ラベル
-  fill(61, 86, 111, 180); textSize(10); textAlign(LEFT, BASELINE);
-  text("角速度", plotX + 8, plotY + 14);
   textAlign(LEFT, BASELINE);
 }
 
