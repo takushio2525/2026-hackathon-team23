@@ -12,11 +12,18 @@
 | `snare.tweaked.instrument.json` | スネアの音色 |
 | `Hi-hat.tweaked.instrument.json` | ハイハットの音色 |
 | `crash.tweaked.instrument.json` | クラッシュの音色 |
+| `drumkit.tweaked.instrument.json` | キック・スネア・ハイハット・クラッシュを1つにまとめたドラムキット |
 
 各ファイルの `harmonics` と `envelope` は Processing の音色合成で使用します。
 音色を差し替える場合は、同じ項目を持つ JSON を用意し、スケッチの
 `INSTRUMENT_FILES` との対応を保ってください。
 ドラムパートも JSON を読み込み、`harmonics`, `envelope`, `noise.level` を使用します。
+
+`drumkit.tweaked.instrument.json` は、PC 側で `instrumentId` を1つに固定したまま
+`noteNumber` でドラム音色を切り替えるためのまとめファイルです。対応は
+`36=キック`, `38=スネア`, `42=ハイハット`, `49=クラッシュ` です。
+通常の `sound_lab.instrument/1` ではなく、`sound_lab.drumkit/1` 形式として
+4つの音色 JSON を `sounds` の中に保持しています。
 
 この音色試聴機能が不要になった場合は、スケッチ側の読み込み処理を外したうえで
 このフォルダを削除して構いません。
