@@ -107,15 +107,29 @@ namespace logic_params {
     constexpr uint16_t LED_MENU_MS             = 300;   // メニュー中 (約 1.7 Hz)
     constexpr uint16_t LED_RESULT_MS           = 120;   // 結果表示中 (速い点滅で完了を示す)
 
-    // ── test_v3 ゲームモード: IMU メニューナビ (単純閾値判定) ──
-    // dynAcc[NAV_LR_AXIS] (左右) / dynAcc[NAV_UD_AXIS] (上下) の符号と大きさだけで判定する。
-    // 複雑なジェスチャ認識はしない。軸番号と符号は IMU の物理取付に依存するので実機で確定する
-    // (右に振る→カーソル右、下に振る→決定、になる軸/符号へ要調整)。暫定: X=左右 / Y=上下。
-    constexpr uint8_t  NAV_LR_AXIS             = 0;     // 左右 = X 軸 (要実機確認)
-    constexpr uint8_t  NAV_UD_AXIS             = 1;     // 上下 = Y 軸 (要実機確認)
+    // ── test_v3 ゲームモード: IMU メニューナビ (重力基準の縦/横判定) ──
+    // 加速度の遅い LPF で重力ベクトルを推定し、振り加速度 (accLpf − 推定重力) を
+    // 「重力軸成分」と「水平面成分」に分解して判定する。センサに取り付け角度が
+    // ついていても「地面に対して垂直に振れば縦 (決定) / 水平に振れば横 (カーソル)」
+    // になる。旧方式のセンサ軸直読み (NAV_LR_AXIS/NAV_UD_AXIS) は取り付け角度で
+    // 破綻したため廃止。
     constexpr float    NAV_SWING_THRESHOLD_G   = 1.00f; // ナビ振り検出しきい値 (拍検出 1.20g より低め)
     constexpr float    NAV_RELEASE_G           = 0.30f; // ナビゲート解放 (1 振り=1 操作にするため)
     constexpr uint32_t NAV_REFRACTORY_MS       = 400;   // ナビ不応期 (誤連打防止)
+    // 縦/横の判定窓: Armed 突入からこの時間、重力軸/水平面の両成分を積算し、
+    // 窓終了かリリース (dynNorm < NAV_RELEASE_G) の早い方で 1 回だけ判定・発火する。
+    // 瞬時値判定だと振り始めの向きの暴れを拾うため、窓積算で振り全体の支配方向を見る。
+    constexpr uint32_t NAV_DECISION_WINDOW_MS  = 250;
+    // 縦 (決定) と判定する優勢比: vertAccum >= horizAccum × この値 で縦。
+    // 上げるほど縦判定が厳しくなる (横に寄る)。1.0 = 単純比較。
+    constexpr float    NAV_VERT_DOMINANCE      = 1.00f;
+    // 横振りのカーソル移動方向の符号。実機で「右に振ったのに左へ動く」なら -1.0 に反転。
+    constexpr float    NAV_LR_SIGN             = 1.0f;
+    // 重力推定 LPF: accLpf をさらに遅い LPF に通す (5ms 周期 α=0.01 で時定数 ≈0.5s)。
+    // dynNorm が NAV_GRAV_FREEZE_G 以上の間 (振り中) は更新を凍結し、
+    // 振り加速度が重力推定へ漏れ込むのを防ぐ。
+    constexpr float    NAV_GRAV_LPF_ALPHA      = 0.01f;
+    constexpr float    NAV_GRAV_FREEZE_G       = 0.30f;
     constexpr uint8_t  MENU_ITEM_COUNT         = 2;     // メニュー項目数 (0=自由演奏 / 1=ゲーム)
 
     // ── test_v3 ゲームモード: ゲーム進行・採点・ガイドフェード ──
