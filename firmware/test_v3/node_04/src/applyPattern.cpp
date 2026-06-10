@@ -7,6 +7,8 @@
 // 設計方針: BPM はあくまで補助 (durationMs 計算で使用)。score の進行は
 // 「指揮者の拍番号 firedBeatNo」で決める。輪唱は headRestBeats だけ頭の拍を
 // 読み飛ばしてから kScore[0] を鳴らし始める (声部ごとにずれて入る)。
+// 周回は CANON_CYCLE_BEATS (曲長 + 最終声部の遅延) のサイクル窓で管理し、
+// 最終声部 (node_05) が 1 周を終えるまで先頭声部は次の周回を始めない。
 // 拍番号駆動なので、Processing をいつ起動しても「曲の現在位置」から自然に鳴る。
 //
 // 処理フロー:
@@ -156,18 +158,23 @@ void applyPattern(SystemData& data) {
     }
 
     // 5. 楽譜進行: 指揮者拍番号 firedBeatNo から自分の楽譜インデックスを算出する。
-    //   effective = firedBeatNo - 1 - headRestBeats
-    //     effective < 0          : まだ「頭の休符」期間 → 何も鳴らさない (拍を消費するだけ)
-    //     effective >= 0         : scoreIndex = effective % kScoreLength で kScore を引いて発火
+    //   輪唱サイクル方式 (4 声対応): cyclePos = (firedBeatNo - 1) % CANON_CYCLE_BEATS
+    //     cyclePos <  headRestBeats             : 自分の入り前 (頭の休符) → 鳴らさない
+    //     headRest <= cyclePos < headRest+曲長  : local = cyclePos - headRestBeats で発火
+    //     cyclePos >= headRest+曲長             : 自分の 1 周は終了 → サイクル末尾まで休む
+    //   サイクル長 56 拍 = 曲長 32 + 最終声部 (node_05, headRest=24) の遅延。全声部が
+    //   同じ周期を共有するため、最終声部が 1 周を終えるまで先頭声部は次の周回を
+    //   始めない (旧 % kScoreLength 方式は各声部が勝手に周回し輪唱の終端が崩れた)。
     // 拍番号で引くので、Processing をいつ起動しても曲の現在位置から鳴り始める。
     // 拍が一つ飛んでも firedBeatNo に追随するだけでズレが残らない (自己補正)。
     if (fired && kScoreLength > 0) {
-        const int32_t effective =
-            (int32_t)firedBeatNo - 1 - (int32_t)ORC_RECEIVER_CONFIG.headRestBeats;
-        if (effective >= 0) {
-            const uint32_t scoreIndex = (uint32_t)effective % (uint32_t)kScoreLength;
-            fireScoreEvent(data, kScore[scoreIndex], now);
-            data.score.currentEventIndex = (uint16_t)scoreIndex;   // 診断ログ用
+        const uint32_t cyclePos =
+            (uint32_t)(firedBeatNo - 1) % (uint32_t)CANON_CYCLE_BEATS;
+        const int32_t local =
+            (int32_t)cyclePos - (int32_t)ORC_RECEIVER_CONFIG.headRestBeats;
+        if (local >= 0 && (uint32_t)local < (uint32_t)kScoreLength) {
+            fireScoreEvent(data, kScore[local], now);
+            data.score.currentEventIndex = (uint16_t)local;   // 診断ログ用
         }
     }
 

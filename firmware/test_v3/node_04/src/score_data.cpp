@@ -4,14 +4,16 @@
 //   pio device monitor -d firmware/test_v3/node_04
 //
 // 輪唱用の楽譜 — 「かえるのうた」(C major, 32 拍 = 4 フレーズ)。
-// 全声部 (node_02/03/04) で同一。
+// 全声部 (node_02〜05) で同一。
 //
 //   フレーズ 1 (拍 1-8):  ド レ ミ ファ ミ レ ドー     (かえるの うたが)
 //   フレーズ 2 (拍 9-16): ミ ファ ソ ラ ソ ファ ミー   (きこえて くるよ)
 //   フレーズ 3 (拍 17-24): ド 休 ド 休 ド 休 ド 休     (グワッ グワッ グワッ グワッ)
 //   フレーズ 4 (拍 25-32): ドドレレミミファファ ミ レ ドー (ゲロゲロゲロゲロ グワッグワッグワッ)
 //
-// 1 周 = 32 拍。kScoreLength = 32。末尾以降は applyPattern が % kScoreLength でループ。
+// 1 周 = 32 拍。kScoreLength = 32。周回は applyPattern が輪唱サイクル
+// (CANON_CYCLE_BEATS = 56 拍 = 曲長 32 + 最終声部の遅延 24) の窓方式で管理し、
+// 最終声部 (node_05) が 1 周を終えるまで先頭声部は次の周回を始めない。
 //
 // 1 拍 = 1 ScoreEvent。指揮者の BEAT を 1 個受けるたびにインデックスを 1 個進める。
 // 4 分音符は durationQ8=240 (≒0.94 拍ぶん鳴らして残りは隙間)。
@@ -19,8 +21,8 @@
 // 8 分音符は subNote で拍の後半に発火 (subOffsetQ8=128 = 0.5拍後、subDurationQ8=128)。
 //
 // 輪唱は ProjectConfig.h の headRestBeats で声部ごとに頭をずらす (node_02=0,
-// node_03=8, node_04=16 拍)。1 周 32 拍に対して 8 拍ずつずれるので、3 声が
-// (0, 8, 16) の位相で入り、4 フレーズの重なりで立体的な輪唱になる。
+// node_03=8, node_04=16, node_05=24 拍)。1 周 32 拍に対して 8 拍 (1 フレーズ) ずつ
+// ずれて 4 声が入り、4 フレーズの重なりで立体的な輪唱になる。
 //
 // {beatAt(参考値), noteNumber(0=休符), velocity, durationQ8(256=1拍),
 //  flags(bit0=NoteOn / bit2=休符), subNote, subVelocity, subOffsetQ8, subDurationQ8}

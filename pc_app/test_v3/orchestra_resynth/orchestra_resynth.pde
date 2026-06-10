@@ -17,7 +17,7 @@
      2  version     uint8   0x01
      3  type        uint8   3=NOTE / 4=UI (1=CTRL / 2=BEAT は USB には流れない)
      --- type=3 (NOTE) ---
-     12 partId      uint8   0x02-0x04
+     12 partId      uint8   0x02-0x05
      13 noteNumber  uint8   MIDI ノート番号
      14 velocity    uint8   0-127
      15 gate        uint8   1=NoteOn
@@ -678,7 +678,7 @@ void drawFreePlayScreen(){
   text("受信パケット: " + totalReceived +
        (lastNoteAtMs > 0 ? "   (最後の NOTE から " + (millis()-lastNoteAtMs) + " ms)" : ""), 50, sy + 44);
   float ry = sy + 64; int col = 0;
-  for (int p = 0x02; p <= 0x04; p++){
+  for (int p = 0x02; p <= 0x05; p++){
     String ev = lastEventByPart[p];
     fill(ev != null ? color(28, 54, 80) : color(150, 160, 180));
     text("声部 0x" + hex(p, 2) + ": " + (ev != null ? ev : "(未受信)"), 50 + col * ((width - 120) / 2), ry);
@@ -799,7 +799,7 @@ void drawAnalyzerScreen(){
   text("直近イベント", 50, sy + 24);
   fill(28, 54, 80); textSize(12);
   float ry = sy + 44; int col = 0;
-  for (int p = 0x02; p <= 0x04; p++){
+  for (int p = 0x02; p <= 0x05; p++){
     String ev = lastEventByPart[p];
     if (ev == null) continue;
     text("0x" + hex(p, 2) + ": " + ev, 50 + col * ((width - 120) / 2), ry);
@@ -811,7 +811,7 @@ void drawAnalyzerScreen(){
 
 // 画面下部の共通パネル: 左にキー操作ガイド、右に接続ステータス。
 // 接続ステータス = 役割 / UI リンク鮮度 (メイン UI のみ) / 声部別 NOTE 受信インジケータ。
-// 「3 台のうちどれが鳴っていないか」「指揮者との UI 中継が生きているか」を常時見せる。
+// 「4 台のうちどれが鳴っていないか」「指揮者との UI 中継が生きているか」を常時見せる。
 void drawHelpPanel(String helpText){
   float hx = 28, hy = height - 66, hw = width - 56, hh = 48;
   fill(255); noStroke();
@@ -827,7 +827,7 @@ void drawHelpPanel(String helpText){
   int now = millis();
 
   // 声部別 NOTE インジケータ (右端)。緑=2 秒以内に受信 / 灰=受信歴あり / 輪郭のみ=未受信
-  for (int p = 0x04; p >= 0x02; p--){
+  for (int p = 0x05; p >= 0x02; p--){
     boolean seen   = lastNoteMsByPart[p] > 0;
     boolean active = seen && (now - lastNoteMsByPart[p] < 2000);
     float cxp = sx - 8;

@@ -4,10 +4,11 @@
 //   pio device monitor -d firmware/test_v3/node_03
 //
 // 楽器ノード node_03 — 輪唱「かえるのうた」の声部 2 (8 拍遅れて入る / 楽器番号 1)
-// node_02/03/04 で差分はこのファイルだけ (楽譜 score_data.* は 3 台とも同一)。
-//   node_02: partId=0x02  headRestBeats=0   instrumentId=0
-//   node_03: partId=0x03  headRestBeats=8   instrumentId=1
-//   node_04: partId=0x04  headRestBeats=16  instrumentId=2
+// node_02〜05 で差分はこのファイルだけ (楽譜 score_data.* は 4 台とも同一)。
+//   node_02: partId=0x02  headRestBeats=0   instrumentId=0 (トランペット)
+//   node_03: partId=0x03  headRestBeats=8   instrumentId=1 (ホルン)
+//   node_04: partId=0x04  headRestBeats=16  instrumentId=2 (トロンボーン)
+//   node_05: partId=0x05  headRestBeats=24  instrumentId=3 (チューバ)
 #pragma once
 #include <Arduino.h>
 #include <IPAddress.h>
@@ -54,4 +55,10 @@ namespace logic_params {
     constexpr uint16_t LED_IDLE_MS       = 1000;
     constexpr uint16_t LED_WAIT_START_MS = 500;
     constexpr float    DEFAULT_BPM = 100.0f;   // CTRL 未受信時の発音長計算に使う既定テンポ
+    // 輪唱サイクル長 [拍] = 曲長 32 拍 + 最終声部 (node_05) の入り遅れ 24 拍。
+    // 全声部がこの周期を共有することで「最終声部が 1 周を終えるまで先頭声部が
+    // 次の周回を始めない」という輪唱の終端が成立する。score_data.cpp の曲長や
+    // 各ノードの headRestBeats (0/8/16/24) を変えるときは、必ず 4 ノードすべてで
+    // この値を揃えて再計算すること (ずれると声部間の周回がぶつかる)。
+    constexpr uint16_t CANON_CYCLE_BEATS = 56;
 }

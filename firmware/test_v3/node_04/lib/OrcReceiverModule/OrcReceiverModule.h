@@ -11,7 +11,7 @@
 #include "IModule.h"
 
 struct OrcReceiverConfig {
-    uint8_t  partId;                  // 0x02-0x04: 輪唱のどの声部か
+    uint8_t  partId;                  // 0x02-0x05: 輪唱のどの声部か
     uint16_t headRestBeats;           // 輪唱: 先頭に入れる休符の拍数 (0=先頭から入る)。
                                       // applyPattern が firedBeatNo からこのぶん引いて楽譜を引く
     float    clockSyncEmaAlpha;       // 初回サンプル (新規 CTRL / 初到着 BEAT) の EMA 係数

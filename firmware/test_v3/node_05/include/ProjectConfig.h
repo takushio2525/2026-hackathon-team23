@@ -1,9 +1,9 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v3/node_02
-//   pio run -d firmware/test_v3/node_02 -t upload
-//   pio device monitor -d firmware/test_v3/node_02
+//   pio run -d firmware/test_v3/node_05
+//   pio run -d firmware/test_v3/node_05 -t upload
+//   pio device monitor -d firmware/test_v3/node_05
 //
-// 楽器ノード node_02 — 輪唱「かえるのうた」の声部 1 (先頭から入る / 楽器番号 0)
+// 楽器ノード node_05 — 輪唱「かえるのうた」の声部 4 (24 拍遅れて入る / 楽器番号 3)
 // node_02〜05 で差分はこのファイルだけ (楽譜 score_data.* は 4 台とも同一)。
 //   node_02: partId=0x02  headRestBeats=0   instrumentId=0 (トランペット)
 //   node_03: partId=0x03  headRestBeats=8   instrumentId=1 (ホルン)
@@ -17,7 +17,6 @@
 #include "OrcReceiverModule.h"
 #include "NoteSenderModule.h"
 #include "StatusLedModule.h"
-#include "UiRelayModule.h"
 
 inline const OrcNetConfig ORC_NET_CONFIG = {
     /*mode=*/                WifiMode::Sta,
@@ -27,12 +26,12 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,
     /*reconnectIntervalMs=*/ 2000,
-    /*beatGapMs=*/           0,    // Sta 側は送信しないので未使用 (送信側 node_01 のみ意味を持つ)
+    /*beatGapMs=*/           0,    // Sta 側は送信しないので未使用
 };
 
 inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
-    /*partId=*/                0x02,    // 輪唱 声部 1
-    /*headRestBeats=*/         0,       // 先頭から入る (頭の休符なし)
+    /*partId=*/                0x05,    // 輪唱 声部 4
+    /*headRestBeats=*/         24,      // 24 拍ぶん頭に休符を入れてから入る (最終声部)
     /*clockSyncEmaAlpha=*/     0.20f,   // 初回サンプル: 旧 0.10 → 0.20 で応答性向上 (時定数 ≈0.25 s)
     /*clockSyncEmaAlphaDup=*/  0.05f,   // 連送 2 個目以降: 過剰反映を避けて軽く補正
     /*clockSyncMinSamples=*/   5,
@@ -42,18 +41,8 @@ inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
 
 inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
     /*baudRate=*/     115200,
-    /*partId=*/       0x02,
-    /*instrumentId=*/ 0,             // PC 側で読み込んだ楽器定義 (data/*.json) の何番目を使うか
-};
-
-// test_v3 ゲームモード: 指揮者の UI 状態 (mode/画面/カーソル/score) を PC へ中継する設定。
-// node_02 = メイン操作 UI が付く PC。「変化時のみ + minIntervalMs 上限 + heartbeat 保険」で送る。
-// Menu/Result では操作時のみ、Conducting 中は bpmQ8 変化時のみで、いずれも低頻度
-// (+1s heartbeat)。node_03/04 はアナライザのため載せない。
-inline const UiRelayConfig UI_RELAY_CONFIG = {
-    /*partId=*/        0x02,
-    /*minIntervalMs=*/ 33,     // 変化送出の最小間隔 (BPM 表示の追従を滑らかにする上限 30Hz)
-    /*heartbeatMs=*/   1000,   // 無変化でも 1s ごとに 1 発 (PC 途中接続でも状態を拾える)
+    /*partId=*/       0x05,
+    /*instrumentId=*/ 3,             // PC 側で読み込んだ楽器定義 (data/*.json) の何番目を使うか (3=チューバ)
 };
 
 inline const StatusLedConfig STATUS_LED_CONFIG = {

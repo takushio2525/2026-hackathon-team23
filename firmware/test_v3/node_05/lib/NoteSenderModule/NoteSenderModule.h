@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v3/node_03
-//   pio run -d firmware/test_v3/node_03 -t upload
-//   pio device monitor -d firmware/test_v3/node_03
+//   pio run -d firmware/test_v3/node_05
+//   pio run -d firmware/test_v3/node_05 -t upload
+//   pio device monitor -d firmware/test_v3/node_05
 //
 // 楽器ノード出力モジュール (輪唱の 1 声部)
 // data.noteOut.pendingOn を見て NotePacket (20 B, NoteOn のみ) を組み立て、

@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v3/node_03
-//   pio run -d firmware/test_v3/node_03 -t upload
-//   pio device monitor -d firmware/test_v3/node_03
+//   pio run -d firmware/test_v3/node_05
+//   pio run -d firmware/test_v3/node_05 -t upload
+//   pio device monitor -d firmware/test_v3/node_05
 //
 // 輪唱用の楽譜 — 「かえるのうた」(C major, 32 拍 = 4 フレーズ)。
 // 全声部 (node_02〜05) で同一。

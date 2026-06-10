@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v3/node_02
-//   pio run -d firmware/test_v3/node_02 -t upload
-//   pio device monitor -d firmware/test_v3/node_02
+//   pio run -d firmware/test_v3/node_05
+//   pio run -d firmware/test_v3/node_05 -t upload
+//   pio device monitor -d firmware/test_v3/node_05
 //
 // 輪唱用の楽譜データ — 全声部 (node_02〜05) で同一の「かえるのうた」(32 拍) を持つ。
 // 1 拍 = 1 ScoreEvent。指揮者の BEAT を 1 個受けるたびに kScore のインデックスを
