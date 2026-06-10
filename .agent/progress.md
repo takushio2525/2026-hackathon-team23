@@ -5,6 +5,12 @@
 
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
+- 2026-06-10: **test_v3 品質向上（机上レビュー＋7 コミット、`shiozawa-test_v3-polish` ブランチ・PR 提出）**。
+  node_01 状態遷移修正（Menu/Result の IMU 監視・Fallback 復帰先・テンポ EMA リセット・beatNo=0 で毎回曲頭から）、
+  楽器クロック同期スナップ復帰（指揮者リセット 1 パケット追従）＋ OrcReceiver/SystemData/applyPattern の 3 ノード統一、
+  Processing ジャイロ軌跡の重複 push 修正＋全画面に接続ステータス/操作ガイド、指揮者 -std=gnu++17（警告 8 件解消）、
+  README 2 本書き直し・api.md 現行同期。全 5 ノード pio run SUCCESS 警告 0・processing-java build 通過。実機検証待ち。
+
 - 2026-06-08: **test_v3 マスターリセット復帰高速化・2D IMUグラフ・8分音符修正**。UI_TIMEOUT_MS 5000→2000、
   onScreenChange に Waiting 遷移時ゲーム状態リセット追加。OrcSenderModule で Conducting 時に navCursor/score を
   IMU 加速度 int8 で上書き、Processing に 2D XY プロット（80 フレームリングバッファ）。score_data.cpp の 8 分音符

@@ -1,9 +1,9 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_02
-//   pio run -d firmware/test_v2/node_02 -t upload
-//   pio device monitor -d firmware/test_v2/node_02
+//   pio run -d firmware/test_v3/node_02
+//   pio run -d firmware/test_v3/node_02 -t upload
+//   pio device monitor -d firmware/test_v3/node_02
 //
-// 楽器ノード node_02 — 輪唱「きらきら星」の声部 1 (先頭から入る / 楽器番号 0)
+// 楽器ノード node_02 — 輪唱「かえるのうた」の声部 1 (先頭から入る / 楽器番号 0)
 // node_02/03/04 で差分はこのファイルだけ (楽譜 score_data.* は 3 台とも同一)。
 //   node_02: partId=0x02  headRestBeats=0   instrumentId=0
 //   node_03: partId=0x03  headRestBeats=8   instrumentId=1
@@ -35,6 +35,7 @@ inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
     /*clockSyncEmaAlpha=*/     0.20f,   // 初回サンプル: 旧 0.10 → 0.20 で応答性向上 (時定数 ≈0.25 s)
     /*clockSyncEmaAlphaDup=*/  0.05f,   // 連送 2 個目以降: 過剰反映を避けて軽く補正
     /*clockSyncMinSamples=*/   5,
+    /*clockSyncSnapThresholdMs=*/ 1000,  // 指揮者リセット (マスタ時計巻き戻り) を 1 パケットで追従。正常遅延 (数十 ms) では届かない
     /*loopIntervalMs=*/        2,       // 旧 5 ms → 2 ms (発音判定ジッタ最大 5 ms → 2 ms)
 };
 
@@ -45,8 +46,10 @@ inline const NoteSenderConfig NOTE_SENDER_CONFIG = {
 };
 
 // test_v3 ゲームモード: 指揮者の UI 状態 (mode/画面/カーソル/score) を PC へ中継する設定。
-// node_02 = メイン操作 UI が付く PC。低頻度送出 (変化時 + 最大 5Hz + 1s heartbeat) で
-// 演奏 NOTE バーストを阻害しない。node_03/04 はアナライザのため UiRelayModule を載せない。
+// node_02 = メイン操作 UI が付く PC。「変化時のみ + minIntervalMs 上限 + heartbeat 保険」で送る。
+// Conducting 中は CTRL の navCursor/score にジャイロが載って毎回変化するため、実質
+// minIntervalMs 周期 (30Hz) の連続送出になる (20B×30Hz=600B/s ≪ 115200bps、NOTE と干渉しない)。
+// Menu/Result では操作時のみ送出 + 1s heartbeat の低頻度。node_03/04 はアナライザのため載せない。
 inline const UiRelayConfig UI_RELAY_CONFIG = {
     /*partId=*/        0x02,
     /*minIntervalMs=*/ 33,     // 変化送出の最小間隔 (30Hz: 角速度データの滑らかな軌跡描画用)

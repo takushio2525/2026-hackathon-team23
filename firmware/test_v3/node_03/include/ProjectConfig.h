@@ -1,9 +1,9 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_03
-//   pio run -d firmware/test_v2/node_03 -t upload
-//   pio device monitor -d firmware/test_v2/node_03
+//   pio run -d firmware/test_v3/node_03
+//   pio run -d firmware/test_v3/node_03 -t upload
+//   pio device monitor -d firmware/test_v3/node_03
 //
-// 楽器ノード node_03 — 輪唱「きらきら星」の声部 2 (8 拍遅れて入る / 楽器番号 1)
+// 楽器ノード node_03 — 輪唱「かえるのうた」の声部 2 (8 拍遅れて入る / 楽器番号 1)
 // node_02/03/04 で差分はこのファイルだけ (楽譜 score_data.* は 3 台とも同一)。
 //   node_02: partId=0x02  headRestBeats=0   instrumentId=0
 //   node_03: partId=0x03  headRestBeats=8   instrumentId=1
@@ -34,6 +34,7 @@ inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
     /*clockSyncEmaAlpha=*/     0.20f,   // 初回サンプル: 旧 0.10 → 0.20 で応答性向上 (時定数 ≈0.25 s)
     /*clockSyncEmaAlphaDup=*/  0.05f,   // 連送 2 個目以降: 過剰反映を避けて軽く補正
     /*clockSyncMinSamples=*/   5,
+    /*clockSyncSnapThresholdMs=*/ 1000,  // 指揮者リセット (マスタ時計巻き戻り) を 1 パケットで追従。正常遅延 (数十 ms) では届かない
     /*loopIntervalMs=*/        2,       // 旧 5 ms → 2 ms (発音判定ジッタ最大 5 ms → 2 ms)
 };
 

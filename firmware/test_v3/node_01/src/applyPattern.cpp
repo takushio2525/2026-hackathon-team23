@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_01
-//   pio run -d firmware/test_v2/node_01 -t upload
-//   pio device monitor -d firmware/test_v2/node_01
+//   pio run -d firmware/test_v3/node_01
+//   pio run -d firmware/test_v3/node_01 -t upload
+//   pio device monitor -d firmware/test_v3/node_01
 //
 // 指揮者ノードの判断ロジック
 // 仕様 §2.4.2.4 の処理フロー:
@@ -53,6 +53,23 @@ void gateToIdle() {
     sBeatFiredInArmed  = false;
     sReleaseStartMs    = 0;
 }
+
+// テンポ推定のリセット (Menu からの演奏セッション開始時に呼ぶ)。
+// sLastBeatMs=0 で次の拍を「1 拍目」(間隔計算なし) に戻す。これをしないと
+// Menu 滞在時間が拍間隔として EMA に混入し、BPM_MIN クランプ値 (40) に
+// 引っ張られた BPM を新セッションの頭で数拍引きずる。
+void resetTempoTracking(SystemData& data) {
+    sLastBeatMs = 0;
+    sBpmEma     = 100.0f;
+    sBpmInit    = false;
+    data.tempo.bpm = 100.0f;
+    data.tempo.nextBeatPredictedMs = 0;
+}
+
+// Fallback に落ちる直前の状態 (= 復帰先)。Menu/Result で IMU が止まっても
+// 復帰後に元の画面へ戻る。既定 Menu は「Calibrating 完了前に Fallback は
+// 起きない」ため実際には使われない保険値。
+ConductorState sStateBeforeFallback = ConductorState::Menu;
 
 // ── test_v3: メニューナビのゲート (拍検出ゲートとは独立) ──
 // dynAcc の左右(X)/上下(Y)成分の符号と大きさだけで「カーソル移動」「決定」を判定する単純式。
@@ -251,6 +268,11 @@ void applyPattern(SystemData& data) {
             const bool imuOk = data.imu.ready ||
                                (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
             if (!imuOk || !data.orcNet.wifiConnected) {
+                sStateBeforeFallback = ConductorState::Conducting;
+                // 復帰後最初の拍間隔は Fallback 滞在時間を含み無意味なので、
+                // 1 拍目扱い (間隔計算なし) に戻して EMA と採点を汚さない。
+                // BPM 自体は維持する (resetTempoTracking はしない)。
+                sLastBeatMs = 0;
                 data.conductor.state = ConductorState::Fallback;
             }
             break;
@@ -260,13 +282,23 @@ void applyPattern(SystemData& data) {
             const bool imuOk = data.imu.ready ||
                                (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
             if (imuOk && data.orcNet.wifiConnected) {
-                data.conductor.state = ConductorState::Conducting;
+                // 落ちる前の状態へ戻す (Conducting 中断なら演奏へ、Menu/Result なら画面へ)
+                data.conductor.state = sStateBeforeFallback;
+                sNavGate = NavGate::Idle;   // ナビの撃ちかけ状態を破棄 (復帰直後の誤発火防止)
             }
             break;
         }
 
         // ── test_v3: メニュー (IMU ナビでモード選択。拍検出は止まる) ──
         case ConductorState::Menu: {
+            const bool imuOk = data.imu.ready ||
+                               (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
+            if (!imuOk || !data.orcNet.wifiConnected) {
+                // Menu 中に IMU が止まると操作不能のまま固まるので Fallback で異常を示す
+                sStateBeforeFallback = ConductorState::Menu;
+                data.conductor.state = ConductorState::Fallback;
+                break;
+            }
             if (updateNav(data, now, MENU_ITEM_COUNT)) {
                 if (data.game.navCursor == 1) {
                     // ゲーム開始: 目標テンポ提示・採点カウンタをリセット
@@ -282,6 +314,16 @@ void applyPattern(SystemData& data) {
                     data.game.targetBpm = 0;
                     data.game.score = 0xFF;
                 }
+                // 演奏セッション開始: テンポ推定と拍番号を初期化する。
+                // beatNo=0 に戻すと楽器側は effective = beatNo-1-headRestBeats < 0 の
+                // 頭休符からやり直す = 毎セッション曲頭から演奏が始まる
+                // (ゲームの「32 拍 = かえるのうた 1 周を採点」の前提と一致させる)。
+                // 楽器側の重複排除は「bn == lastBeatNo」だけなので巻き戻しも受理される。
+                // ※前セッションが 1 拍だけで終わった直後に限り、新セッションの bn=1 が
+                //   重複と誤判定され 1 拍飲まれるが、bn=2 から自己回復するため許容。
+                resetTempoTracking(data);
+                data.beat.beatNo = 0;
+                gateToIdle();
                 data.conductor.state = ConductorState::Conducting;
             }
             break;
@@ -289,6 +331,13 @@ void applyPattern(SystemData& data) {
 
         // ── test_v3: 結果表示 (縦振り=決定で Menu へ戻る。拍検出は止まる) ──
         case ConductorState::Result: {
+            const bool imuOk = data.imu.ready ||
+                               (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
+            if (!imuOk || !data.orcNet.wifiConnected) {
+                sStateBeforeFallback = ConductorState::Result;
+                data.conductor.state = ConductorState::Fallback;
+                break;
+            }
             if (updateNav(data, now, 1)) {
                 data.conductor.state = ConductorState::Menu;
                 data.game.mode = 0;

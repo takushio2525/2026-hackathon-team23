@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_01
-//   pio run -d firmware/test_v2/node_01 -t upload
-//   pio device monitor -d firmware/test_v2/node_01
+//   pio run -d firmware/test_v3/node_01
+//   pio run -d firmware/test_v3/node_01 -t upload
+//   pio device monitor -d firmware/test_v3/node_01
 //
 // 指揮者ノード node_01 のエントリポイント
 // EMA の 3 フェーズループ (入力 -> ロジック -> 出力) を loop() で回す
@@ -51,6 +51,8 @@ const char* stateName(ConductorState s) {
         case ConductorState::Calibrating: return "Calibrating";
         case ConductorState::Conducting:  return "Conducting";
         case ConductorState::Fallback:    return "Fallback";
+        case ConductorState::Menu:        return "Menu";
+        case ConductorState::Result:      return "Result";
     }
     return "?";
 }

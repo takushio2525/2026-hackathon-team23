@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_03
-//   pio run -d firmware/test_v2/node_03 -t upload
-//   pio device monitor -d firmware/test_v2/node_03
+//   pio run -d firmware/test_v3/node_03
+//   pio run -d firmware/test_v3/node_03 -t upload
+//   pio device monitor -d firmware/test_v3/node_03
 //
 // 楽器ノード (輪唱の 1 声部) の判断ロジック
 // 設計方針: BPM はあくまで補助 (durationMs 計算で使用)。score の進行は
@@ -20,6 +20,7 @@
 
 #include "SystemData.h"
 #include "ProjectConfig.h"
+#include "SerialDebug.h"
 #include "score_data.h"
 
 namespace {
@@ -76,6 +77,12 @@ void firePendingSub(SystemData& data, uint32_t now) {
     data.noteOut.velocity   = (uint8_t)v;
     data.noteOut.durationMs = data.score.pendingSubDurationMs;
     data.noteOut.pendingOn  = true;
+    DBG_PRINTF("[SUB] note=%u vel=%u dur=%u delay=%lu now=%lu\n",
+               (unsigned)data.score.pendingSubNote,
+               (unsigned)v,
+               (unsigned)data.score.pendingSubDurationMs,
+               (unsigned long)(now - data.score.pendingSubAtMs),
+               (unsigned long)now);
     data.score.pendingSub = false;
 }
 

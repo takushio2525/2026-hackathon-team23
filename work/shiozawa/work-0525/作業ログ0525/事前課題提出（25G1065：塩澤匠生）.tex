@@ -1,0 +1,269 @@
+%================================================================
+% 作業ログ 2026-05-25（test_v1 4 ノード同期試験まで・パケロス対応中）
+%   GW から続けてきた IMU モーション取得・WiFi 通信・回路まわりの作業を
+%   一区切りつけたところまでをまとめる．test_v1（最初の同期検証版）の 4 ノード
+%   同期試験は時刻同期までは到達したものの，UDP マルチキャストのパケロスにより
+%   安定発音に至らず進捗 70% で停滞，現在パケロス対策の検証中．
+%
+%   ビルド:
+%     cd work/shiozawa/work-0525/作業ログ0525
+%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログ0525.tex
+%================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{url}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：塩澤 匠生
+
+報告日：2026年5月25日
+
+プロジェクト名：タクトーン~ IMUジェスチャーで奏でるArduinoオーケストラ~ \\
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：25\%（基礎技術検証フェーズの途中．4 ノード同期試験でパケロスが顕在化し停滞）
+  \item マイルストーン達成状況：
+    \begin{itemize}
+      \item IMU モーション取得・回路結線・WiFi UDP 通信：達成
+      \item 4 ノード同期試験（test\_v1）：未達（時刻同期は到達したがパケロスにより安定発音に至らず，進捗 70\%）
+    \end{itemize}
+  \item 主要成果：
+    \begin{itemize}
+      \item 指揮者ノード（XIAO ESP32-S3 Sense + GY-521 IMU）で振り下ろしによる拍検出を実装
+      \item 自前プロトコル（CTRL／BEAT／NOTE の3種パケット）を WiFi UDP マルチキャストで配信
+      \item マスタクロック方式＋EMA 時計同期で楽器間の時刻ズレを実用範囲に収束
+    \end{itemize}
+  \item 重大課題（影響度：高）：
+    \begin{itemize}
+      \item {}[UDP マルチキャストのパケロスにより，楽器ノードへの NOTE／BEAT が一部到達せず，4 ノード同期試験で発音が抜ける／拍が遅れる症状が発生．マルチキャストは ACK と再送が無いため，シーケンス番号付与＋同一パケットの連送，もしくは NOTE のユニキャスト分離で吸収する方針を検討中（未解決・対応中）]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 2. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{7.5em}p{5em}p{5em}p{4em}p{3em}Xp{8em}@{}}
+\toprule
+作業項目 & 開始日 & 予定完了日 & 状態 & 進捗 & 依存関係・ブロッカー & コメント \\
+\midrule
+IMU モーション取得 & 2026-04-29 & 2026-05-05 & 完了 & 100\% & なし & GY-521 を I2C 接続し加速度ピークから振り下ろしを検出 \\
+回路結線・動作確認 & 2026-04-29 & 2026-05-06 & 完了 & 100\% & 部材調達 & XIAO の D4／D5 を SDA／SCL に割当，AD0=GND で I2C アドレスを 0x68 固定 \\
+WiFi UDP 通信 & 2026-05-03 & 2026-05-10 & 完了 & 100\% & IMU 完了 & SoftAP 起動，239.0.0.1:5001 マルチキャストで CTRL／BEAT／NOTE を配信 \\
+4 ノード同期試験（test\_v1） & 2026-05-10 & 2026-05-31 & 進行中 & 70\% & WiFi 完了 & マスタクロック方式＋EMA で時刻ズレは収束したが，パケロスにより安定発音に至らず停滞 \\
+パケロス計測・対策 & 2026-05-22 & 2026-05-31 & 進行中 & 30\% & 同期試験継続 & シーケンス番号と受信ログで欠落率を計測，連送／ユニキャスト分離の有効性を検証中 \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 3. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{8em}Xp{2.5em}p{2.5em}Xp{5em}p{3em}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 期限 & 状態 \\
+\midrule
+UDP マルチキャストのパケロス & 802.11 マルチキャストは Basic Rate（低レート）でブロードキャストされ ACK・再送が無いため，SoftAP 配下で楽器ノード数が増えるとパケットの取りこぼしが発生する．4 ノード同期試験で NOTE／BEAT の欠落として顕在化 & 高 & 高 & シーケンス番号を付与し同一パケットを 2〜3 回連送，受信側で重複排除．効果が薄ければ NOTE を楽器ごとのユニキャストへ分離する案を検討 & 2026-05-31 & 対応中 \\
+WiFi 到達時刻のばらつき & 無線到達時刻が数十 ms 単位でばらつくため，楽器ごとに発音が前後して聞こえる & 中 & 中 & マスタクロック方式（指揮者の millis() を共有）と EMA 時計同期で吸収．BEAT に発音目標時刻を載せて送出 & 2026-05-18 & 解決 \\
+XIAO 内蔵 LED の極性 & GPIO21 が active LOW であり，HIGH 書き込みで消灯する & 低 & 低 & 設定で \texttt{activeLow=true} を指定し，コード側は論理レベルで扱う & 2026-05-10 & 解決 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト
+
+※優先度＝対応の緊急性
+
+\sectionrule
+
+%================================================================
+% 4. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証(再現性重視)}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：パケロス対策の方針検討，UDP 信頼化手法の整理，ESP32 SoftAP のマルチキャスト挙動の確認
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}[802.11 マルチキャスト／ブロードキャストが Basic Rate で送出される件と，SoftAP 配下での取りこぼし傾向の整理]
+      \item {}[UDP 上で簡易な信頼性を持たせる方式の比較（シーケンス＋連送，選択的再送，FEC）]
+      \item {}[NOTE のように欠落が即音抜けにつながるパケットを，ユニキャストへ分離した場合の負荷見積もり]
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item {}[マルチキャストは ACK が無く，SoftAP では送出レートが Basic Rate に固定されるため，RSSI が低い端末ほど取りこぼしが出やすいとの説明]
+      \item {}[「全パケットを 2〜3 回連送＋シーケンス番号で重複排除」が最も実装コストが低い，との整理]
+      \item {}[NOTE のみユニキャスト化する場合，楽器ノードの IP 取得と送信先テーブルが必要となり，CTRL／BEAT はマルチキャスト維持が現実的，との示唆]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+※第三者が再現できるレベルで記述
+
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item {}[各楽器ノードでシーケンス番号と受信時刻をシリアル経由で記録し，欠落率と欠落タイミングを集計]
+      \item {}[連送あり／なしで欠落率を比較し，可聴な音抜けが残るかを実演で確認]
+    \end{itemize}
+  \item 検証手順：
+    \begin{enumerate}
+      \item node\_01 で CTRL／BEAT／NOTE にシーケンス番号を付与し，4 ノード同期試験を 60 秒間連続で実行する
+      \item node\_02／03／04 の受信側で，種別ごとに受信シーケンスをシリアルへログ出力する
+      \item ログを Python で集計し，欠落数・欠落位置・RSSI との相関を表に整理する
+      \item 同一パケットの 2 回連送を有効化し，同じ手順で欠落率を再計測する
+      \item Mac 上の Processing で発音される音の抜けを聴感でも確認する
+    \end{enumerate}
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+  \item 一致点：
+    \begin{itemize}
+      \item {}[マルチキャストが Basic Rate で送出され，SoftAP 配下の端末では取りこぼしが起きやすい点は Espressif の説明や一般的な WiFi の挙動と整合]
+      \item {}[「シーケンス番号＋連送」によるパケロス吸収は LAN 上の合奏／同期演奏系の事例でも採用例があり，実装容易性が高い]
+    \end{itemize}
+  \item 不一致・疑義：
+    \begin{itemize}
+      \item {}[AI 出力には「マルチキャスト送出レートを 802.11g/n の上位に固定する」案もあったが，ESP-IDF 経由で確実に変更できる API が見当たらず，実機での再現性が担保できないため不採用]
+      \item {}[FEC（Reed-Solomon 等）は実装負荷の割に得られる効果が連送と大差ない見積もりとなったため不採用]
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用（シーケンス番号付与＋同一パケットを 2〜3 回連送，受信側で重複排除．効果が不足する場合のみ NOTE をユニキャスト分離）
+    \end{itemize}
+  \item 根拠：
+    \begin{itemize}
+      \item {}[実機計測で欠落率と聴感の双方を確認したうえで採用判断する．結果は ADR-0007 に明文化する]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 5. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item {}[シーケンス番号＋同一パケットの連送をプロトコルに組み込み，4 ノード同期試験で安定発音に到達させる]
+      \item {}[対策が固まった段階で本番想定構成（楽器 5 台，金管 4＋ドラム）でも同等の安定性が得られるか確認する]
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item {}[4 ノード構成で NOTE の欠落率 1\% 未満（連送有効化後）]
+      \item {}[30 秒以上の連続送出で，PC 側の発音に欠落が認められない]
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item {}[2026 年 5 月末を目安に対策実装と再計測，6 月以降は本番想定構成（楽器 5 台）の準備に移行]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item {}[同期誤差（時刻ズレ）とパケロス（パケットの取りこぼし）は別問題として切り分ける．前者は EMA で吸収済，後者はアプリケーション層の対策が必要]
+  \item {}[楽器ノードのシリアルは NOTE バイナリパケットを PC 側 Processing へ流すため SERIAL\_DEBUG=0 を既定とする．パケロス計測時のみ一時的に有効化する]
+  \item {}[実機未テストのファームウェアに対する机上修正は同期挙動を逆転させるリスクがあるため，必ず実機書き込みでの確認を経て取り込む]
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. 付録
+%================================================================
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item ソースコード：\texttt{firmware/test\_v1/}（node\_01〜node\_04 と共通ライブラリ \texttt{common/}）
+      \item PC 側アプリ：\texttt{pc\_app/test\_v1/orchestra\_player/}（MIDI 風発音）
+      \item GitHub リポジトリ：\url{https://github.com/takushio2525/2026-hackathon-team23}
+      \item 設計判断記録：ADR-0002（プロトコル選定），ADR-0003（IMU 採用），ADR-0006（同期誤差 20 ms），ADR-0007（パケロス対策方針／起票予定）
+    \end{itemize}
+  \item リポジトリ閲覧の要検討事項：
+    \begin{itemize}
+      \item {}[上記 GitHub リポジトリは現在プライベート設定のため，TA・教員など第三者からは閲覧できない．採点・レビューを成立させるには以下のいずれかの対応が必要]
+      \item {}[案 A：個人情報・授業内情報が含まれることを承知のうえでパブリックリポジトリへ変更する]
+      \item {}[案 B：採点用アカウントを共同開発者（Collaborator）として招待し，プライベート設定のまま閲覧権限を付与する]
+    \end{itemize}
+  \item 添付範囲：
+    \begin{itemize}
+      \item 差分（test\_v1 の 4 ノード同期試験までを実装し，パケロス対応に入った直近時点のスナップショット）
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\end{document}

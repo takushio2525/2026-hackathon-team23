@@ -1,6 +1,6 @@
 // Build (run from project root) — shared by node_01 and node_02:
-//   pio run -d firmware/test_v2/node_01     # 指揮者ノード
-//   pio run -d firmware/test_v2/node_02     # 楽器 1
+//   pio run -d firmware/test_v3/node_01     # 指揮者ノード
+//   pio run -d firmware/test_v3/node_02     # 楽器 1
 //
 // シリアルデバッグの共通フック
 // build_flags の -DSERIAL_DEBUG=1 で有効化される。
