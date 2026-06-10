@@ -27,6 +27,13 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 - [Processing IDE](https://processing.org/download)（4.x）
 - Minim ライブラリ（`スケッチ → ライブラリをインポート → ライブラリを追加` から `Minim`）
 
+## ディレクトリ
+
+| パス | 内容 |
+|---|---|
+| `orchestra_resynth/` | `firmware/test_v3` から届く NOTE / UI パケットを受信して発音・画面表示する本体 Processing スケッチ |
+| `kaeru_score_debug/` | かえるのうたの作成済み楽譜と解析済み音色 JSON をまとめた試聴・移植確認用スケッチ。不要になったら削除して構いません |
+
 ## 実行手順
 
 1. 指揮者ノード（`firmware/test_v3/node_01`）と楽器ノード（`node_02`〜`node_04`）を電源 ON
