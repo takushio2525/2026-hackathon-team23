@@ -5,6 +5,11 @@
 
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
+- 2026-06-10: **test_v3 修正 5 タスク**（main 直 4 コミット）。ジャイロ 2D 表示削除（`4b480a6`）、
+  メニューナビを重力推定 LPF＋窓積算の縦/横判定に改善（`9f9490c`）、状態遷移デッドタイム 1000ms 追加
+  （`b656884`）、新音色 4 種で 4 台輪唱＝node_05 新設＋CANON_CYCLE_BEATS=56 のサイクル窓終端処理
+  （`80ec121`）。全 6 ノード pio run SUCCESS 警告 0・processing-java build 成功。実機検証はユーザー。
+
 - 2026-06-10: **test_v3 品質向上（机上レビュー＋7 コミット、`shiozawa-test_v3-polish` ブランチ・PR 提出）**。
   node_01 状態遷移修正（Menu/Result の IMU 監視・Fallback 復帰先・テンポ EMA リセット・beatNo=0 で毎回曲頭から）、
   楽器クロック同期スナップ復帰（指揮者リセット 1 パケット追従）＋ OrcReceiver/SystemData/applyPattern の 3 ノード統一、
