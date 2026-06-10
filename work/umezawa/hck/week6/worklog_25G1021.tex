@@ -5,6 +5,7 @@
 \usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{graphicx}
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.6em}
@@ -20,7 +21,11 @@
 \newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
 
 \renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
 \setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
 
 \begin{document}
 
@@ -28,7 +33,7 @@
 
 報告者：梅澤颯太
 
-報告日：2026年6月2日
+報告日：2026年6月9日
 
 プロジェクト名：タクトーン～IMU ジェスチャーで奏でるArduino オーケストラ～
 
@@ -37,9 +42,35 @@
 \section{進捗サマリー（要約）}
 
 \begin{itemize}
-  \item 2026/05/27に，UI/モード表示のプログラム作成を授業時間内に行った．
-  \item 2026/05/30に，4パート同時発音管理ロジック確認・プログラムの作成を行った．
+  \item 全体進捗率：90\%
+  \item マイルストーン達成状況：概ね達成
+  \item 主要成果：
+    \begin{itemize}
+      \item \texttt{NOTE} 受信モジュールを作成し，20 byte 固定長フレームを Processing 側で読み取れるようにした．
+      \item 受信した \texttt{partId}，\texttt{noteNumber}，\texttt{velocity}，\texttt{durationMs} をもとに，音色合成エンジンへ渡す処理を実装した．
+      \item 4パート同時発音管理ロジックを確認し，パートごとの同時発音数制限と音の自動停止処理を整理した．
+      \item UI/モード表示として，タイトル画面，ポート選択画面，モード選択画面，演奏画面を作成した．
+    \end{itemize}
+  \item 課題：
+    \begin{itemize}
+      \item Arduino 実機からの \texttt{NOTE} 受信と，複数ノードを接続した結合、調整は次回で実施する．
+      \item 音色と音量は Processing 単体では確認できたが，本番環境ではスピーカや会場音量に合わせた再調整が必要である．
+    \end{itemize}
 \end{itemize}
+
+\subsection{ガントチャート}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig/ガントチャート_梅澤_全員.pdf}
+  \caption{全体のガントチャート}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig/ガントチャート_梅澤担当_20260527-20260609.pdf}
+  \caption{梅澤担当範囲のガントチャート}
+\end{figure}
 
 \sectionrule
 
@@ -49,8 +80,10 @@
 \toprule
 日付 & 作業時間 & 作業内容 & 成果・メモ \\
 \midrule
-2026/05/27 & 2h & UI/モード表示のプログラム作成を授業時間内に行った． & UI画面とモード表示に関する実装を進めた． \\
-2026/05/30 & 1.5h & 4パート同時発音管理ロジック確認・プログラムの作成を行った． & 複数パートを同時に扱うための発音管理ロジックを確認し，プログラム作成を進めた． \\
+2026/05/27 & 2h & UI/モード表示のプログラム作成を授業時間内に行った． & タイトル画面，ポート選択画面，モード選択画面，演奏画面の構成を作成した． \\
+2026/05/30 & 1.5h & 4パート同時発音管理ロジック確認・プログラムの作成を行った． & 複数パートを同時に扱うための発音管理ロジックを確認し，パートごとの発音数制限を整理した． \\
+2026/06/01 & 2h & \texttt{NOTE} 受信モジュールを作成した． & 20 byte 固定長フレームを読み取り，\texttt{NotePacket} として扱う処理を作成した． \\
+2026/06/02 & 1h & UI/モード表示の確認を行った． & 受信状態，選択中パート，ミュート状態，受信数，破棄数，波形表示を演奏画面で確認できるようにした． \\
 \bottomrule
 \end{tabularx}
 
@@ -61,6 +94,16 @@
 %================================================================
 \section{課題管理}
 
+\begin{tabularx}{\linewidth}{@{}p{0.20\linewidth}Xp{0.08\linewidth}p{0.08\linewidth}Xp{0.11\linewidth}p{0.09\linewidth}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 期限 & 状態 \\
+\midrule
+Arduino 実機からの \texttt{NOTE} 受信確認 & 今週は Processing 側の受信処理と音源処理の実装整理を中心に進めたため，実機結合，調整が残っている． & 高 & 高 & Arduino 側から仕様通りの 20 byte フレームを送信し，Processing 側の受信数，破棄数，ログを確認する． & 2026/06/10以降 & 対応中 \\
+複数ノード接続時の同期確認 & 単体では疑似 \texttt{NOTE} フレームで確認できるが，複数ノード同時接続時のずれは実環境で確認する必要がある． & 中 & 中 & 各ノードから同時に \texttt{NOTE} を送信し，ログの \texttt{seq} と聴感で同期状態を確認する． & 2026/06/10以降 & 対応中 \\
+音量・音色の最終調整 & PC 内蔵音量やスピーカ環境によって，Processing 側の \texttt{MASTER\_GAIN} と各音色の聞こえ方が変わる． & 中 & 中 & 本番に近い音響環境でテストし，音割れしない範囲で各パートの音量を調整する． & 結合テスト時 & 対応予定 \\
+\bottomrule
+\end{tabularx}
+
 \sectionrule
 
 %================================================================
@@ -70,13 +113,64 @@
 
 \subsection{利用内容}
 
+\begin{itemize}
+  \item 利用目的：Processing 側実装内容の整理，Processing プログラム作成の補助，作業ログ文章の作成補助
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item Processing で \texttt{NOTE} フレームを受信し，音色合成エンジンへ渡す処理の作成方針を相談した．
+      \item 4パート同時発音管理，UI/モード表示，ログ出力などのプログラム構成について質問した．
+      \item Processing プログラム内で実装済みの項目を確認し，レポートに反映する観点を相談した．
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item \texttt{NOTE} 受信，パート判定，音色合成，4パート同時発音管理，UI/モード表示の実装方針を整理できた．
+      \item Processing プログラム作成時に，処理を複数ファイルへ分ける構成や確認手順を整理できた．
+      \item 課題管理，検証方法，次回計画に書く内容の候補を作成できた．
+    \end{itemize}
+\end{itemize}
+
 \sectionrule
 
 \subsection{検証方法}
 
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item Processing のソースコードを読み，AI の提案内容が実際のプログラム構成と矛盾していないかを確認した．
+      \item 疑似 \texttt{NOTE} フレームを使って，受信処理から音源処理までの流れを確認できる構成になっているかを確認した．
+    \end{itemize}
+  \item 検証手順：
+    \begin{enumerate}
+      \item \texttt{P03\_NoteProtocol.pde} と \texttt{P04\_SerialNoteFrameReader.pde} で \texttt{NOTE} フレームの読み取り処理を確認する．
+      \item \texttt{processing.pde} で受信後の検証，パート判定，ログ出力，音源への受け渡しを確認する．
+      \item \texttt{P05\_SoundPartManager.pde} と \texttt{P06\_SoundVoices.pde} で同時発音管理と音色合成処理を確認する．
+      \item \texttt{P07\_ScreenView.pde} で画面表示とモード表示を確認する．
+    \end{enumerate}
+\end{itemize}
+
 \sectionrule
 
 \subsection{ファクトチェック結果}
+
+\begin{itemize}
+  \item 一致点：
+    \begin{itemize}
+      \item \texttt{NOTE} 受信，パート判定，音色合成，4パート同時発音管理，UI/モード表示に関するAIの整理内容は，Processing ソースコード上の構成と一致していた．
+      \item レポート本文に記載した作業内容は，既存の \texttt{README.md} と各 \texttt{.pde} ファイルの内容と矛盾しない．
+    \end{itemize}
+  \item 不一致・疑義：
+    \begin{itemize}
+      \item 実機からの \texttt{NOTE} 受信と複数ノード結合時の同期確認は，ソースコード確認だけでは完了判断できない．
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item レポート本文として採用する．ただし，実機結合に関する内容は次回課題として扱う．
+    \end{itemize}
+  \item 根拠：
+    \begin{itemize}
+      \item Processing 側の主要処理はソースコード上で確認できた一方，外部機器との接続確認は今後の結合テストで確認する必要があるため．
+    \end{itemize}
+\end{itemize}
 
 \sectionrule
 
@@ -85,6 +179,24 @@
 %================================================================
 \section{次回計画}
 
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item Arduino 側から送信される \texttt{NOTE} フレームを Processing 側で受信し，音として再生できることを確認する．
+      \item 複数ノード接続時の同期状態と音量バランスを確認する．
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item 実機から送った \texttt{NOTE} が Processing 側の受信数として増え，対応するパートの音が鳴ること．
+      \item \texttt{wrong part}，\texttt{missing}，\texttt{dropped} の増加原因をログから確認できること．
+      \item 全パートを同時に鳴らしたとき，音割れせず，各パートの音量差が大きすぎないこと．
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item 2026/06/10以降の結合テスト時
+    \end{itemize}
+\end{itemize}
+
 \sectionrule
 
 %================================================================
@@ -92,12 +204,19 @@
 %================================================================
 \section{その他}
 
+\begin{itemize}
+  \item 今週は Processing 側のプログラム整理とレポート作成を中心に行った．
+  \item 実機結合時には，Processing 側だけでなく Arduino 側の \texttt{partId}，baud rate，\texttt{NOTE} フレーム形式も同時に確認する必要がある．
+\end{itemize}
+
 \sectionrule
 
 %================================================================
 % 7. 付録
 %================================================================
 \section{付録}
+
+無し
 
 \sectionrule
 
