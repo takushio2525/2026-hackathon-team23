@@ -86,8 +86,9 @@ final int SCR_GAME_PLAY   = 4;
 final int SCR_RESULT      = 5;
 final int SCR_ANALYZER    = 6;
 
-// メニュー項目
+// メニュー項目 (説明文はメニュー画面のボックス内に表示)
 final String[] MENU_ITEMS = { "自由演奏", "ゲーム" };
+final String[] MENU_DESCS = { "振ったテンポで輪唱", "目標テンポ維持を採点" };
 
 // ── オーディオ ────────────────────────────────────────────
 Minim       minim;
@@ -125,6 +126,7 @@ ArrayList<ResynthVoice> activeVoices = new ArrayList<ResynthVoice>();
 // ── 表示用 ────────────────────────────────────────────────
 int      totalReceived = 0;
 String[] lastEventByPart = new String[256];
+int[]    lastNoteMsByPart = new int[256];   // 声部別の最終 NOTE 受信時刻 (0=未受信。接続インジケータ用)
 int      lastNoteAtMs   = 0;
 PFont    uiFont;
 
@@ -148,7 +150,9 @@ int   prevScreen      = -1;
 ArrayList<MetroClick> metroClicks = new ArrayList<MetroClick>();
 
 // 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度 2 軸をリングバッファに蓄積)
-final int GYRO_TRAIL_LEN = 120;
+// サンプルは UI フレーム到着時 (約 30Hz) にのみ積む。draw() (90fps) で積むと
+// 同じ値が 3 回ずつ重複して軌跡の時間スケールが狂う。90 サンプル ≒ 3 秒分。
+final int GYRO_TRAIL_LEN = 90;
 float[] gyroTrailX = new float[GYRO_TRAIL_LEN];
 float[] gyroTrailY = new float[GYRO_TRAIL_LEN];
 int gyroTrailIdx = 0;
@@ -291,7 +295,15 @@ void closePort(String name){
     nodeRole = ROLE_UNKNOWN;
     uiState = ST_IDLE;
     uiScore = 0xFF;
+    updateRoleTitle();
   }
+}
+
+// 役割の確定/リセットをウィンドウタイトルにも反映する (複数 Mac 運用時の取り違え防止)
+void updateRoleTitle(){
+  String role = (nodeRole == ROLE_MAIN_UI) ? "メイン操作UI"
+              : (nodeRole == ROLE_ANALYZER) ? "アナライザ" : "ポート選択";
+  surface.setTitle("タクトーン test_v3 — " + role);
 }
 void closeAllPorts(){
   for (String n : new ArrayList<String>(openByName.keySet())) closePort(n);
@@ -348,12 +360,14 @@ void handlePacket(byte[] buf){
     if (uiState == ST_CONDUCTING) {
       currentGyroX = (float)((byte)buf[14]);
       currentGyroY = (float)((byte)buf[16]);
+      pushGyroSample(currentGyroX, currentGyroY);   // 新フレーム到着時のみ軌跡に積む
     } else {
       uiNavCursor = u8(buf[14]);
       uiScore     = u8(buf[16]);
     }
     if (nodeRole != ROLE_MAIN_UI){
       nodeRole = ROLE_MAIN_UI;
+      updateRoleTitle();
       println("役割自動判定: メイン操作 UI (UIフレーム受信)");
     }
     masterResetDetected = false;
@@ -378,12 +392,14 @@ void handlePacket(byte[] buf){
       nodeRole = ROLE_ANALYZER;
       println("役割自動判定: アナライザ (partId=0x" + hex(partId, 2) + ")");
     }
+    updateRoleTitle();
   }
 
   if (gate == 1){
     println("NOTE: part=0x" + hex(partId,2) + " note=" + noteNumber + "(" + noteName(noteNumber) + ") vel=" + velocity + " dur=" + durationMs + "ms gate=" + gate + " instr=" + instrumentId);
     triggerNote(partId, instrumentId, noteNumber, velocity, durationMs);
     lastEventByPart[partId] = noteName(noteNumber) + " v=" + velocity + " dur=" + durationMs + "ms";
+    lastNoteMsByPart[partId] = millis();
     lastNoteAtMs = millis();
   } else {
     releaseMatching(partId, noteNumber);
@@ -454,6 +470,11 @@ void onScreenChange(int fromScr, int toScr){
     for (MetroClick mc : metroClicks) mc.unpatch(out);
     metroClicks.clear();
   }
+  // 演奏画面 (自由/ゲーム) を離れたら指揮棒軌跡を消す。次の演奏で古い軌跡から
+  // 描き始めない (Menu に一瞬戻って再開したときの混入防止)。
+  boolean wasPlay = (fromScr == SCR_FREE_PLAY || fromScr == SCR_GAME_PLAY);
+  boolean isPlay  = (toScr   == SCR_FREE_PLAY || toScr   == SCR_GAME_PLAY);
+  if (wasPlay && !isPlay) clearGyroTrail();
 }
 
 // ── ガイド強度 (firmware と同じ式) ────────────────────────
@@ -592,11 +613,20 @@ void drawPortSelectScreen(){
 // ── 接続待ち画面 ──────────────────────────────────────────
 void drawWaitingScreen(){
   drawBackground();
-  String title;
+  String title, desc;
   switch (uiState){
-    case ST_CALIBRATING: title = "キャリブレーション中..."; break;
-    case ST_FALLBACK:    title = "Fallback — 復帰待ち"; break;
-    default:             title = nodeRole == ROLE_UNKNOWN ? "データ待ち..." : "待機中"; break;
+    case ST_CALIBRATING:
+      title = "キャリブレーション中...";
+      desc  = "指揮棒を静止させたまま約 2 秒待ってください";
+      break;
+    case ST_FALLBACK:
+      title = "一時停止 (Fallback)";
+      desc  = "指揮者の IMU / WiFi が止まっています。復帰すると自動で戻ります";
+      break;
+    default:
+      title = nodeRole == ROLE_UNKNOWN ? "データ待ち..." : "待機中";
+      desc  = "指揮者の起動とキャリブレーション完了を待っています";
+      break;
   }
   drawPageTitle("タクトーン — test_v3", "ポート " + openByName.size() + " 個接続中  /  " + title);
 
@@ -604,12 +634,14 @@ void drawWaitingScreen(){
   fill(18, 54, 88); textSize(24); textAlign(CENTER, CENTER);
   text(title, width/2, height/2 - 30);
   fill(61, 86, 111); textSize(14);
-  text("指揮者のキャリブレーション完了を待っています", width/2, height/2 + 10);
+  text(desc, width/2, height/2 + 10);
   if (masterResetDetected){
     fill(197, 83, 31); textSize(13);
     text("指揮者の再起動を検知しました。再接続中...", width/2, height/2 + 40);
   }
   textAlign(LEFT, BASELINE);
+
+  drawHelpPanel("[r]ポート再選択  [t]テスト音  [+/-]音量  [Space]停止");
 }
 
 // ── メニュー画面 ──────────────────────────────────────────
@@ -638,13 +670,18 @@ void drawMenuScreen(){
     fill(selected ? color(255) : color(60, 70, 80));
     textAlign(CENTER, CENTER);
     textSize(selected ? 30 : 24);
-    text((selected ? "▶ " : "") + MENU_ITEMS[i], bx + modeW/2, modeY + modeH/2);
+    text((selected ? "▶ " : "") + MENU_ITEMS[i], bx + modeW/2, modeY + modeH/2 - 14);
+    textSize(13);
+    fill(selected ? color(235, 245, 255) : color(110, 120, 130));
+    text(MENU_DESCS[i], bx + modeW/2, modeY + modeH/2 + 28);
   }
   textAlign(LEFT, BASELINE);
 
-  fill(61, 86, 111); textSize(13); textAlign(CENTER, BASELINE);
-  text("← 左右振り = カーソル移動  /  ↓ 縦振り = 決定 →", width/2, modeY + modeH + 40);
+  fill(61, 86, 111); textSize(14); textAlign(CENTER, BASELINE);
+  text("指揮棒を 左右に振る = 選択を移動  /  縦に振る = 決定", width/2, modeY + modeH + 40);
   textAlign(LEFT, BASELINE);
+
+  drawHelpPanel("[r]ポート再選択  [t]テスト音  [p]音色切替  [+/-]音量");
 }
 
 // ── 自由演奏画面 ──────────────────────────────────────────
@@ -708,11 +745,12 @@ void drawGamePlayScreen(){
 
   drawScope(28, 138, width - 56, 80);
 
-  // 拍進捗
+  // ガイド進捗 (PC ローカルの目標テンポ基準。指揮者が実際に振った拍数とは別物で、
+  // ゲームの終了 = 指揮者が 32 拍振った時点。ここはメトロノームの進行を示す)
   float py = 228;
   drawPanel(28, py, width - 56, 60);
   fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
-  text("経過: " + elapsedBeats + " / " + GAME_LENGTH_BEATS + " 拍", 50, py + 24);
+  text("ガイド: " + elapsedBeats + " / " + GAME_LENGTH_BEATS + " 拍 (目標テンポ基準)", 50, py + 24);
   float dotStartX = 50, dotY = py + 44, dotR = 10, dotGap = 2;
   for (int i = 0; i < GAME_LENGTH_BEATS; i++){
     float dx = dotStartX + i * (dotR + dotGap);
@@ -725,12 +763,12 @@ void drawGamePlayScreen(){
     ellipse(dx + dotR/2, dotY, dotR, dotR);
   }
 
-  // スコア表示
+  // スコア表示 (ファームは曲終了まで 0xFF=採点中を送る。確定値は結果画面で出る)
   drawPanel(28, 298, width - 56, 130);
   fill(18, 54, 88); textSize(50); textAlign(CENTER, CENTER);
   text(scoreStr, width/2, 348);
   fill(61, 86, 111); textSize(16);
-  text("スコア", width/2, 398);
+  text(uiScore == 0xFF ? "スコア (32 拍振り切ると結果画面へ)" : "スコア", width/2, 398);
   textAlign(LEFT, BASELINE);
 
   // 目標テンポ
@@ -765,8 +803,10 @@ void drawResultScreen(){
   }
 
   textSize(14); fill(61, 86, 111); textAlign(CENTER, BASELINE);
-  text("指揮者の操作でメニューに戻ります", width/2, height/2 + 100);
+  text("指揮棒を縦に振るとメニューに戻ります", width/2, height/2 + 100);
   textAlign(LEFT, BASELINE);
+
+  drawHelpPanel("[r]ポート再選択  [+/-]音量  [Space]停止");
 }
 
 // ── アナライザ画面 ────────────────────────────────────────
@@ -794,6 +834,9 @@ void drawAnalyzerScreen(){
   drawHelpPanel("[t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
 }
 
+// 画面下部の共通パネル: 左にキー操作ガイド、右に接続ステータス。
+// 接続ステータス = 役割 / UI リンク鮮度 (メイン UI のみ) / 声部別 NOTE 受信インジケータ。
+// 「3 台のうちどれが鳴っていないか」「指揮者との UI 中継が生きているか」を常時見せる。
 void drawHelpPanel(String helpText){
   float hx = 28, hy = height - 66, hw = width - 56, hh = 48;
   fill(255); noStroke();
@@ -803,20 +846,63 @@ void drawHelpPanel(String helpText){
   strokeWeight(1); noStroke();
   fill(28, 54, 80); textSize(13); textAlign(LEFT, BASELINE);
   text(helpText, hx + 22, hy + 28);
+
+  // ── 右側: 接続ステータス ──
+  float sx = hx + hw - 22;   // 右端から左へ詰めて描く
+  int now = millis();
+
+  // 声部別 NOTE インジケータ (右端)。緑=2 秒以内に受信 / 灰=受信歴あり / 輪郭のみ=未受信
+  for (int p = 0x04; p >= 0x02; p--){
+    boolean seen   = lastNoteMsByPart[p] > 0;
+    boolean active = seen && (now - lastNoteMsByPart[p] < 2000);
+    float cxp = sx - 8;
+    if (active)      { noStroke(); fill(24, 156, 104); }
+    else if (seen)   { noStroke(); fill(170, 180, 190); }
+    else             { stroke(170, 180, 190); strokeWeight(1.5f); noFill(); }
+    ellipse(cxp, hy + 18, 11, 11);
+    noStroke(); fill(110, 125, 140); textSize(9); textAlign(CENTER, BASELINE);
+    text(hex(p, 1), cxp, hy + 38);
+    sx -= 22;
+  }
+  fill(110, 125, 140); textSize(10); textAlign(RIGHT, BASELINE);
+  text("声部", sx, hy + 22);
+  sx -= 38;
+
+  // 役割と UI リンク鮮度
+  String roleStr = (nodeRole == ROLE_MAIN_UI) ? "メインUI"
+                 : (nodeRole == ROLE_ANALYZER) ? "アナライザ" : "役割判定待ち";
+  String linkStr = "";
+  int linkCol = color(110, 125, 140);
+  if (nodeRole == ROLE_MAIN_UI && lastUiAtMs > 0){
+    int age = now - lastUiAtMs;
+    if (age < 500){ linkStr = "UI同期OK";  linkCol = color(24, 156, 104); }
+    else          { linkStr = "UI遅延 " + nf(age/1000.0f, 1, 1) + "s"; linkCol = color(214, 138, 24); }
+  }
+  textAlign(RIGHT, BASELINE); textSize(12);
+  if (linkStr.length() > 0){
+    fill(linkCol); text(linkStr, sx, hy + 28);
+    sx -= textWidth(linkStr) + 16;
+  }
+  fill(61, 86, 111);
+  text(roleStr + "  /  ポート " + openByName.size(), sx, hy + 28);
   textAlign(LEFT, BASELINE);
 }
 
 // ── 指揮棒軌跡 (2D XY プロット: ジャイロスコープ角速度の軌跡) ───
+// サンプル蓄積は handlePacket() (UI フレーム到着時 30Hz) で行う。ここは描画のみ。
+void pushGyroSample(float gx, float gy){
+  gyroTrailX[gyroTrailIdx] = gx;
+  gyroTrailY[gyroTrailIdx] = gy;
+  gyroTrailIdx = (gyroTrailIdx + 1) % GYRO_TRAIL_LEN;
+  if (gyroTrailCount < GYRO_TRAIL_LEN) gyroTrailCount++;
+}
+void clearGyroTrail(){
+  gyroTrailIdx = 0;
+  gyroTrailCount = 0;
+}
 void drawBatonTrail(){
-  if (currentScreen == SCR_PORT_SELECT) return;
-
-  // Conducting 中のみリングバッファに蓄積
-  if (uiState == ST_CONDUCTING) {
-    gyroTrailX[gyroTrailIdx] = currentGyroX;
-    gyroTrailY[gyroTrailIdx] = currentGyroY;
-    gyroTrailIdx = (gyroTrailIdx + 1) % GYRO_TRAIL_LEN;
-    if (gyroTrailCount < GYRO_TRAIL_LEN) gyroTrailCount++;
-  }
+  // 演奏中 (Conducting) 以外では出さない。Menu/Result に古い軌跡が残ると紛らわしい。
+  if (uiState != ST_CONDUCTING) return;
 
   if (gyroTrailCount < 2) return;
 
@@ -898,8 +984,9 @@ void drawPortListAt(float startY){
        x + 22, y + 24);
   fill(61, 86, 111); textSize(12);
   text("クリックで開閉 / ホイールでスクロール / [f] フィルタ切替 / [r] 再列挙", x + 22, y + 42);
+  text("node_02 を開くと操作画面、node_03/04 はアナライザ表示になります (受信データから自動判定)", x + 22, y + 58);
 
-  portRowX = x + 16; portRowW = w - 32; portRowY0 = y + 54; portRowH = 40;
+  portRowX = x + 16; portRowW = w - 32; portRowY0 = y + 70; portRowH = 40;
   portViewY = portRowY0; portViewH = (y + h) - portRowY0 - 8;
   portRowCount = displayPorts.length;
 

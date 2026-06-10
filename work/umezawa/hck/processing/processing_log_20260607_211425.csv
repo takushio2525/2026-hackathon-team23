@@ -1,0 +1,6 @@
+millis,event,seq,timestampMs,partId,noteNumber,velocity,gate,durationMs
+5410,serial_connected_/dev/cu.usbmodem34B7DA64482C2,,,,,,,
+5516,NOTE以外のtype: 4,159,150228,0x05,1,0,100,594
+6550,NOTE以外のtype: 4,160,151255,0x05,1,0,100,594
+7561,NOTE以外のtype: 4,161,152271,0x05,1,0,100,594
+8592,NOTE以外のtype: 4,162,153293,0x05,1,0,100,594

@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_01
-//   pio run -d firmware/test_v2/node_01 -t upload
-//   pio device monitor -d firmware/test_v2/node_01
+//   pio run -d firmware/test_v3/node_01
+//   pio run -d firmware/test_v3/node_01 -t upload
+//   pio device monitor -d firmware/test_v3/node_01
 //
 // 指揮者ノード node_01 のピン/定数/閾値を一元管理
 // 具体値はこの 1 ファイルでだけ管理し、モジュール本体にはハードコードしない

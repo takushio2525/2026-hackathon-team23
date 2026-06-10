@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v2/node_04
-//   pio run -d firmware/test_v2/node_04 -t upload
-//   pio device monitor -d firmware/test_v2/node_04
+//   pio run -d firmware/test_v3/node_04
+//   pio run -d firmware/test_v3/node_04 -t upload
+//   pio device monitor -d firmware/test_v3/node_04
 //
 // 楽器ノード node_04 (輪唱の 1 声部) の全モジュール共有データ
 #pragma once
@@ -28,6 +28,13 @@ struct CtrlData {
     float    bpm = 100.0f;   // CTRL 未受信時の既定。指揮者の初期テンポも 100 BPM
     uint8_t  velocity = 64;
     uint8_t  state = 0;
+    // ── test_v3 ゲームモード: CTRL 予約バイトから展開した UI 状態 ──
+    // UiRelayModule がこれらを PC へ中継する (演奏ロジックには使わない)。
+    uint8_t  mode = 0;          // 0=自由演奏 / 1=ゲーム
+    uint8_t  navCursor = 0;     // メニューカーソル位置
+    uint8_t  targetBpm = 0;     // ゲーム目標テンポ (生 BPM)
+    uint8_t  score = 0xFF;      // 得点 0-100 / 0xFF=未確定
+    uint16_t bpmQ8 = 800;       // 実振り BPM ×8 (受信値をそのまま中継・演奏画面のテンポ表示用)
     uint32_t lastReceivedMs = 0;
 };
 

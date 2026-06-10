@@ -1,73 +1,72 @@
-# pc_app/test_v2 — 輪唱（きらきら星）を sound_lab の音色で鳴らす Processing
+# pc_app/test_v3 — ゲームモード対応 Processing アプリ
 
-`firmware/test_v2/` の楽器ノード（Arduino UNO R4 WiFi）から USB Serial で送られてくる
-NOTE パケット（**楽器番号 / 高さ / 長さ / 声部 / velocity**）を受け、`sound_lab` で解析した
-楽器定義（`data/*.json`）を使ってポリフォニックに加算合成する。
+`firmware/test_v3/` の楽器ノード（Arduino UNO R4 WiFi）から USB Serial で送られてくる
+**NOTE パケット**（type=3: 楽器番号 / 高さ / 長さ / 声部 / velocity）と
+**UI 状態パケット**（type=4: 指揮者の state/mode/カーソル/目標テンポ/score）を受け、
+NOTE は加算合成で発音、UI は画面を**データ駆動で自動判定**して描画する。
 
 ```
-pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde
+pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 ```
 
-## 構成
+## test_v2 からの主要変更点
 
-| ディレクトリ | 内容 |
-|---|---|
-| `orchestra_resynth/` | 受信した NOTE を `data/*.json` の音色で再合成して鳴らす。複数シリアルポートを同時に開ける |
-| `orchestra_resynth/data/` | 楽器定義 JSON（番号 = Arduino が送る `instrumentId`）。4 種類同梱 |
-
-合成方式は `sound_lab/processing/instrument_player` と同じ（倍音ごとの振幅・周波数比・時間
-エンベロープを持つ加算合成 + 非調和性 + スペクトル整形ノイズ + 全体振幅エンベロープ +
-ビブラート/トレモロ）。`InstrModel` / `ResynthVoice` をそちらから移植している。
+- **役割の手動選択を廃止**: ポートを開くだけで、UI フレーム受信 or NOTE の partId から
+  「メイン操作 UI（node_02 接続）」「アナライザ（node_03/04 接続）」を自動判定
+- **データ駆動の画面遷移**: 指揮者の `(state, mode)` から毎フレーム画面を再判定する。
+  ポート選択 → 待機 → メニュー → 自由演奏 / ゲーム演奏 → 結果、の各画面
+- **ゲーム画面**: 目標テンポ・ガイド強度バー・拍進捗・ライブスコアを表示し、
+  メトロノームクリック音（ガイド強度に応じてフェードアウト）をローカル生成
+- **指揮棒 2D プロット**: Conducting 中に CTRL→UI 経由で届くジャイロ角速度 2 軸を
+  右上の XY プロットに軌跡表示（NOTE 発音でパルス演出）
+- **マスターリセット検知**: UI フレームが `UI_TIMEOUT_MS`（2 秒）途絶えると待機画面へ
+  戻し、発音を止めて指揮者の再起動に追従する
 
 ## 必要なもの
 
-- [Processing IDE](https://processing.org/download)
-- Minim ライブラリ（Processing IDE の `スケッチ → ライブラリをインポート → ライブラリを追加` から `Minim`）
+- [Processing IDE](https://processing.org/download)（4.x）
+- Minim ライブラリ（`スケッチ → ライブラリをインポート → ライブラリを追加` から `Minim`）
 
 ## 実行手順
 
-1. 指揮者ノード（`firmware/test_v2/node_01`）と楽器ノード（`node_02` / `node_03` / `node_04`）を電源 ON
-2. 楽器ノードを Mac に USB Type-C で接続する
-   - 本番想定は **1 Mac : 1 ノード（1 声部）**
-   - テスト用に **1 Mac に複数ノードを挿してもよい**（このアプリで複数ポートを同時に開ける）
+1. 指揮者ノード（`firmware/test_v3/node_01`）と楽器ノード（`node_02`〜`node_04`）を電源 ON
+2. 楽器ノードを Mac に USB 接続する（本番想定は 1 Mac : 1 ノード）
 3. Processing IDE で `orchestra_resynth/orchestra_resynth.pde` を開いて Run
-4. 画面下の「シリアルポート」一覧で、繋いだ Arduino のポートを **クリックして開く**
-   （複数挿しているなら、それぞれのポートをクリックして全部開く）。もう一度クリックで閉じる
-5. node_02 がすぐ「きらきら星」を弾き始める。node_03 は 8 拍後、node_04 は 16 拍後に入って輪唱になる
-   - Processing をいつ起動しても「曲の現在位置」から鳴り始める（途中参加 OK）。
-     `pio device monitor` を立ち上げているとポートが二重に開けないので閉じる
+4. ポート一覧で繋いだ Arduino のポートをクリックして開く（もう一度クリックで閉じる）
+5. 指揮者を振ってモードを選ぶと、PC の画面が自動で追従する
+   - node_02 を開いた Mac: メニュー → 演奏/ゲーム画面が出る
+   - node_03/04 を開いた Mac: アナライザ画面（波形 + 受信状況）が出る
+   - `pio device monitor` を開いているとポートが二重に開けないので閉じておく
 
-### Arduino なしで音だけ確認したいとき
+### キー操作
 
-- `t` キー: テスト和音（C・E・G を楽器 0/1/2 で同時に鳴らす）
-- `0`〜`3` キー: その番号の楽器で C4 を 1 発（楽器の聴き比べ）
-- `Space`: 全音停止 / `+` `-`: マスター音量 / `a`: 振幅包絡の方式切替（実エンベロープ ↔ ADSR4値）
-- `r`: シリアルポート再列挙 / `i`: `data/` の楽器定義を再スキャン
+- `r`: ポートを全部閉じて再列挙（画面リセット） / `f`: USB ポートのみ表示の切替
+- `t`: テスト和音 / `0`〜`3`: その番号の楽器で C4 を 1 発
+- `p`: 全パート同一音色モード（piano.json）の ON/OFF
+- `a`: 振幅包絡の方式切替（実エンベロープ ↔ ADSR4 値）
+- `+` `-`: マスター音量 / `Space`: 全音停止 / `i`: 楽器定義の再スキャン
 
 ## パケット仕様（受信, 20 バイト固定, リトルエンディアン）
 
-| Offset | Field | Type | 説明 |
-|---|---|---|---|
-| 0 | magic | uint16 | 0x4F52（`OR`） |
-| 2 | version | uint8 | 0x01 |
-| 3 | type | uint8 | 3=NOTE（1=CTRL / 2=BEAT は USB には流れない） |
-| 4 | seq | uint32 | 単調増加 |
-| 8 | timestampMs | uint32 | 送信時のマスタ時刻 |
-| 12 | partId | uint8 | test_v2 は 0x02–0x04 / production 想定は 0x02–0x06（ADR-0004 改訂版で楽器 5 台 = 金管 4 + ドラム 1。輪唱のどの声部か） |
-| 13 | noteNumber | uint8 | MIDI ノート番号（60=C4, 高さ） |
-| 14 | velocity | uint8 | 0–127 |
-| 15 | gate | uint8 | 1=NoteOn（0=NoteOff は来ないが来たら一致音を release） |
-| 16 | durationMs | uint16 | 発音予定長（長さ）。これを過ぎたら自動で release |
-| 18 | instrumentId | uint8 | 0..N-1（楽器番号 — `data/` の何番目の楽器定義か） |
-| 19 | reserved | uint8 | 0 |
+ヘッダ 12B（magic 0x4F52 / version 0x01 / type / seq / timestampMs）+ ペイロード 8B。
 
-楽器定義 JSON のフォーマット: [`../../sound_lab/library_format.md`](../../sound_lab/library_format.md)
+| type | 内容 | ペイロード |
+|---|---|---|
+| 3 (NOTE) | 発音指示 | partId / noteNumber / velocity / gate / durationMs / instrumentId |
+| 4 (UI) | 指揮者状態の中継（node_02 のみ） | state / mode / navCursor / targetBpm / score / partId / bpmQ8 |
+
+- UI の `state`: 0=Idle / 1=Calibrating / 2=Conducting / 3=Fallback / 4=Menu / 5=Result
+- **Conducting 中は `navCursor`/`score` バイトにジャイロ角速度 2 軸（int8）が透過する**
+  （指揮棒 2D プロット用。メニュー値/得点として有効なのは Menu/Result のときだけ）
+- 詳細は `.agent/api.md` と `firmware/test_v3/common/lib/OrcProtocol/OrcProtocol.h`
 
 ## トラブルシュート
 
-- 音が鳴らない → コンソールに `Failed to open` が出ていないか確認。`pio device monitor` を閉じる。
-  楽器ノードの `platformio.ini` が `SERIAL_DEBUG=0`（既定）になっているか確認（`=1` だとバイナリ
-  NOTE が流れず、人間可読テキストになる）
+- 音が鳴らない → コンソールに `Failed to open` が出ていないか確認。`pio device monitor` を
+  閉じる。楽器ノードの `platformio.ini` が `SERIAL_DEBUG=0`（既定）か確認
+  （`=1` だとバイナリが流れず人間可読テキストになる）
+- メニュー画面が出ない → 開いたポートが node_02 か確認（UI フレームは node_02 だけが
+  中継する）。node_03/04 はアナライザ画面になる
 - ノイズ / 割れる → `-` キーでマスター音量を下げる（3 声部合算で大きくなりがち）
-- ポートを開いても受信 0 のまま → 指揮者ノードが SoftAP を立てていて、楽器ノードが STA 接続できているか
-  LED 点滅で確認（1 Hz=Idle / 0.5 Hz=WaitStart / 点灯=Playing）。指揮棒を振らないと BEAT が出ない
+- 画面が「待機中」のまま → 指揮者の LED が Menu 点滅（約 1.7Hz）になっているか確認。
+  Idle 1Hz 点滅のままなら SoftAP 起動失敗、2Hz ならキャリブレーション中

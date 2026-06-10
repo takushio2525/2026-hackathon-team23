@@ -1,0 +1,3 @@
+millis,event,seq,timestampMs,partId,noteNumber,velocity,gate,durationMs
+4875,serial_connected_/dev/cu.ULTFIELD1,,,,,,,
+15270,serial_connected_/dev/cu.debug-console,,,,,,,

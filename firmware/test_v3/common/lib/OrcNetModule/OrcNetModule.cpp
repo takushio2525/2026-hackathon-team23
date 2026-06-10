@@ -1,6 +1,6 @@
 // Build (run from project root) — shared by node_01 and node_02:
-//   pio run -d firmware/test_v2/node_01     # 指揮者ノード (SoftAp)
-//   pio run -d firmware/test_v2/node_02     # 楽器 1 (Sta)
+//   pio run -d firmware/test_v3/node_01     # 指揮者ノード (SoftAp)
+//   pio run -d firmware/test_v3/node_02     # 楽器 1 (Sta)
 
 #include "OrcNetModule.h"
 #include "SystemData.h"  // 各ノードが提供 (build_flags = -I include)
