@@ -98,8 +98,8 @@ AudioOutput out;
 ArrayList<File>        instrumentFiles = new ArrayList<File>();
 ArrayList<InstrModel>  models          = new ArrayList<InstrModel>();
 ArrayList<String>      modelLabels     = new ArrayList<String>();
-boolean      forceSingleInstrument    = true;
-final String FORCED_INSTRUMENT_FILE   = "piano.json";
+boolean      forceSingleInstrument    = false;
+final String FORCED_INSTRUMENT_FILE   = "0_trumpets.tweaked.instrument.json";
 int          forcedInstrumentIdx      = -1;
 
 // ── シリアルポート ────────────────────────────────────────

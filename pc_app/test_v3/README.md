@@ -32,7 +32,6 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 | パス | 内容 |
 |---|---|
 | `orchestra_resynth/` | `firmware/test_v3` から届く NOTE / UI パケットを受信して発音・画面表示する本体 Processing スケッチ |
-| `kaeru_score_debug/` | かえるのうたの作成済み楽譜と解析済み音色 JSON をまとめた試聴・移植確認用スケッチ。不要になったら削除して構いません |
 
 ## 実行手順
 
@@ -49,7 +48,7 @@ pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde
 
 - `r`: ポートを全部閉じて再列挙（画面リセット） / `f`: USB ポートのみ表示の切替
 - `t`: テスト和音 / `0`〜`3`: その番号の楽器で C4 を 1 発
-- `p`: 全パート同一音色モード（piano.json）の ON/OFF
+- `p`: 全パート同一音色モード（`0_trumpets.tweaked.instrument.json`）の ON/OFF
 - `a`: 振幅包絡の方式切替（実エンベロープ ↔ ADSR4 値）
 - `+` `-`: マスター音量 / `Space`: 全音停止 / `i`: 楽器定義の再スキャン
 
