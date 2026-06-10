@@ -72,36 +72,92 @@ void resetTempoTracking(SystemData& data) {
 ConductorState sStateBeforeFallback = ConductorState::Menu;
 
 // ── test_v3: メニューナビのゲート (拍検出ゲートとは独立) ──
-// dynAcc の左右(X)/上下(Y)成分の符号と大きさだけで「カーソル移動」「決定」を判定する単純式。
-// 複雑なジェスチャ認識はしない (要件外)。Menu / Result 状態でのみ動かす。
+// 重力基準の縦/横判定。加速度の遅い LPF で重力ベクトルを推定し、振り加速度
+// (accLpf − 推定重力) を「重力軸成分」と「水平面成分」に分解する。センサに
+// 取り付け角度がついていても「地面に対して垂直=縦 (決定) / 水平=横 (カーソル)」
+// になる (旧方式のセンサ軸直読みは取り付け角度で破綻した)。
+// 瞬時値は振り始めの向きが暴れるので、Armed 中の判定窓で両成分を積算し、
+// 窓終了かリリースの早い方で 1 回だけ判定・発火する。Menu / Result 状態でのみ動かす。
 enum class NavGate : uint8_t { Idle, Armed };
-NavGate  sNavGate   = NavGate::Idle;
-uint32_t sLastNavMs = 0;
+NavGate  sNavGate        = NavGate::Idle;
+uint32_t sLastNavMs      = 0;            // 最後に発火した時刻 (不応期の基準)
+uint32_t sNavArmedAtMs   = 0;            // Armed 突入時刻 (判定窓の基準)
+bool     sNavFired       = false;        // 現 Armed セッションで発火済みか
+float    sNavVertAccum   = 0.0f;         // |重力軸成分| の積算
+float    sNavHorizAccum  = 0.0f;         // |水平面成分| の積算
+float    sNavHorizVec[3] = {0, 0, 0};    // 水平面成分ベクトルの積算 (カーソル移動方向用)
 
-// 1 振りを 1 操作として処理する。左右振り→カーソル移動 (data.game.navCursor を更新・false)、
-// 縦振り→決定 (true を返す)。多重発火は Armed ゲート + 不応期で防ぐ。
+// ナビ用の重力ベクトル推定 (accLpf をさらに遅い LPF に通したもの)。
+// 拍検出のキャリブ値 gravityMag はスカラーなので方向の分解には使えない。
+float    sNavGrav[3] = {0, 0, 0};
+bool     sNavGravInit = false;
+
+// 1 振りを 1 操作として処理する。横振り→カーソル移動 (data.game.navCursor を更新・false)、
+// 縦振り→決定 (true を返す)。多重発火は Armed ゲート + 発火済みフラグ + 不応期で防ぐ。
 bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
     using namespace logic_params;
     if (!data.imu.ready) return false;
-    if (sNavGate == NavGate::Armed) {
-        // 振りが収まったら次操作に備えて Idle へ戻す
-        if (data.imu.dynNorm < NAV_RELEASE_G) sNavGate = NavGate::Idle;
-        return false;
+
+    if (sNavGate == NavGate::Idle) {
+        // しきい値超え + 不応期経過で Armed へ (積算を開始)
+        if (data.imu.dynNorm <= NAV_SWING_THRESHOLD_G) return false;
+        if ((now - sLastNavMs) < NAV_REFRACTORY_MS) return false;
+        sNavGate        = NavGate::Armed;
+        sNavArmedAtMs   = now;
+        sNavFired       = false;
+        sNavVertAccum   = 0.0f;
+        sNavHorizAccum  = 0.0f;
+        sNavHorizVec[0] = sNavHorizVec[1] = sNavHorizVec[2] = 0.0f;
     }
-    // Idle: しきい値超え + 不応期経過の立ち上がりで 1 回だけ発火
-    if (data.imu.dynNorm <= NAV_SWING_THRESHOLD_G) return false;
-    if ((now - sLastNavMs) < NAV_REFRACTORY_MS) return false;
-    sNavGate   = NavGate::Armed;
-    sLastNavMs = now;
-    const float lr = data.imu.dynAcc[NAV_LR_AXIS];
-    const float ud = data.imu.dynAcc[NAV_UD_AXIS];
-    if (fabsf(lr) >= fabsf(ud)) {
-        // 左右が支配的 → カーソル移動 (符号で左/右)
-        if (lr < 0.0f) { if (data.game.navCursor > 0)             data.game.navCursor--; }
-        else           { if (data.game.navCursor + 1 < itemCount) data.game.navCursor++; }
-        return false;
+
+    // Armed 中: 振り加速度を重力軸成分と水平面成分に分解して積算する
+    const float gravNorm = sqrtf(sNavGrav[0] * sNavGrav[0] +
+                                 sNavGrav[1] * sNavGrav[1] +
+                                 sNavGrav[2] * sNavGrav[2]);
+    if (gravNorm > 1e-3f) {
+        const float invG = 1.0f / gravNorm;
+        float swing[3];   // 振り加速度ベクトル (g 単位、重力差し引き済み)
+        for (int i = 0; i < 3; ++i) swing[i] = data.imu.accLpf[i] - sNavGrav[i];
+        const float vert = (swing[0] * sNavGrav[0] +
+                            swing[1] * sNavGrav[1] +
+                            swing[2] * sNavGrav[2]) * invG;   // 符号付き重力軸成分
+        sNavVertAccum += fabsf(vert);
+        float horizSq = 0.0f;
+        for (int i = 0; i < 3; ++i) {
+            const float h = swing[i] - vert * sNavGrav[i] * invG;   // 水平面成分
+            sNavHorizVec[i] += h;
+            horizSq         += h * h;
+        }
+        sNavHorizAccum += sqrtf(horizSq);
     }
-    return true;   // 上下が支配的 → 決定
+
+    // 判定: 窓終了かリリースの早い方で 1 回だけ発火
+    const bool windowDone = (now - sNavArmedAtMs) >= NAV_DECISION_WINDOW_MS;
+    const bool release    = data.imu.dynNorm < NAV_RELEASE_G;
+    bool decide = false;
+    if (!sNavFired && (windowDone || release)) {
+        sNavFired  = true;
+        sLastNavMs = now;
+        if (sNavVertAccum >= sNavHorizAccum * NAV_VERT_DOMINANCE) {
+            decide = true;   // 縦振りが支配的 → 決定
+        } else {
+            // 横振りが支配的 → カーソル移動。向きは水平積算ベクトルの支配軸の符号で決める
+            // (どの軸が水平に対応するかは取り付けに依存するが、支配軸選択で自動追従する。
+            //  左右の向きが実機で逆なら NAV_LR_SIGN を反転する)。
+            int dom = 0;
+            for (int i = 1; i < 3; ++i) {
+                if (fabsf(sNavHorizVec[i]) > fabsf(sNavHorizVec[dom])) dom = i;
+            }
+            const float dir = sNavHorizVec[dom] * NAV_LR_SIGN;
+            if (dir < 0.0f) { if (data.game.navCursor > 0)             data.game.navCursor--; }
+            else            { if (data.game.navCursor + 1 < itemCount) data.game.navCursor++; }
+        }
+        DBG_PRINTF("[N1 NAV vert=%5.2f horiz=%5.2f -> %s]\n",
+                   sNavVertAccum, sNavHorizAccum,
+                   decide ? "DECIDE" : "CURSOR");
+    }
+    if (release) sNavGate = NavGate::Idle;   // 振りが収まったら次操作に備える
+    return decide;
 }
 
 // メトロノームガイド強度 (経過拍ベースの固定スケジュール・通信不要)。1.0=はっきり / 0.0=なし。
@@ -188,6 +244,19 @@ void applyPattern(SystemData& data) {
             for (int i = 0; i < 3; ++i) data.imu.dynAcc[i] = sLpfAcc[i] * k;
         } else {
             for (int i = 0; i < 3; ++i) data.imu.dynAcc[i] = 0.0f;
+        }
+
+        // ナビ用の重力ベクトル推定: accLpf をさらに遅い LPF に通す。
+        // dynNorm が大きい間 (振り中) は更新を凍結し、振り加速度の漏れ込みを防ぐ。
+        // 状態によらず常時回しておくことで、Menu 突入時には収束済みになっている
+        // (Calibrating の静止 2 秒で十分収束する)。
+        if (!sNavGravInit) {
+            for (int i = 0; i < 3; ++i) sNavGrav[i] = data.imu.accLpf[i];
+            sNavGravInit = true;
+        } else if (data.imu.dynNorm < NAV_GRAV_FREEZE_G) {
+            for (int i = 0; i < 3; ++i) {
+                sNavGrav[i] += NAV_GRAV_LPF_ALPHA * (data.imu.accLpf[i] - sNavGrav[i]);
+            }
         }
 
         // Armed 中のみ dynAcc を二重積分して経路長 sPathLen を更新する。
