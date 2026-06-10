@@ -132,6 +132,15 @@ namespace logic_params {
     constexpr float    NAV_GRAV_FREEZE_G       = 0.30f;
     constexpr uint8_t  MENU_ITEM_COUNT         = 2;     // メニュー項目数 (0=自由演奏 / 1=ゲーム)
 
+    // ── test_v3: 状態遷移直後のデッドタイム (ジェスチャ/拍検出の不感時間) ──
+    // 遷移を起こした振りの残り (惰性・戻し) を次状態の入力として拾わないための時間。
+    //   Menu→Conducting: メニュー決定の縦振りが演奏の 1 拍目として誤検出される
+    //   Conducting→Result: 最後の音符の振りが Result の縦振り操作として誤検出され
+    //                      点数を見る前に Menu へ戻ってしまう
+    // を防ぐ。全状態遷移に一律で適用する (Fallback 復帰直後の誤検出も同時に防げる)。
+    // 実機で「待たされ感」が強ければ 500〜800ms へ詰める。
+    constexpr uint32_t STATE_TRANSITION_DEADTIME_MS = 1000;
+
     // ── test_v3 ゲームモード: ゲーム進行・採点・ガイドフェード ──
     constexpr uint16_t GAME_LENGTH_BEATS       = 32;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周 = 32 拍)
     constexpr uint8_t  GAME_TARGET_BPM         = 100;   // 目標テンポ (固定・設定値)

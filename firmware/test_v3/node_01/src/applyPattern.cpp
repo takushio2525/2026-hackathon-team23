@@ -160,6 +160,28 @@ bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
     return decide;
 }
 
+// ── test_v3: 状態遷移直後のデッドタイム (ジェスチャ/拍検出の不感時間) ──
+// 遷移を起こした振りの残り (惰性・戻し) を次状態の入力として拾わないため、
+// 遷移から STATE_TRANSITION_DEADTIME_MS の間は拍検出とナビを無視する。
+ConductorState sPrevState      = ConductorState::Idle;
+uint32_t       sStateEnteredMs = 0;
+
+// 状態遷移を検知したら不感時間を開始し、拍/ナビ両ゲートの撃ちかけを破棄する。
+// 遷移は状態遷移 switch 内と拍検出ブロック内 (Conducting→Result) の複数箇所で
+// 起きるため、switch の前後 2 箇所から呼ぶ (state 不変なら何もしない冪等処理)。
+void noteStateTransition(SystemData& data, uint32_t now) {
+    if (data.conductor.state == sPrevState) return;
+    sPrevState      = data.conductor.state;
+    sStateEnteredMs = now;
+    gateToIdle();
+    sNavGate = NavGate::Idle;
+    data.beat.pathLenM = 0.0f;
+}
+
+bool inTransitionDeadtime(uint32_t now) {
+    return (now - sStateEnteredMs) < logic_params::STATE_TRANSITION_DEADTIME_MS;
+}
+
 // メトロノームガイド強度 (経過拍ベースの固定スケジュール・通信不要)。1.0=はっきり / 0.0=なし。
 // 採点重みは 1 - この値 (ガイドが薄い/無い区間ほど重く配点する)。
 float gameGuideIntensity(uint16_t beatCount) {
@@ -291,6 +313,9 @@ void applyPattern(SystemData& data) {
     }
 
     // 4. 状態遷移
+    // 前ループの拍検出ブロック内で起きた遷移 (Conducting→Result) をここで拾い、
+    // Result のナビが動き出す前にデッドタイムを開始する。
+    noteStateTransition(data, now);
     switch (data.conductor.state) {
         case ConductorState::Idle:
             // SoftAP 起動完了で Calibrating へ
@@ -368,7 +393,7 @@ void applyPattern(SystemData& data) {
                 data.conductor.state = ConductorState::Fallback;
                 break;
             }
-            if (updateNav(data, now, MENU_ITEM_COUNT)) {
+            if (!inTransitionDeadtime(now) && updateNav(data, now, MENU_ITEM_COUNT)) {
                 if (data.game.navCursor == 1) {
                     // ゲーム開始: 目標テンポ提示・採点カウンタをリセット
                     data.game.mode = 1;
@@ -407,7 +432,7 @@ void applyPattern(SystemData& data) {
                 data.conductor.state = ConductorState::Fallback;
                 break;
             }
-            if (updateNav(data, now, 1)) {
+            if (!inTransitionDeadtime(now) && updateNav(data, now, 1)) {
                 data.conductor.state = ConductorState::Menu;
                 data.game.mode = 0;
                 data.game.navCursor = 0;
@@ -417,6 +442,10 @@ void applyPattern(SystemData& data) {
             break;
         }
     }
+
+    // 今ループの switch 内で起きた遷移 (Menu→Conducting 等) を即時反映し、
+    // 直後の拍検出ブロックがメニュー決定の振りを 1 拍目として拾わないようにする。
+    noteStateTransition(data, now);
 
     // 2-3. 拍検出 (ゲート式ステートマシン + 早期発火)
     //   Idle:  dynNorm > BEAT_DYN_THRESHOLD_G で Armed に遷移し積分を開始
@@ -434,7 +463,9 @@ void applyPattern(SystemData& data) {
     //       未発火セッションでは pathOk も AND して弱い振りの早期リリースを防ぐ
     //       (発火済セッションは pathOk が自明なので無条件)。
     //       minHoldOk で突入直後の単発ノイズによる即リリースも防ぐ。
-    if (data.conductor.state == ConductorState::Conducting && data.imu.ready) {
+    // 遷移直後のデッドタイム中は拍検出を走らせない (ゲートは遷移検知時に Idle 化済み)。
+    if (data.conductor.state == ConductorState::Conducting && data.imu.ready &&
+        !inTransitionDeadtime(now)) {
         switch (sGate) {
             case BeatGate::Idle:
                 if (data.imu.dynNorm > BEAT_DYN_THRESHOLD_G) {
