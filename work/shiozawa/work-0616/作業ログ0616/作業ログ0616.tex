@@ -1,0 +1,319 @@
+%================================================================
+% 作業ログ 2026-06-16（test_v3 品質向上・4台輪唱・机上検証・KiCad回路図）
+%   test_v3 品質向上（PR #25 で状態遷移/同期/Processing UI の徹底デバッグ），
+%   4台輪唱（node_05 新設＋サイクル窓終端処理），机上検証スクリプトで
+%   20アサーション全PASS＝ファームにバグなし確認，KiCad で指揮者テスト基板の
+%   回路図作成まで．
+%
+%   ビルド:
+%     cd work/shiozawa/work-0616/作業ログ0616
+%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログ0616.tex
+%================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図・色 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[table]{xcolor}
+\usepackage{amssymb}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+% --- 進捗ガントチャート用（グリッド表）---
+\definecolor{barDone}{gray}{0.55} % 完了
+\definecolor{barProg}{gray}{0.78} % 進行中
+\definecolor{barPlan}{gray}{0.90} % 予定
+\definecolor{nowCol}{gray}{0.30}  % 今週の見出し
+\newcolumntype{G}{>{\centering\arraybackslash}p{2.0em}}
+\newcommand{\bD}{\cellcolor{barDone}}
+\newcommand{\bP}{\cellcolor{barProg}}
+\newcommand{\bQ}{\cellcolor{barPlan}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：塩澤 匠生
+
+報告日：2026年6月16日
+
+プロジェクト名：タクトーン~ IMUジェスチャーで奏でるArduinoオーケストラ~ \\
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：70\%（test\_v3 の品質向上と 4 台輪唱を実装完了，机上検証でファームにバグなし確認．
+        テストフェーズに移行し，実機切り分けが次の一手）
+  \item 進捗状況（今週の変化）：
+    \begin{itemize}
+      \item PR \#25 で test\_v3 の状態遷移・同期・Processing UI を徹底デバッグし品質向上
+      \item 4 台輪唱を実装（node\_05 新設，CANON\_CYCLE\_BEATS=56，サイクル窓終端処理）
+      \item 輪唱ロジックの机上検証スクリプト（Python）で拍 1〜120 を全数検証し 20 アサーション全 PASS
+      \item メニューナビを重力推定 LPF＋窓積算の縦/横判定に改善，状態遷移デッドタイム 1000ms 追加
+      \item KiCad で ESP32-S3-DevKitC-1 の指揮者テスト基板回路図を作成
+    \end{itemize}
+  \item 今週の主要成果：
+    \begin{itemize}
+      \item PR \#25（\texttt{shiozawa-test\_v3-polish}）：node\_01 の Menu/Result 状態 IMU 監視・
+            Fallback 復帰先修正，楽器クロック同期スナップ復帰（指揮者リセット 1 パケット追従），
+            Processing 全画面に接続ステータス/操作ガイド追加，指揮者 \texttt{-std=gnu++17} で警告 8 件解消
+      \item 4 台輪唱：新音色 4 種（トランペット/ホルン/トロンボーン/チューバ），
+            headRestBeats 0/8/16/24 で 8 拍ずつ入りをずらす設計
+      \item 机上検証で「コードにバグなし」を確信．実機で輪唱が聞こえなかった原因は
+            楽器ファームの書き込み取り違え（test\_v2 のまま）の可能性が最有力
+    \end{itemize}
+  \item 重大課題（影響度：中）：
+    \begin{itemize}
+      \item {}[実機で node\_03/04 の輪唱が聞こえない．机上検証でバグなしのため，
+            楽器ファームの書き込み取り違え（3 台とも同じノード用で遅延ゼロ）が有力仮説．
+            test\_v3 main を全楽器に書き込み直して切り分ける必要あり]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 2. 進捗ガントチャート（計画と現在地）
+%================================================================
+\section{進捗ガントチャート（計画と現在地）}
+
+チームのガントチャート（\texttt{meetings/ガントチャーver1ト.xlsx}）のフェーズ区分（110 基本設計／
+120 詳細設計／200 実装／300 テスト／400 ストレッチ）に，現在の進み具合を重ねたもの．
+「今」の縦位置は本報告時点（6 月第 3 週）．
+
+\medskip
+{\footnotesize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}p{8.5em}|*{12}{G}@{}}
+ & & & & & & & & & & \multicolumn{1}{c}{$\downarrow$今} & & \\
+作業項目（フェーズ）
+ & \cellcolor{barPlan}\tiny 4/15 & \cellcolor{barPlan}\tiny 4/22 & \cellcolor{barPlan}\tiny 4/29
+ & \cellcolor{barPlan}\tiny 5/6 & \cellcolor{barPlan}\tiny 5/13 & \cellcolor{barPlan}\tiny 5/20
+ & \cellcolor{barPlan}\tiny 5/27 & \cellcolor{barPlan}\tiny 6/3 & \cellcolor{barPlan}\tiny 6/10
+ & \cellcolor{nowCol}\tiny\textcolor{white}{6/17} & \cellcolor{barPlan}\tiny 6/24 & \cellcolor{barPlan}\tiny 7/1 \\
+\midrule
+企画・テーマ決定        & \bD & \bD &     &     &     &     &     &     &     &     &     &     \\
+110 基本設計            &     &     & \bD & \bD &     &     &     &     &     &     &     &     \\
+120 詳細設計            &     &     &     &     & \bD &     &     &     &     &     &     &     \\
+\textbf{200 実装}       &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad test\_v2 輪唱・同期 &     &     &     & \bD & \bD & \bD & \bD &     &     &     &     &     \\
+\quad test\_v3 ゲーム(firmware) &  &     &     &     &     & \bD & \bD & \bD & \bD &     &     &     \\
+\quad test\_v3 Processing &   &     &     &     &     &     & \bD & \bD & \bD &     &     &     \\
+\textbf{300 テスト}     &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad 単体・結合・システム &   &     &     &     &     &     &     &     & \bP & \bP & \bQ &     \\
+\quad 評価（精度・遅延） &     &     &     &     &     &     &     &     &     & \bQ & \bQ &     \\
+400 ストレッチ（強弱ほか） &  &     &     &     &     &     &     & \bQ & \bQ &     &     &     \\
+発表会                  &     &     &     &     &     &     &     &     &     &     &     & \multicolumn{1}{c}{$\bigstar$} \\
+\bottomrule
+\end{tabular}
+}
+
+\medskip
+凡例：\colorbox{barDone}{~~}~完了 \quad \colorbox{barProg}{~~}~進行中 \quad
+\colorbox{barPlan}{~~}~予定 \quad $\bigstar$~発表会（7/1）
+
+\medskip
+※ test\_v3 firmware は 6/10 週の品質向上＋4 台輪唱で完了．Processing も PR \#25 で
+UI 改善が完了し，残りは実機テストでの微調整のみ．
+※ 300 テストフェーズは机上検証スクリプト（20 アサーション全 PASS）で開始．
+実機切り分け（書き込み取り違え確認）が次のマイルストーン．
+
+\sectionrule
+
+%================================================================
+% 3. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{10em}p{6em}p{4em}X@{}}
+\toprule
+作業項目 & 実施日 & 作業時間 & コメント \\
+\midrule
+品質向上 PR \#25 & 2026-06-10 & 25 分 & 状態遷移修正（Menu/Result IMU 監視・Fallback 復帰先），楽器クロック同期スナップ復帰，Processing 接続ステータス/操作ガイド追加，\texttt{-std=gnu++17} 警告解消 \\
+ジャイロ 2D 表示削除 & 2026-06-10 & 5 分 & ジャイロ値が不正のため 2D 表示機能ごと除去 \\
+メニューナビ改善 & 2026-06-10 & 10 分 & 重力推定 LPF＋窓積算の縦/横判定に変更（dynAcc 直読みより安定） \\
+デッドタイム追加 & 2026-06-10 & 10 分 & 状態遷移直後のジェスチャ/拍検出を 1000ms 抑制（誤動作防止） \\
+4 台輪唱実装 & 2026-06-10 & 20 分 & node\_05 新設，新音色 4 種，CANON\_CYCLE\_BEATS=56，サイクル窓終端処理 \\
+机上検証スクリプト & 2026-06-10 & 15 分 & Python で applyPattern のサイクル窓ロジックを再現，拍 1〜120 で 20 アサーション全 PASS \\
+作業メモ更新 & 2026-06-10 & 5 分 & activeContext/progress を修正 5 タスク完了＋机上検証結果で更新 \\
+KiCad 回路図作成 & 2026-06-16 & 30 分 & ESP32-S3-DevKitC-1-N32R16V，10 ピンコネクタ（I2C），スイッチ 3 個，LED 回路．指揮者ノードのテスト基板 \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{合計}} & \textbf{120 分} & \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 4. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{8em}Xp{2.5em}p{2.5em}Xp{3em}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 状態 \\
+\midrule
+実機で輪唱が聞こえない & node\_03/04 が入りの遅延なしで発音．机上検証でファームにバグなし→書き込み取り違えが有力 & 高 & 高 & test\_v3 main を全楽器に書き込み直し，Processing 画面で partId/音色が 3 台で異なるか確認する & 対応中 \\
+ゲームモードの打ち切り & GAME\_LENGTH\_BEATS\allowbreak{}=32 のため node\_04 は 16 拍しか弾けない（仕様上の制約） & 低 & 低 & ゲーム長の延長 or 採点区間の調整＝設計判断．自由演奏には影響なし & 保留 \\
+UDP マルチキャストのパケロス & ACK・再送なし & 中 & 中 & 連送 4 発＋WiFi 復帰時再 join で対策済み．実機テストで効果確認する & 継続 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト，優先度＝対応の緊急性
+
+\sectionrule
+
+%================================================================
+% 5. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証(再現性重視)}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：test\_v3 品質向上のレビュー，4 台輪唱のサイクル窓設計，机上検証スクリプトの作成
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}[PR \#25 の状態遷移・同期ロジックの不具合箇所のレビューと改善案]
+      \item {}[4 台で 8 拍ずつ入りをずらす輪唱のサイクル窓終端処理の設計]
+      \item {}[applyPattern のサイクル窓ロジックを Python で再現し，全拍を検証するスクリプトの生成]
+    \end{itemize}
+  \item 出力概要：
+    \begin{itemize}
+      \item {}[Menu/Result 状態での IMU 監視不足，Fallback 復帰先の誤り，楽器側のスナップ復帰欠如を特定し修正案を提示]
+      \item {}[CANON\_CYCLE\_BEATS=56（8 拍$\times$7 区間）で 4 声部を収容するサイクル窓設計]
+      \item {}[Python スクリプト（\texttt{tools/canon\_sim/}）で拍 1〜120 の発音パターンを全数検証，20 アサーション全 PASS]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法・ファクトチェック}
+
+\begin{itemize}
+  \item 検証手法：
+    \begin{itemize}
+      \item {}[全 6 ノード（node\_01〜05 + devkitc）を \texttt{pio run} でビルドし SUCCESS 確認（警告 0）]
+      \item {}[机上検証スクリプトで applyPattern の C++ ロジックを Python に移植し，拍ごとの発音ノード・休符を全数照合]
+      \item {}[processing-java build 通過を確認]
+    \end{itemize}
+  \item 最終判断：
+    \begin{itemize}
+      \item 採用．机上検証で「ファームにバグなし」を確信．実機で輪唱が聞こえない原因は
+            楽器ファームの書き込み取り違え（test\_v2 のまま or 3 台同一ノード用）が最有力．
+            実機書き込み直しで切り分ける
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item {}[test\_v3 main を全楽器（node\_02/03/04，可能なら node\_05）に書き込み直し，
+            書き込み取り違えの切り分けを完了する]
+      \item {}[Processing 画面で partId（0x02/0x03/0x04）と音色（トランペット/ホルン/トロンボーン）が
+            3 台で異なることを確認する]
+      \item {}[自由演奏 60 拍以上で入りが 8 拍ずつズレること，拍 33 以降の尻すぼみ→無音 8 拍→
+            拍 57 再入を聴感確認する]
+      \item {}[300 テストフェーズを本格化し，精度・遅延の定量評価を開始する]
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item {}[4 台の輪唱が実機で聴感的に成立する（入りのズレが明確に聞こえる）]
+      \item {}[書き込み取り違えが確定 or 棄却され，次の対策が明確になっている]
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item {}[6/24 までに実機切り分け完了＋テスト評価を開始し，発表準備に着手]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item {}[机上検証（20 アサーション全 PASS）により「コードにバグなし」を確信できたことで，
+        デバッグの焦点が実機側（書き込み取り違え・ハードウェア）に絞られた．
+        これは今後の切り分けを大幅に効率化する]
+  \item {}[KiCad 回路図は \texttt{hardware/} 配下に作成済み（未コミット）．
+        ESP32-S3-DevKitC-1-N32R16V をメインに，I2C コネクタ・スイッチ 3 個・LED 回路を配置した
+        指揮者ノードのテスト用基板設計]
+  \item {}[ゲームモードは追加機能（ストレッチ）であり，遅れても自由演奏のみで発表は成立する位置づけ]
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 8. 付録
+%================================================================
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item ソースコード：\texttt{firmware/test\_v3/}（共通ライブラリ＋node\_01〜node\_05），\texttt{pc\_app/test\_v3/}
+      \item 机上検証スクリプト：\texttt{tools/canon\_sim/}
+      \item 回路図（未コミット）：\texttt{hardware/}
+      \item GitHub リポジトリ：\url{https://github.com/takushio2525/2026-hackathon-team23}
+      \item 関連コミット：\texttt{53437e8}，\texttt{4b480a6}，\texttt{9f9490c}，\texttt{b656884}，\texttt{80ec121}，\texttt{390e4ac}
+    \end{itemize}
+  \item 添付範囲：
+    \begin{itemize}
+      \item 差分（test\_v3 品質向上・4 台輪唱・机上検証の 1 週間分のスナップショット）
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\end{document}
