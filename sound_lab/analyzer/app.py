@@ -65,7 +65,8 @@ def analyze():
         fd, tmp_path = tempfile.mkstemp(suffix=ext)
         os.close(fd)
         f.save(tmp_path)
-        result = analyze_file(tmp_path, name=os.path.splitext(os.path.basename(f.filename))[0])
+        profile = request.form.get("profile", "auto")
+        result = analyze_file(tmp_path, name=os.path.splitext(os.path.basename(f.filename))[0], profile=profile)
         return jsonify(result)
     except AnalysisError as e:
         return jsonify(error=str(e)), 422

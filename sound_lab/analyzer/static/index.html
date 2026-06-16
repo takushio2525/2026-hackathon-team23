@@ -24,7 +24,7 @@
   <header>
     <h1>sound_lab — 楽器音アナライザ &amp; 編集スタジオ</h1>
     <p>楽器の<strong>単音</strong>を渡すと、ADSR・倍音・残差ノイズ・非調和性・ビブラート/トレモロまで解析し、
-      その場で<strong>鳴らしながら</strong>音色を作り込めます。仕上げた音色は Processing 用 JSON / WAV に書き出せます。</p>
+      その場で<strong>鳴らしながら</strong>音色を作り込めます。金属楽器向けの補正、単音クオリティ向上、4音源の音量バランス調整と ZIP 書き出しに対応しています。</p>
   </header>
 
   <!-- file:// で開かれた / サーバに繋がらないときの案内 -->
@@ -42,17 +42,52 @@
 
   <!-- アップロード -->
   <div class="card" id="uploadCard">
-    <div id="drop" tabindex="0" role="button" aria-label="音源ファイルを選択">
-      <div class="big">🎵 音源ファイルをドロップ / クリックして選択</div>
-      <div class="sub"><b>.wav</b> 推奨 ・ .flac / .ogg / .mp3 / .aiff / .m4a 可 ・ 〜32&nbsp;MB ・ <b>1音だけ</b>を渡してください</div>
+    <div class="mode-tabs" role="tablist" aria-label="解析モード">
+      <button class="mode-tab active" id="singleModeBtn" type="button" role="tab" aria-selected="true">単一楽器クオリティ向上</button>
+      <button class="mode-tab" id="balanceModeBtn" type="button" role="tab" aria-selected="false">4音源バランス調整</button>
     </div>
-    <input type="file" id="file" accept=".wav,.flac,.ogg,.mp3,.aiff,.aif,.m4a,audio/*" />
-    <div class="row" style="margin-top:16px;flex-wrap:wrap">
-      <button class="btn-primary" id="analyzeBtn" disabled>解析する</button>
-      <button class="btn-ghost" id="demoBtn">内蔵デモ音色で試す</button>
-      <button class="btn-ghost" id="loadJsonBtn">保存した JSON を読み込む</button>
-      <input type="file" id="jsonFile" accept=".json,application/json" style="display:none" />
-      <span id="status"></span>
+
+    <div id="singleMode">
+      <div class="profile-row">
+        <label for="instrumentProfile">楽器プロファイル</label>
+        <select id="instrumentProfile">
+          <option value="auto">自動（汎用）</option>
+          <option value="trumpet">トランペット</option>
+          <option value="drum">ドラム / 打楽器</option>
+        </select>
+        <span class="profile-hint">指定した楽器に合わせて、基音探索と初期音色補正を調整します。</span>
+      </div>
+      <div id="drop" tabindex="0" role="button" aria-label="音源ファイルを選択">
+        <div class="big">🎵 音源ファイルをドロップ / クリックして選択</div>
+        <div class="sub"><b>.wav</b> 推奨 ・ .flac / .ogg / .mp3 / .aiff / .m4a 可 ・ 〜32&nbsp;MB ・ <b>1音だけ</b>を渡してください</div>
+      </div>
+      <input type="file" id="file" accept=".wav,.flac,.ogg,.mp3,.aiff,.aif,.m4a,audio/*" />
+      <div class="row" style="margin-top:16px;flex-wrap:wrap">
+        <button class="btn-primary" id="analyzeBtn" disabled>解析する</button>
+        <button class="btn-metal" id="singleMetalBtn" disabled>金属楽器向けに強化</button>
+        <button class="btn-ghost" id="singleDrumBtn" disabled>ドラム向けに強化</button>
+        <button class="btn-ghost" id="demoBtn">内蔵デモ音色で試す</button>
+        <button class="btn-ghost" id="loadJsonBtn">保存した JSON を読み込む</button>
+        <input type="file" id="jsonFile" accept=".json,application/json" style="display:none" />
+        <span id="status"></span>
+      </div>
+    </div>
+
+    <div id="balanceMode" class="hidden">
+      <div id="batchDrop" tabindex="0" role="button" aria-label="4つの音源ファイルを選択">
+        <div class="big">🎚 4つの音源ファイルをまとめて選択</div>
+        <div class="sub"><b>最大4ファイル</b> ・ 各ファイルは単音推奨 ・ 解析後に音量バランスを調整して ZIP で書き出します</div>
+      </div>
+      <input type="file" id="batchFiles" multiple accept=".wav,.flac,.ogg,.mp3,.aiff,.aif,.m4a,audio/*" />
+      <div class="row" style="margin-top:16px;flex-wrap:wrap">
+        <button class="btn-primary" id="analyzeBatchBtn" disabled>4音源を解析</button>
+        <button class="btn-metal" id="batchMetalBtn" disabled>4音源を金属楽器向けに強化</button>
+        <button class="btn-ghost" id="autoBalanceBtn" disabled>音量を自動でそろえる</button>
+        <button class="btn-ghost" id="exportBatchZipBtn" disabled>ZIP で書き出し</button>
+        <label class="exsub">WAV 長さ <input type="number" id="batchWavDur" min="0.3" max="12" step="0.1" value="2.5" /> 秒</label>
+        <span id="batchStatus"></span>
+      </div>
+      <div id="batchList" class="batch-list"></div>
     </div>
   </div>
 
@@ -104,6 +139,19 @@
     <!-- 書き出し -->
     <div class="card">
       <div class="card-head"><h2><span class="dot"></span> 💾 書き出し / 操作</h2></div>
+      <div class="exportrow">
+        <button class="btn-metal" id="qualityBtn">金属楽器向けクオリティ向上</button>
+        <span class="exsub">倍音・非調和性・アタック・EQ を金属楽器向けにまとめて調整します。</span>
+      </div>
+      <div class="abbox" aria-label="A/B比較">
+        <div class="abtitle">A/B比較</div>
+        <button class="btn-ghost sm" id="abSaveA">Aへ保存</button>
+        <button class="btn-ghost sm" id="abSaveB">Bへ保存</button>
+        <button class="btn-ghost sm" id="abApplyA">Aを聴く</button>
+        <button class="btn-ghost sm" id="abApplyB">Bを聴く</button>
+        <button class="btn-primary sm" id="abToggleBtn">A/B切替</button>
+        <span class="exsub" id="abStatus">A/Bは解析後に自動で初期化されます。</span>
+      </div>
       <div class="exportrow">
         <button class="btn-primary" id="dlJsonBtn">⬇ 調整後のインストゥルメント JSON</button>
         <span class="exsub">→ Processing の <code>instrument_player/data/</code> に置けばこの音色で鳴る（<code>fx</code> 欄はブラウザ専用の付加情報）</span>

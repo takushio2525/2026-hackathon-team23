@@ -37,8 +37,22 @@ HARM_ENV_POINTS = 32             # 倍音ごとの時間エンベロープの点
 ENV_MAX_POINTS = 1200            # 全体エンベロープの最大点数(これを超えたら間引く ≒ 6 秒)
 ONE_CYCLE_POINTS = 1024          # 単一周期波形の点数
 NOISE_BANDS_HZ = [0, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, SR // 2]
+ATTACK_SAMPLE_SR = 22050         # 原音アタック波形の保存サンプルレート
+ATTACK_SAMPLE_SEC = 0.18         # トランペットのタンギング/バズ感として重ねる原音先頭の長さ
+SUSTAIN_SAMPLE_SR = 44100        # トランペット定常部の保存サンプルレート
+SUSTAIN_SAMPLE_SEC = 0.22        # トランペットの管鳴り/唇のバズ感として薄くループする長さ
+DRUM_ATTACK_SAMPLE_SEC = 0.45     # ドラム用に保存する原音アタック/胴鳴りの長さ
+DRUM_SAMPLE_SR = 44100           # ドラム本体サンプルの保存サンプルレート。ハイハットの高域を残すため 44.1kHz。
+DRUM_SAMPLE_SEC = 3.0            # ドラム本体として保存する最大秒数
 FMIN = 50.0                      # 基音探索の下限
 FMAX = 2200.0                    # 基音探索の上限
+INSTRUMENT_PROFILES = {
+    "auto": {"label": "自動", "fmin": FMIN, "fmax": FMAX},
+    # トランペットは倍音が明るく、基音候補を低く取りすぎると 1/2 倍音側に誤認しやすい。
+    "trumpet": {"label": "トランペット", "fmin": 120.0, "fmax": 1400.0},
+    # ドラムは明確な基音が無い音も多いため、低域ピークを再生時の便宜的な基準音として使う。
+    "drum": {"label": "ドラム / 打楽器", "fmin": 35.0, "fmax": 900.0, "percussive": True},
+}
 PYIN_FRAME = 2048                # pyin のフレーム長(hop はその 1/4 = 512 → フレームレート ≒ SR/512)
 PYIN_HOP = PYIN_FRAME // 4       # = 512
 F0_TRACK_HZ = SR / PYIN_HOP      # ≒ 86.13 Hz (f0 トラックの時間解像度)
@@ -87,14 +101,14 @@ def _resample_curve(values: np.ndarray, n_out: int) -> np.ndarray:
     return np.interp(x, xp, values)
 
 
-def _autocorr_f0(seg: np.ndarray, sr: int) -> float | None:
+def _autocorr_f0(seg: np.ndarray, sr: int, fmin: float = FMIN, fmax: float = FMAX) -> float | None:
     """pyin が使えないとき用の自己相関ベース基音推定。"""
     seg = seg - float(np.mean(seg))
     if np.allclose(seg, 0.0):
         return None
     corr = np.correlate(seg, seg, mode="full")[len(seg) - 1:]
-    lo = max(1, int(sr / FMAX))
-    hi = min(len(corr) - 1, int(sr / FMIN))
+    lo = max(1, int(sr / fmax))
+    hi = min(len(corr) - 1, int(sr / fmin))
     if hi <= lo:
         return None
     lag = lo + int(np.argmax(corr[lo:hi]))
@@ -131,11 +145,14 @@ def _trim_silence(y: np.ndarray, sr: int):
 
 
 # ── メイン ───────────────────────────────────────────────────
-def analyze_file(path: str, name: str | None = None) -> dict:
+def analyze_file(path: str, name: str | None = None, profile: str = "auto") -> dict:
     """音源ファイルを解析して {"instrument": {...}, "preview": {...}} を返す。"""
     source_file = os.path.basename(path)
     if name is None:
         name = os.path.splitext(source_file)[0]
+    profile = profile if profile in INSTRUMENT_PROFILES else "auto"
+    profile_info = INSTRUMENT_PROFILES[profile]
+    is_percussive = bool(profile_info.get("percussive"))
 
     y, _ = librosa.load(path, sr=SR, mono=True)
     if y.size == 0 or float(np.max(np.abs(y))) < 1e-5:
@@ -156,7 +173,7 @@ def analyze_file(path: str, name: str | None = None) -> dict:
     n_env = len(env)
 
     # ── 基音検出 (f0 トラックも保持: ビブラート解析と描画に使う) ──
-    fundamental, f0_track = _detect_fundamental(y)
+    fundamental, f0_track = _detect_fundamental(y, profile)
     midi = _hz_to_midi(fundamental)
 
     # ── ビブラート / トレモロ の検出 ───────────────────
@@ -164,7 +181,7 @@ def analyze_file(path: str, name: str | None = None) -> dict:
 
     # ── ADSR + ループ点の当てはめ ────────────────────────
     adsr = _fit_adsr(env, ENV_HZ)
-    sustaining = adsr["sustain_level"] > 0.18
+    sustaining = False if is_percussive else adsr["sustain_level"] > 0.18
 
     # ── 定常部(倍音解析に使う窓) ────────────────────────
     a_idx = int(round(adsr["loop_start_sec"] * ENV_HZ))
@@ -172,6 +189,10 @@ def analyze_file(path: str, name: str | None = None) -> dict:
     a_samp = max(0, a_idx * ENV_HOP)
     b_samp = min(y.size, max(a_samp + 4096, b_idx * ENV_HOP))
     steady = y[a_samp:b_samp]
+    if is_percussive:
+        peak_samp = int(np.argmax(np.abs(y)))
+        head = max(0, peak_samp - int(0.005 * SR))
+        steady = y[head:head + max(4096, int(0.35 * SR))]
     if steady.size < 4096:                # 短ければアタック直後を使う
         peak_samp = int(np.argmax(np.abs(y)))
         steady = y[peak_samp:peak_samp + max(4096, int(0.3 * SR))]
@@ -187,9 +208,20 @@ def analyze_file(path: str, name: str | None = None) -> dict:
 
     # ── 単一周期波形 ────────────────────────────────────
     one_cycle = _extract_one_cycle(steady, fundamental, SR)
+    attack_sample = None
+    sustain_sample = None
+    drum_sample = None
+    if profile == "trumpet":
+        attack_sample = _extract_attack_sample(y, SR, midi, ATTACK_SAMPLE_SEC)
+        sustain_sample = _extract_sustain_sample(steady, SR, midi, fundamental)
+    elif is_percussive:
+        attack_sample = _extract_attack_sample(y, SR, midi, DRUM_ATTACK_SAMPLE_SEC)
+        drum_sample = _extract_drum_sample(y, SR, midi)
 
     # ── 表示用特徴量 ────────────────────────────────────
     features = _spectral_features(y, steady)
+    if is_percussive:
+        features.update(_drum_features(y, steady, fundamental))
     features["rms_peak"] = _r(rms_peak, 4)
     features["harmonic_count"] = int(sum(1 for h in harmonics if h["amp"] > 0.0))
     features["source_duration_sec"] = _r(raw_sec, 3)        # トリム前の長さ
@@ -206,6 +238,8 @@ def analyze_file(path: str, name: str | None = None) -> dict:
         "format": "sound_lab.instrument/1",
         "name": name,
         "source_file": source_file,
+        "instrument_profile": profile,
+        "instrument_profile_label": profile_info["label"],
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sample_rate": SR,
         "fundamental_hz": _r(fundamental, 3),
@@ -233,6 +267,12 @@ def analyze_file(path: str, name: str | None = None) -> dict:
         },
         "features": features,
     }
+    if attack_sample is not None:
+        instrument["attack_sample"] = attack_sample
+    if sustain_sample is not None:
+        instrument["sustain_sample"] = sustain_sample
+    if drum_sample is not None:
+        instrument["drum_sample"] = drum_sample
 
     # 描画用 f0 トラック(中央値からのセント差)
     f0_cents_prev, f0_prev_rate = _f0_cents_preview(f0_track, duration_sec)
@@ -248,11 +288,15 @@ def analyze_file(path: str, name: str | None = None) -> dict:
 
 
 # ── 基音 ─────────────────────────────────────────────────────
-def _detect_fundamental(y: np.ndarray):
+def _detect_fundamental(y: np.ndarray, profile: str = "auto"):
     """基音 (中央値, Hz) と f0 トラック(フレームごとの Hz・無声は NaN / 失敗時 None) を返す。"""
+    p = INSTRUMENT_PROFILES.get(profile, INSTRUMENT_PROFILES["auto"])
+    fmin, fmax = p["fmin"], p["fmax"]
+    if p.get("percussive"):
+        return _detect_drum_reference_f0(y, fmin, fmax), None
     try:
         f0, _, _ = librosa.pyin(
-            y, fmin=max(FMIN, 55.0), fmax=min(FMAX, 2000.0),
+            y, fmin=max(fmin, 55.0), fmax=min(fmax, 2000.0),
             sr=SR, frame_length=PYIN_FRAME, hop_length=PYIN_HOP)
         f0v = f0[~np.isnan(f0)]
         if f0v.size >= 3:
@@ -263,11 +307,44 @@ def _detect_fundamental(y: np.ndarray):
     # フォールバック: 振幅最大付近の自己相関(トラックは取れない)
     peak = int(np.argmax(np.abs(y)))
     seg = y[peak:peak + min(y.size - peak, int(0.2 * SR))]
-    f0 = _autocorr_f0(seg if seg.size > 1024 else y, SR)
-    if f0 is None or not (FMIN <= f0 <= FMAX):
+    f0 = _autocorr_f0(seg if seg.size > 1024 else y, SR, fmin=fmin, fmax=fmax)
+    if f0 is None or not (fmin <= f0 <= fmax):
         raise AnalysisError(
             "基音を検出できませんでした。和音やノイズではなく、ピッチのはっきりした単音を渡してください。")
     return float(f0), None
+
+
+def _detect_drum_reference_f0(y: np.ndarray, fmin: float, fmax: float) -> float:
+    """ドラム用の便宜的な基準周波数を返す。
+
+    ドラムは基音が無い/時間で急変する音が多いので、pyin ではなくアタック直後のスペクトルから
+    低域寄りに重み付けしたピークを拾う。これは「音名表示と移調の基準」であり、調和音としての
+    厳密な基音ではない。
+    """
+    peak = int(np.argmax(np.abs(y)))
+    start = max(0, peak - int(0.01 * SR))
+    end = min(y.size, peak + int(0.35 * SR))
+    seg = y[start:end]
+    if seg.size < 2048:
+        seg = y[:min(y.size, int(0.45 * SR))]
+    if seg.size < 128:
+        return 120.0
+
+    win = np.hanning(seg.size)
+    nfft = 1
+    while nfft < max(seg.size, 1 << 15):
+        nfft <<= 1
+    mag = np.abs(np.fft.rfft(seg * win, n=nfft))
+    freqs = np.fft.rfftfreq(nfft, d=1.0 / SR)
+    sel = (freqs >= fmin) & (freqs <= fmax)
+    if not np.any(sel):
+        return 120.0
+    idxs = np.where(sel)[0]
+    # シンバルやスネアの広帯域ノイズに引っ張られすぎないよう、低域を少し優先する。
+    score = mag[idxs] / np.sqrt(np.maximum(freqs[idxs], fmin))
+    k = int(idxs[np.argmax(score)])
+    freq = float(freqs[k])
+    return float(np.clip(freq, fmin, fmax))
 
 
 # ── ビブラート / トレモロ ────────────────────────────────────
@@ -634,6 +711,168 @@ def _extract_one_cycle(steady: np.ndarray, f0: float, sr: int) -> np.ndarray:
     cyc = _resample_curve(seg, ONE_CYCLE_POINTS)
     m = float(np.max(np.abs(cyc)))
     return cyc / m if m > 1e-9 else cyc
+
+
+def _extract_attack_sample(y: np.ndarray, sr: int, midi: float, duration_sec: float = ATTACK_SAMPLE_SEC) -> dict:
+    """原音のアタックを再合成に重ねられるよう、先頭だけを短く保存する。"""
+    n = min(y.size, int(round(duration_sec * sr)))
+    seg = np.array(y[:n], dtype=float, copy=True)
+    if seg.size < 16:
+        seg = np.zeros(16, dtype=float)
+
+    # 再合成音に重ねたときクリックしないよう、末尾だけ短くフェードアウトする。
+    fade_n = min(seg.size, int(round(0.025 * sr)))
+    if fade_n > 1:
+        seg[-fade_n:] *= np.linspace(1.0, 0.0, fade_n)
+
+    peak = float(np.max(np.abs(seg))) or 1.0
+    seg = seg / peak
+    if sr != ATTACK_SAMPLE_SR:
+        seg = librosa.resample(seg, orig_sr=sr, target_sr=ATTACK_SAMPLE_SR)
+
+    return {
+        "sample_rate": ATTACK_SAMPLE_SR,
+        "duration_sec": _r(seg.size / ATTACK_SAMPLE_SR, 4),
+        "root_midi_note": int(round(midi)),
+        "source_peak": _r(peak, 5),
+        "values": _r(seg, 4),
+    }
+
+
+def _extract_sustain_sample(steady: np.ndarray, sr: int, midi: float, f0: float) -> dict | None:
+    """トランペットの定常部を短いループ素材として保存する。
+
+    倍音加算だけでは出にくい唇の細かいバズと管鳴りを、薄く混ぜるための補助素材。
+    ループ境界で大きなクリックが出ないよう、基音周期の整数倍に近い長さで切り出す。
+    """
+    if steady.size < int(0.06 * sr) or not np.isfinite(f0) or f0 <= 0:
+        return None
+
+    period = sr / f0
+    if period < 8:
+        return None
+    cycles = max(8, int(round(SUSTAIN_SAMPLE_SEC * f0)))
+    n = int(round(cycles * period))
+    n = min(n, steady.size)
+    if n < int(0.045 * sr):
+        return None
+
+    mid = steady.size // 2
+    start_min = 0
+    start_max = max(0, steady.size - n - 1)
+    search0 = max(start_min, mid - n)
+    search1 = min(start_max, mid + n)
+    start = min(max(0, mid - n // 2), start_max)
+    for i in range(search0, max(search0 + 1, search1)):
+        if steady[i] <= 0.0 < steady[i + 1] and i + n < steady.size:
+            start = i
+            break
+
+    seg = np.array(steady[start:start + n], dtype=float, copy=True)
+    if seg.size < 16:
+        return None
+    seg -= float(np.mean(seg))
+
+    # ループ素材はピーク正規化しすぎると主音を食うため、RMS 基準で穏やかに整える。
+    rms = float(np.sqrt(np.mean(seg ** 2))) or 1.0
+    seg = seg / max(rms * 4.0, 1e-9)
+    peak = float(np.max(np.abs(seg))) or 1.0
+    if peak > 1.0:
+        seg = seg / peak
+
+    if sr != SUSTAIN_SAMPLE_SR:
+        seg = librosa.resample(seg, orig_sr=sr, target_sr=SUSTAIN_SAMPLE_SR)
+
+    return {
+        "sample_rate": SUSTAIN_SAMPLE_SR,
+        "duration_sec": _r(seg.size / SUSTAIN_SAMPLE_SR, 4),
+        "root_midi_note": int(round(midi)),
+        "loop_start_sec": 0.0,
+        "loop_end_sec": _r(seg.size / SUSTAIN_SAMPLE_SR, 4),
+        "source_rms": _r(rms, 5),
+        "values": _r(seg, 4),
+    }
+
+
+def _extract_drum_sample(y: np.ndarray, sr: int, midi: float) -> dict:
+    """ドラムの1打をサンプル駆動で再現するため、トリム後の原音本体を保存する。"""
+    n = min(y.size, int(round(DRUM_SAMPLE_SEC * sr)))
+    seg = np.array(y[:n], dtype=float, copy=True)
+    if seg.size < 16:
+        seg = np.zeros(16, dtype=float)
+
+    # アタックは残しつつ、ファイル先頭/末尾のクリックだけ避ける。
+    fade_in = min(seg.size, int(round(0.0003 * sr)))
+    if fade_in > 1:
+        seg[:fade_in] *= np.linspace(0.0, 1.0, fade_in)
+    fade_out = min(seg.size, int(round(0.035 * sr)))
+    if fade_out > 1:
+        seg[-fade_out:] *= np.linspace(1.0, 0.0, fade_out)
+
+    peak = float(np.max(np.abs(seg))) or 1.0
+    seg = seg / peak
+    if sr != DRUM_SAMPLE_SR:
+        seg = librosa.resample(seg, orig_sr=sr, target_sr=DRUM_SAMPLE_SR)
+
+    return {
+        "sample_rate": DRUM_SAMPLE_SR,
+        "duration_sec": _r(seg.size / DRUM_SAMPLE_SR, 4),
+        "root_midi_note": int(round(midi)),
+        "source_peak": _r(peak, 5),
+        "values": _r(seg, 4),
+    }
+
+
+def _drum_features(y: np.ndarray, steady: np.ndarray, reference_f0: float) -> dict:
+    """ドラムモード用の表示/初期調整向け特徴量を返す。"""
+    try:
+        n_fft = 4096
+        mag = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=ENV_HOP, center=True))
+        freqs = librosa.fft_frequencies(sr=SR, n_fft=n_fft)
+        pow_mean = np.mean(mag ** 2, axis=1)
+        total = float(np.sum(pow_mean)) + 1e-12
+        low = float(np.sum(pow_mean[freqs < 180.0]) / total)
+        mid = float(np.sum(pow_mean[(freqs >= 180.0) & (freqs < 2500.0)]) / total)
+        high = float(np.sum(pow_mean[freqs >= 2500.0]) / total)
+        onset = librosa.onset.onset_strength(y=y, sr=SR)
+        transient = float(np.max(onset) / (np.mean(onset) + 1e-9)) if onset.size else 0.0
+        rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=256, center=True)[0]
+        if rms.size:
+            peak_i = int(np.argmax(rms))
+            thr = float(np.max(rms)) * (10.0 ** (-34.0 / 20.0))
+            tail = np.where(rms[peak_i:] >= thr)[0]
+            decay_sec = float((tail[-1] if tail.size else 0) * 256 / SR)
+        else:
+            decay_sec = 0.0
+    except Exception:
+        low = mid = high = transient = decay_sec = 0.0
+
+    if low > 0.36 and reference_f0 < 150 and high < 0.45:
+        guess = "kick"
+        label = "キック系"
+    elif high > 0.45 and low < 0.24:
+        if decay_sec < 0.75:
+            guess = "hihat"
+            label = "ハイハット系"
+        else:
+            guess = "crash"
+            label = "クラッシュシンバル系"
+    elif mid > 0.32 or transient > 6.0:
+        guess = "snare"
+        label = "スネア / タム系"
+    else:
+        guess = "drum"
+        label = "ドラム系"
+
+    return {
+        "drum_type_guess": guess,
+        "drum_type_label": label,
+        "drum_low_energy": _r(low, 4),
+        "drum_mid_energy": _r(mid, 4),
+        "drum_high_energy": _r(high, 4),
+        "drum_transient_strength": _r(transient, 3),
+        "drum_decay_sec": _r(decay_sec, 4),
+    }
 
 
 # ── 表示用特徴量 ─────────────────────────────────────────────

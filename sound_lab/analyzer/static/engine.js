@@ -110,6 +110,94 @@ window.SL = window.SL || {};
       // 出力: 各倍音 → envGain(録音された時間形状) → ampGain(静的振幅・即編集) → amp(ADSR) → S.voiceMix
       this.amp = ctx.createGain(); this.amp.gain.value = 0;
       this.amp.connect(S.voiceMix);
+      this.waveSrc = null; this.waveGain = null;
+      this.attackSrc = null; this.attackGain = null;
+      this.sustainSrc = null; this.sustainTone = null; this.sustainGain = null;
+      this.drumSrc = null; this.drumGain = null;
+      this.isTrumpet = (S.instrument && S.instrument.instrument_profile) === "trumpet";
+
+      // ドラムは倍音合成よりも原音1打の非周期成分が本体なので、解析元サンプルを主音として鳴らす。
+      const drumBuf = S._getDrumBuffer && S._getDrumBuffer();
+      if (drumBuf && (P.drumSampleMix || 0) > 0.001) {
+        const src = ctx.createBufferSource();
+        const g = ctx.createGain();
+        const smp = S.instrument.drum_sample || {};
+        const root = smp.root_midi_note || S.instrument.midi_note || midi;
+        const follow = !!P.drumPitchFollow;
+        const rate = clamp(Math.pow(2, ((follow ? midi - root : 0) + (P.transposeSemis || 0)) / 12), 0.25, 4);
+        const mix = clamp(P.drumSampleMix || 0, 0, 1.5) * this.vel * 0.9;
+        src.buffer = drumBuf;
+        src.playbackRate.setValueAtTime(rate, t0);
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(mix, t0 + 0.002);
+        g.gain.setTargetAtTime(0.0001, t0 + Math.max(0.05, drumBuf.duration / rate * 0.98), 0.03);
+        src.connect(g); g.connect(S.voiceMix);
+        src.start(t0);
+        try { src.stop(t0 + drumBuf.duration / rate + 0.08); } catch (_) {}
+        this.drumSrc = src; this.drumGain = g;
+      }
+
+      // トランペットは倍音加算だけだと芯がサイン波寄りになりやすいので、
+      // 解析した原音1周期波形を安定した主波形として薄く混ぜる。
+      const wavBuf = S._getWaveCycleBuffer && S._getWaveCycleBuffer();
+      if (wavBuf && (P.trumpetWaveMix || 0) > 0.001) {
+        const src = ctx.createBufferSource();
+        const g = ctx.createGain();
+        const root = S.instrument.midi_note || midi;
+        const rate = clamp(Math.pow(2, (midi - root + (P.transposeSemis || 0)) / 12), 0.25, 4);
+        src.buffer = wavBuf;
+        src.loop = true;
+        src.playbackRate.setValueAtTime(rate, t0);
+        src.connect(g); g.connect(this.amp);
+        this.waveSrc = src; this.waveGain = g;
+        this.applyWaveMix(true);
+        src.start(t0);
+      }
+
+      // トランペットなどの立ち上がりはサイン波の倍音加算だけでは痩せやすいので、
+      // 解析時に保存した原音アタックを短く重ねる。
+      const atkBuf = S._getAttackBuffer && S._getAttackBuffer();
+      if (atkBuf && (P.attackSampleMix || 0) > 0.001) {
+        const src = ctx.createBufferSource();
+        const g = ctx.createGain();
+        const atk = S.instrument.attack_sample || {};
+        const root = atk.root_midi_note || S.instrument.midi_note || midi;
+        const semis = midi - root + (P.transposeSemis || 0);
+        const rate = clamp(Math.pow(2, semis / 12), 0.25, 4);
+        const pitchSafe = 1 / (1 + Math.abs(semis) * 0.08);
+        const mix = clamp(P.attackSampleMix || 0, 0, 1.5) * this.vel * 0.55 * pitchSafe;
+        src.buffer = atkBuf;
+        src.playbackRate.setValueAtTime(rate, t0);
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(mix, t0 + 0.006);
+        g.gain.setTargetAtTime(0.0001, t0 + Math.max(0.035, atkBuf.duration / rate * 0.62), 0.035);
+        src.connect(g); g.connect(S.voiceMix);
+        src.start(t0);
+        try { src.stop(t0 + atkBuf.duration / rate + 0.08); } catch (_) {}
+        this.attackSrc = src; this.attackGain = g;
+      }
+
+      // トランペットの伸びている部分に含まれる唇の細かいバズと管鳴りを薄くループして混ぜる。
+      const susBuf = S._getSustainBuffer && S._getSustainBuffer();
+      if (susBuf) {
+        const src = ctx.createBufferSource();
+        const tone = ctx.createBiquadFilter();
+        const g = ctx.createGain();
+        const smp = S.instrument.sustain_sample || {};
+        const root = smp.root_midi_note || S.instrument.midi_note || midi;
+        this.sustainPitchDelta = midi - root + (P.transposeSemis || 0);
+        const rate = clamp(Math.pow(2, this.sustainPitchDelta / 12), 0.25, 4);
+        src.buffer = susBuf;
+        src.loop = true;
+        src.loopStart = clamp(smp.loop_start_sec || 0, 0, Math.max(0, susBuf.duration - 0.002));
+        src.loopEnd = clamp(smp.loop_end_sec || susBuf.duration, src.loopStart + 0.002, susBuf.duration);
+        src.playbackRate.setValueAtTime(rate, t0);
+        tone.type = "lowpass"; tone.frequency.value = S._sustainBufferIsFallback ? 3600 : 4800; tone.Q.value = 0.45;
+        src.connect(tone); tone.connect(g); g.connect(this.amp);
+        this.sustainSrc = src; this.sustainTone = tone; this.sustainGain = g;
+        this.applySustainMix(true);
+        src.start(t0);
+      }
 
       // ビブラート用ゲート(onset で 0→1)
       this.vibGate = ctx.createGain(); this.vibGate.gain.value = 0;
@@ -126,7 +214,15 @@ window.SL = window.SL || {};
         osc.connect(envGain); envGain.connect(ampGain); ampGain.connect(this.amp);
         osc.detune.setValueAtTime((P.fineCents || 0) + this.humCents, t0);
         this.vibGate.connect(osc.detune);
-        this.harm.push({ n: h.n, ratio: h.ratio, ampBase: h.amp, env: (h.env && h.env.length ? h.env : [1, 1]), osc, envGain, ampGain });
+        let layerOsc = null, layerEnvGain = null, layerAmpGain = null;
+        if (this.isTrumpet) {
+          layerOsc = ctx.createOscillator(); layerOsc.type = "sine";
+          layerEnvGain = ctx.createGain();
+          layerAmpGain = ctx.createGain(); layerAmpGain.gain.value = 0;
+          layerOsc.connect(layerEnvGain); layerEnvGain.connect(layerAmpGain); layerAmpGain.connect(this.amp);
+          this.vibGate.connect(layerOsc.detune);
+        }
+        this.harm.push({ n: h.n, ratio: h.ratio, ampBase: h.amp, env: (h.env && h.env.length ? h.env : [1, 1]), osc, envGain, ampGain, layerOsc, layerEnvGain, layerAmpGain });
       }
       this.origSumAmp = this.harm.reduce((s, h) => s + h.ampBase, 0) || 1;
 
@@ -145,7 +241,10 @@ window.SL = window.SL || {};
       this.scheduleNoiseEnv(t0);
       this.scheduleAmp(t0);
 
-      for (const h of this.harm) { h.osc.start(t0); }
+      for (const h of this.harm) {
+        h.osc.start(t0);
+        if (h.layerOsc) h.layerOsc.start(t0);
+      }
       this.noiseSrc.start(t0);
     }
 
@@ -160,8 +259,56 @@ window.SL = window.SL || {};
         if (immediate || !this.everFreq || (P.glideMs || 0) < 6) h.osc.frequency.setValueAtTime(f, t);
         else h.osc.frequency.setTargetAtTime(f, t, Math.max(0.004, (P.glideMs || 0) / 1000 / 3));
         h.osc.detune.setValueAtTime((P.fineCents || 0) + this.humCents, t);
+        if (h.layerOsc) {
+          const spread = clamp(P.brassLayerDetuneCents || 0, 0, 18);
+          const sign = h.n % 2 === 0 ? -0.72 : 1.0;
+          const cents = spread * sign * (0.82 + Math.min(h.n, 12) * 0.018);
+          if (immediate || !this.everFreq || (P.glideMs || 0) < 6) h.layerOsc.frequency.setValueAtTime(f, t);
+          else h.layerOsc.frequency.setTargetAtTime(f, t, Math.max(0.004, (P.glideMs || 0) / 1000 / 3));
+          h.layerOsc.detune.setValueAtTime((P.fineCents || 0) + this.humCents + cents, t);
+        }
+      }
+      if (this.sustainSrc) {
+        const smp = S.instrument.sustain_sample || {};
+        const root = smp.root_midi_note || S.instrument.midi_note || this.midi;
+        this.sustainPitchDelta = this.midi - root + (P.transposeSemis || 0);
+        const rate = clamp(Math.pow(2, this.sustainPitchDelta / 12), 0.25, 4);
+        if (immediate || !this.everFreq || (P.glideMs || 0) < 6) this.sustainSrc.playbackRate.setValueAtTime(rate, t);
+        else this.sustainSrc.playbackRate.setTargetAtTime(rate, t, Math.max(0.004, (P.glideMs || 0) / 1000 / 3));
+        this.applySustainMix(false);
+      }
+      if (this.waveSrc) {
+        const root = S.instrument.midi_note || this.midi;
+        const rate = clamp(Math.pow(2, (this.midi - root + (P.transposeSemis || 0)) / 12), 0.25, 4);
+        if (immediate || !this.everFreq || (P.glideMs || 0) < 6) this.waveSrc.playbackRate.setValueAtTime(rate, t);
+        else this.waveSrc.playbackRate.setTargetAtTime(rate, t, Math.max(0.004, (P.glideMs || 0) / 1000 / 3));
       }
       this.everFreq = true;
+    }
+
+    applyWaveMix(immediate) {
+      if (!this.waveGain) return;
+      const t = this.S.ctx.currentTime;
+      const target = clamp(this.S.params.trumpetWaveMix || 0, 0, 1) * 0.34;
+      if (immediate) this.waveGain.gain.setValueAtTime(target, t);
+      else this.waveGain.gain.setTargetAtTime(target, t, 0.025);
+    }
+
+    applySustainMix(immediate) {
+      if (!this.sustainGain) return;
+      const t = this.S.ctx.currentTime;
+      const semis = Math.abs(this.sustainPitchDelta || 0);
+      const pitchSafe = 1 / (1 + semis * semis * 0.12);
+      const mul = this.S._sustainBufferIsFallback ? 0.34 : 0.48;
+      const target = clamp(this.S.params.sustainSampleMix || 0, 0, 0.9) * mul * pitchSafe;
+      if (immediate) this.sustainGain.gain.setValueAtTime(target, t);
+      else this.sustainGain.gain.setTargetAtTime(target, t, 0.025);
+      if (this.sustainTone) {
+        const baseCut = this.S._sustainBufferIsFallback ? 3600 : 4800;
+        const cutoff = clamp(baseCut / (1 + semis * 0.08), 2200, baseCut);
+        if (immediate) this.sustainTone.frequency.setValueAtTime(cutoff, t);
+        else this.sustainTone.frequency.setTargetAtTime(cutoff, t, 0.03);
+      }
     }
 
     // 倍音ごとの静的振幅: ampBase × n^brightness × exp(-rolloff(n-1)) × odd/even × 手動ゲイン × 倍音数制限
@@ -180,10 +327,20 @@ window.SL = window.SL || {};
       const S = this.S, t = S.ctx.currentTime;
       const scal = this.harm.map((h) => this.ampScalar(h));
       const sum = scal.reduce((s, v) => s + v, 0) || 1;
+      const brassLayerMix = this.isTrumpet ? clamp(S.params.brassLayerMix || 0, 0, 0.75) : 0;
+      const waveMix = this.isTrumpet ? clamp(S.params.trumpetWaveMix || 0, 0, 1) : 0;
       for (let i = 0; i < this.harm.length; i++) {
+        const h = this.harm[i];
         const target = (scal[i] / sum) * (S.params.harmonicGainTrim != null ? S.params.harmonicGainTrim : 1);
-        if (immediate) this.harm[i].ampGain.gain.setValueAtTime(target, t);
-        else this.harm[i].ampGain.gain.setTargetAtTime(target, t, 0.02);
+        const mainTarget = target * (1 - brassLayerMix * 0.16) * (1 - waveMix * 0.28);
+        const layerTone = 0.5 + Math.min(h.n, 14) * 0.035;
+        const layerTarget = target * brassLayerMix * layerTone;
+        if (immediate) h.ampGain.gain.setValueAtTime(mainTarget, t);
+        else h.ampGain.gain.setTargetAtTime(mainTarget, t, 0.02);
+        if (h.layerAmpGain) {
+          if (immediate) h.layerAmpGain.gain.setValueAtTime(layerTarget, t);
+          else h.layerAmpGain.gain.setTargetAtTime(layerTarget, t, 0.02);
+        }
       }
     }
     // 倍音ごとの時間エンベロープ: 録音された立ち上がり形 → サステイン中はループ域の平均値で保持
@@ -194,6 +351,7 @@ window.SL = window.SL || {};
       const leT = clamp(I.envelope.loop_end_sec || origDur * 0.7, lsT + 1e-3, origDur);
       for (const h of this.harm) {
         const g = h.envGain.gain;
+        const lg = h.layerEnvGain ? h.layerEnvGain.gain : null;
         if (!P.harmFollowEnv) { g.setValueAtTime(1, t0); continue; }
         const env = h.env, m = env.length;
         // env は origDur 全体に 32 点等間隔。head 部を切り出してリサンプル
@@ -208,6 +366,10 @@ window.SL = window.SL || {};
         const susV = c ? s / c : (env[m - 1] || 1);
         g.setValueCurveAtTime(curve, t0, Math.max(0.02, lsT));
         g.setValueAtTime(susV, t0 + Math.max(0.02, lsT));
+        if (lg) {
+          lg.setValueCurveAtTime(curve, t0, Math.max(0.02, lsT));
+          lg.setValueAtTime(susV, t0 + Math.max(0.02, lsT));
+        }
         h.susEnv = susV;
       }
     }
@@ -288,8 +450,10 @@ window.SL = window.SL || {};
     // パラメータ変更が来たとき(構造を変えずに反映できるもの)
     refreshLive(keys) {
       const k = (n) => keys === "*" || (keys && keys.indexOf(n) >= 0);
-      if (k("*") || k("fineCents") || k("transposeSemis") || k("inharmMul") || k("glideMs")) this.applyFrequencies(false);
-      if (k("*") || k("brightness") || k("harmRolloff") || k("oddEvenBal") || k("harmLimit") || k("harmGains")) this.applyAmpGains(false);
+      if (k("*") || k("fineCents") || k("transposeSemis") || k("inharmMul") || k("glideMs") || k("brassLayerDetuneCents")) this.applyFrequencies(false);
+      if (k("*") || k("brightness") || k("harmRolloff") || k("oddEvenBal") || k("harmLimit") || k("harmGains") || k("brassLayerMix") || k("trumpetWaveMix")) this.applyAmpGains(false);
+      if (k("*") || k("trumpetWaveMix")) this.applyWaveMix(false);
+      if (k("*") || k("sustainSampleMix")) this.applySustainMix(false);
       if (k("*") || k("noiseHpHz") || k("noiseLpHz")) this.applyNoiseFilters(false);
     }
 
@@ -303,6 +467,22 @@ window.SL = window.SL || {};
       this.amp.gain.setValueAtTime(0, t + relSec * 1.4);
       holdParam(this.noiseGain.gain, t);
       this.noiseGain.gain.setTargetAtTime(0.0001, t, relSec / 4);
+      if (this.attackGain) {
+        holdParam(this.attackGain.gain, t);
+        this.attackGain.gain.setTargetAtTime(0.0001, t, 0.018);
+      }
+      if (this.waveGain) {
+        holdParam(this.waveGain.gain, t);
+        this.waveGain.gain.setTargetAtTime(0.0001, t, relSec / 4);
+      }
+      if (this.sustainGain) {
+        holdParam(this.sustainGain.gain, t);
+        this.sustainGain.gain.setTargetAtTime(0.0001, t, relSec / 4);
+      }
+      if (this.drumGain) {
+        holdParam(this.drumGain.gain, t);
+        this.drumGain.gain.setTargetAtTime(0.0001, t, relSec / 5);
+      }
       this.releaseEnd = t + relSec * 1.5;
       // 倍音/ノイズの時間形状は離した時点で固定(setValueAtTime で十分。既に hold 済み)
     }
@@ -315,8 +495,25 @@ window.SL = window.SL || {};
     }
     kill() {
       if (this.dead) return; this.dead = true;
-      try { for (const h of this.harm) { try { h.osc.stop(); } catch (_) {} h.osc.disconnect(); h.envGain.disconnect(); h.ampGain.disconnect(); } } catch (_) {}
+      try {
+        for (const h of this.harm) {
+          try { h.osc.stop(); } catch (_) {}
+          try { if (h.layerOsc) h.layerOsc.stop(); } catch (_) {}
+          h.osc.disconnect(); h.envGain.disconnect(); h.ampGain.disconnect();
+          if (h.layerOsc) h.layerOsc.disconnect();
+          if (h.layerEnvGain) h.layerEnvGain.disconnect();
+          if (h.layerAmpGain) h.layerAmpGain.disconnect();
+        }
+      } catch (_) {}
       try { this.noiseSrc.stop(); } catch (_) {}
+      try { if (this.waveSrc) this.waveSrc.stop(); } catch (_) {}
+      try { if (this.waveSrc) this.waveSrc.disconnect(); if (this.waveGain) this.waveGain.disconnect(); } catch (_) {}
+      try { if (this.attackSrc) this.attackSrc.stop(); } catch (_) {}
+      try { if (this.attackSrc) this.attackSrc.disconnect(); if (this.attackGain) this.attackGain.disconnect(); } catch (_) {}
+      try { if (this.sustainSrc) this.sustainSrc.stop(); } catch (_) {}
+      try { if (this.sustainSrc) this.sustainSrc.disconnect(); if (this.sustainTone) this.sustainTone.disconnect(); if (this.sustainGain) this.sustainGain.disconnect(); } catch (_) {}
+      try { if (this.drumSrc) this.drumSrc.stop(); } catch (_) {}
+      try { if (this.drumSrc) this.drumSrc.disconnect(); if (this.drumGain) this.drumGain.disconnect(); } catch (_) {}
       try { this.noiseSrc.disconnect(); this.noiseHP.disconnect(); this.noiseLP.disconnect(); this.noiseGain.disconnect(); this.amp.disconnect(); this.vibGate.disconnect(); } catch (_) {}
     }
   }
@@ -364,6 +561,9 @@ window.SL = window.SL || {};
       this.eqMid = ctx.createBiquadFilter(); this.eqMid.type = "peaking"; this.eqMid.frequency.value = 900; this.eqMid.Q.value = 1; this.eqMid.gain.value = 0;
       this.eqPres = ctx.createBiquadFilter(); this.eqPres.type = "peaking"; this.eqPres.frequency.value = 3800; this.eqPres.Q.value = 1.2; this.eqPres.gain.value = 0;
       this.eqHigh = ctx.createBiquadFilter(); this.eqHigh.type = "highshelf"; this.eqHigh.frequency.value = 8000; this.eqHigh.gain.value = 0;
+      this.trumpetBody = ctx.createBiquadFilter(); this.trumpetBody.type = "peaking"; this.trumpetBody.frequency.value = 980; this.trumpetBody.Q.value = 1.1; this.trumpetBody.gain.value = 0;
+      this.trumpetBell = ctx.createBiquadFilter(); this.trumpetBell.type = "peaking"; this.trumpetBell.frequency.value = 3200; this.trumpetBell.Q.value = 1.0; this.trumpetBell.gain.value = 0;
+      this.trumpetAir = ctx.createBiquadFilter(); this.trumpetAir.type = "peaking"; this.trumpetAir.frequency.value = 7200; this.trumpetAir.Q.value = 0.85; this.trumpetAir.gain.value = 0;
 
       // トーン(マスター)フィルタ + ワウ LFO
       this.toneFilter = ctx.createBiquadFilter(); this.toneFilter.type = "lowpass"; this.toneFilter.frequency.value = 20000; this.toneFilter.Q.value = 0.0001;
@@ -382,11 +582,12 @@ window.SL = window.SL || {};
       this.vibratoDepth = ctx.createGain(); this.vibratoDepth.gain.value = 0;   // cents 単位
       this.vibratoLFO.connect(this.vibratoDepth); this.vibratoLFO.start();
 
-      // 直列: voiceMix → preGain → drive(shaper→makeup→tone) → eq×4 → toneFilter → tremGain
+      // 直列: voiceMix → preGain → drive(shaper→makeup→tone) → eq → toneFilter → tremGain
       this.voiceMix.connect(this.preGain);
       this.preGain.connect(this.driveShaper); this.driveShaper.connect(this.driveMakeup); this.driveMakeup.connect(this.driveTone);
       this.driveTone.connect(this.eqLow); this.eqLow.connect(this.eqMid); this.eqMid.connect(this.eqPres); this.eqPres.connect(this.eqHigh);
-      this.eqHigh.connect(this.toneFilter); this.toneFilter.connect(this.tremGain);
+      this.eqHigh.connect(this.trumpetBody); this.trumpetBody.connect(this.trumpetBell); this.trumpetBell.connect(this.trumpetAir); this.trumpetAir.connect(this.toneFilter);
+      this.toneFilter.connect(this.tremGain);
 
       // 分岐: ドライ / コーラス(send) / リバーブ(send) → sumIn
       this.sumIn = ctx.createGain(); this.sumIn.gain.value = 1;
@@ -440,6 +641,12 @@ window.SL = window.SL || {};
     // ── 既定パラメータ(instrument から導出) ──
     defaultParams(I) {
       const e = I.envelope || {}, mod = I.modulation || {}, vib = mod.vibrato || {}, trem = mod.tremolo || {};
+      const profile = I.instrument_profile || "auto";
+      const isTrumpet = profile === "trumpet";
+      const isDrum = profile === "drum";
+      const drumGuess = I.features && I.features.drum_type_guess || "";
+      const isCymbal = drumGuess === "crash" || drumGuess === "hihat" || drumGuess === "cymbal";
+      const isPlainDrumSample = drumGuess === "kick" || drumGuess === "hihat";
       const harmNs = (I.harmonics || []).filter((h) => h.amp > 0).map((h) => h.n);
       const maxN = harmNs.length ? Math.max.apply(null, harmNs) : 16;
       // ノイズの色: band_levels の重心からおおよその低域/高域カットを決める
@@ -458,34 +665,78 @@ window.SL = window.SL || {};
         masterVol: 0.6, transposeSemis: 0, glideMs: 0, humanizeCents: 0,
         // ピッチ & ビブラート
         fineCents: 0,
-        vibDepthCents: vib.detected ? clamp(vib.depth_cents || 0, 0, 200) : 0,
+        // 解析値は表示と「検出値に合わせる」用に残すが、初期再生では揺れを足さない。
+        // f0/振幅の微小な解析ゆらぎを LFO として再適用すると、元音より不安定に聴こえるため。
+        vibDepthCents: 0,
         vibRateHz: vib.detected ? clamp(vib.rate_hz || 5.5, 0.1, 14) : 5.5,
-        vibShape: "sine", vibOnsetSec: vib.detected ? clamp(vib.onset_sec || 0, 0, 3) : 0,
+        vibShape: "sine", vibOnsetSec: 0,
         // 倍音
-        brightness: 0, harmRolloff: 0, oddEvenBal: 0, inharmMul: 1, harmLimit: maxN,
-        harmFollowEnv: true, harmGains: {}, harmonicGainTrim: 1,
+        brightness: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.1 : -0.18) : isTrumpet ? 0.24 : 0,
+        harmRolloff: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.02 : 0.12) : isTrumpet ? -0.012 : 0,
+        oddEvenBal: 0,
+        inharmMul: isDrum ? 1.0 : 1,
+        harmLimit: isDrum ? Math.min(maxN, isCymbal ? 18 : 10) : maxN,
+        // 解析した倍音包絡には録音ノイズ由来の細かい上下が乗るため、初期状態では固定倍音で安定させる。
+        harmFollowEnv: false, harmGains: {}, harmonicGainTrim: isDrum ? (isPlainDrumSample ? 0 : 0.12) : 1,
         // トレモロ
-        tremDepth: trem.detected ? clamp(trem.depth || 0, 0, 0.9) : 0,
+        tremDepth: 0,
         tremRateHz: trem.detected ? clamp(trem.rate_hz || 5, 0.1, 14) : 5, tremShape: "sine",
         // ノイズ / 息
-        noiseLevel: 1, noiseHpHz: nhp, noiseLpHz: nlp, attackNoise: 0, breathAmount: 0, noiseMode: "recorded",
+        // 残差ノイズは白色ノイズ再合成なので、初期状態では混ぜない。必要なときだけスライダーで足す。
+        noiseLevel: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.08 : 0.06) : 0,
+        noiseHpHz: isDrum ? (drumGuess === "kick" ? 35 : isCymbal ? 900 : 120) : nhp,
+        noiseLpHz: isDrum ? (drumGuess === "kick" ? 5200 : isCymbal ? 18000 : 14500) : nlp,
+        attackNoise: isDrum ? 0 : 0,
+        breathAmount: 0,
+        noiseMode: isDrum ? "recorded" : "recorded",
+        // トランペット/ドラム指定時は、合成だけでは抜けやすい原音アタックを短く重ねる。
+        attackSampleMix: I.attack_sample ? (isDrum ? 0 : isTrumpet ? 0.75 : 0) : 0,
+        // 解析した原音1周期波形を主成分として混ぜ、サイン波っぽさを減らす。
+        trumpetWaveMix: isTrumpet && I.waveform && I.waveform.one_cycle ? 0.28 : 0,
+        // トランペットの定常部にあるバズ/管鳴りを薄いループとして補う。
+        sustainSampleMix: I.sustain_sample && isTrumpet ? 0.08 : 0,
+        // トランペットの唇のバズ/管の反射に近い、わずかにずれた倍音レイヤー。
+        brassLayerMix: isTrumpet ? 0.22 : 0,
+        brassLayerDetuneCents: isTrumpet ? 5.5 : 0,
+        // ドラム指定時は原音1打を主音として使う。これが各ドラム音の再現品質の土台。
+        drumSampleMix: isDrum && I.drum_sample ? 1.0 : 0,
+        drumPitchFollow: false,
         // エンベロープ
-        envMode: "recorded", attackMs: Math.round((e.attack_sec || 0.01) * 1000),
-        decayMs: Math.round((e.decay_sec || 0.1) * 1000), sustainLvl: clamp(e.sustain_level == null ? 0.7 : e.sustain_level, 0, 1),
-        releaseMs: Math.round((e.release_sec || 0.12) * 1000), attackCurve: "lin", decayStretch: 1,
+        // 録音RMSの微細な揺れではなく、まず ADSR で安定した包絡から始める。
+        envMode: isDrum ? "recorded" : "adsr",
+        attackMs: isDrum ? Math.max(1, Math.min(12, Math.round((e.attack_sec || 0.005) * 1000))) : Math.round((e.attack_sec || 0.01) * 1000),
+        decayMs: isDrum ? (isCymbal ? 900 : drumGuess === "kick" ? 180 : 320) : Math.round((e.decay_sec || 0.1) * 1000),
+        sustainLvl: isDrum ? 0.02 : clamp(e.sustain_level == null ? 0.7 : e.sustain_level, 0, 1),
+        releaseMs: isDrum ? (drumGuess === "crash" ? 1500 : drumGuess === "hihat" ? 500 : drumGuess === "kick" ? 120 : 260) : Math.round((e.release_sec || 0.12) * 1000),
+        attackCurve: isDrum ? "exp" : "lin", decayStretch: 1,
         // 空間 / 響き
         reverbMix: 0, reverbSizeSec: 2.2, reverbDamping: 0.35, reverbPreMs: 0, reverbWidth: 0.85,
         // エフェクト
-        driveAmount: 0, driveToneHz: 16000,
+        driveAmount: isDrum ? (isPlainDrumSample ? 0 : 0.035) : isTrumpet ? 0.035 : 0,
+        driveToneHz: isTrumpet ? 18000 : 16000,
         chorusMix: 0, chorusRateHz: 0.25, chorusDepth: 0.4, chorusWidth: 0.8,
         filterMode: "off", filterCutoffHz: 6000, filterQ: 1, filterLfoRateHz: 1.5, filterLfoDepth: 0,
+        trumpetResonance: isTrumpet ? 0.62 : 0,
         // ボディ EQ
-        eqLowGain: 0, eqMidFreq: 900, eqMidGain: 0, eqMidQ: 1, eqPresGain: 0, eqHighGain: 0,
+        eqLowGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? -4.0 : 0.5) : isTrumpet ? -2.0 : 0,
+        eqMidFreq: isDrum ? (drumGuess === "kick" ? 180 : isCymbal ? 4200 : 950) : isTrumpet ? 780 : 900,
+        eqMidGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.6 : 1.8) : isTrumpet ? -1.2 : 0,
+        eqMidQ: isDrum ? 1.1 : isTrumpet ? 1.3 : 1,
+        eqPresGain: isDrum ? (isPlainDrumSample ? 0 : 2.0) : isTrumpet ? 3.4 : 0,
+        eqHighGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 2.0 : 1.2) : isTrumpet ? 2.4 : 0,
       };
     }
 
     load(I) {
       this.instrument = I;
+      this._attackBuffer = null;
+      this._attackBufferKey = "";
+      this._waveCycleBuffer = null;
+      this._waveCycleBufferKey = "";
+      this._sustainBuffer = null;
+      this._sustainBufferKey = "";
+      this._drumBuffer = null;
+      this._drumBufferKey = "";
       this._maxHarmN = (I.harmonics || []).filter((h) => h.amp > 0).reduce((m, h) => Math.max(m, h.n), 1);
       this.params = this.defaultParams(I);
       // ノイズ用の白色ノイズ(ループ)バッファ
@@ -501,13 +752,108 @@ window.SL = window.SL || {};
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.noiseBuffer = b;
     }
+    _getAttackBuffer() {
+      if (!this.ctx || !this.instrument || !this.instrument.attack_sample) return null;
+      const a = this.instrument.attack_sample;
+      const vals = a.values || [];
+      if (!vals.length) return null;
+      const sr = a.sample_rate || this.ctx.sampleRate;
+      const key = vals.length + ":" + sr;
+      if (this._attackBuffer && this._attackBufferKey === key) return this._attackBuffer;
+      const b = this.ctx.createBuffer(1, vals.length, sr);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < vals.length; i++) d[i] = vals[i] || 0;
+      this._attackBuffer = b;
+      this._attackBufferKey = key;
+      return b;
+    }
+    _getWaveCycleBuffer() {
+      if (!this.ctx || !this.instrument || !this.instrument.waveform || this.instrument.instrument_profile !== "trumpet") return null;
+      const vals = this.instrument.waveform.one_cycle || [];
+      const f0 = this.instrument.fundamental_hz || 440;
+      if (vals.length < 8 || !(f0 > 0)) return null;
+      const sr = clamp(Math.round(f0 * vals.length), 8000, 192000);
+      const key = vals.length + ":" + sr + ":" + f0;
+      if (this._waveCycleBuffer && this._waveCycleBufferKey === key) return this._waveCycleBuffer;
+      const clean = this._cleanWaveCycle(vals);
+      const b = this.ctx.createBuffer(1, clean.length, sr);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < clean.length; i++) d[i] = clean[i] || 0;
+      this._waveCycleBuffer = b;
+      this._waveCycleBufferKey = key;
+      return b;
+    }
+    _cleanWaveCycle(vals) {
+      const N = vals.length;
+      const mean = vals.reduce((s, v) => s + (v || 0), 0) / N;
+      const maxH = Math.min(22, Math.floor(N / 2) - 1);
+      const out = new Float32Array(N);
+      for (let k = 1; k <= maxH; k++) {
+        let re = 0, im = 0;
+        for (let n = 0; n < N; n++) {
+          const phase = 2 * Math.PI * k * n / N;
+          const v = (vals[n] || 0) - mean;
+          re += v * Math.cos(phase);
+          im += v * Math.sin(phase);
+        }
+        re *= 2 / N; im *= 2 / N;
+        const keep = Math.exp(-Math.max(0, k - 14) * 0.18);
+        for (let n = 0; n < N; n++) {
+          const phase = 2 * Math.PI * k * n / N;
+          out[n] += keep * (re * Math.cos(phase) + im * Math.sin(phase));
+        }
+      }
+      let peak = 0;
+      for (let n = 0; n < N; n++) peak = Math.max(peak, Math.abs(out[n]));
+      if (peak > 1e-9) for (let n = 0; n < N; n++) out[n] /= peak;
+      return out;
+    }
+    _getSustainBuffer() {
+      if (!this.ctx || !this.instrument) return null;
+      const a = this.instrument.sustain_sample || {};
+      let vals = a.values || [];
+      let sr = a.sample_rate || this.ctx.sampleRate;
+      this._sustainBufferIsFallback = false;
+      if (!vals.length && this.instrument.instrument_profile === "trumpet" && this.instrument.waveform && this.instrument.waveform.one_cycle) {
+        const cyc = this.instrument.waveform.one_cycle || [];
+        const repeats = Math.max(8, Math.ceil(0.18 * (this.instrument.fundamental_hz || 440)));
+        vals = [];
+        for (let r = 0; r < repeats; r++) vals.push.apply(vals, cyc);
+        sr = Math.max(8000, Math.round((this.instrument.fundamental_hz || 440) * cyc.length));
+        this._sustainBufferIsFallback = true;
+      }
+      if (!vals.length) return null;
+      const key = vals.length + ":" + sr + ":" + (this.instrument.sustain_sample ? "recorded" : "cycle");
+      if (this._sustainBuffer && this._sustainBufferKey === key) return this._sustainBuffer;
+      const b = this.ctx.createBuffer(1, vals.length, sr);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < vals.length; i++) d[i] = vals[i] || 0;
+      this._sustainBuffer = b;
+      this._sustainBufferKey = key;
+      return b;
+    }
+    _getDrumBuffer() {
+      if (!this.ctx || !this.instrument || !this.instrument.drum_sample) return null;
+      const a = this.instrument.drum_sample;
+      const vals = a.values || [];
+      if (!vals.length) return null;
+      const sr = a.sample_rate || this.ctx.sampleRate;
+      const key = vals.length + ":" + sr;
+      if (this._drumBuffer && this._drumBufferKey === key) return this._drumBuffer;
+      const b = this.ctx.createBuffer(1, vals.length, sr);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < vals.length; i++) d[i] = vals[i] || 0;
+      this._drumBuffer = b;
+      this._drumBufferKey = key;
+      return b;
+    }
 
     // ── パラメータ反映 ──
     set(key, value) {
       this.params[key] = value;
       this._apply([key]);
       // 「録音エンベロープ ↔ ADSR」など、鳴っている音に構造的に効くものは drone を貼り直し
-      if (this.drone && (key === "envMode" || key === "noiseMode" || key === "harmFollowEnv" || key === "decayStretch" || key === "attackCurve")) {
+      if (this.drone && (key === "envMode" || key === "noiseMode" || key === "harmFollowEnv" || key === "decayStretch" || key === "attackCurve" || key === "attackSampleMix" || key === "sustainSampleMix" || key === "drumSampleMix" || key === "drumPitchFollow")) {
         this._retriggerDrone();
       }
     }
@@ -540,6 +886,12 @@ window.SL = window.SL || {};
       if (has("eqMidQ")) ramp(this.eqMid.Q, clamp(P.eqMidQ, 0.2, 8), 0.02);
       if (has("eqPresGain")) ramp(this.eqPres.gain, clamp(P.eqPresGain, -18, 18), 0.02);
       if (has("eqHighGain")) ramp(this.eqHigh.gain, clamp(P.eqHighGain, -18, 18), 0.02);
+      if (has("trumpetResonance")) {
+        const r = clamp(P.trumpetResonance || 0, 0, 1);
+        ramp(this.trumpetBody.gain, r * 1.7, 0.03);
+        ramp(this.trumpetBell.gain, r * 3.0, 0.03);
+        ramp(this.trumpetAir.gain, r * 0.75, 0.03);
+      }
       // トーンフィルタ + ワウ
       if (has("filterMode") || has("filterCutoffHz") || has("filterQ")) {
         if (P.filterMode === "off") { this.toneFilter.type = "lowpass"; this.toneFilter.frequency.setTargetAtTime(20000, t, 0.02); this.toneFilter.Q.setTargetAtTime(0.0001, t, 0.02); }
@@ -570,7 +922,7 @@ window.SL = window.SL || {};
       // 倍音 limit の上限値クランプ
       if (has("harmLimit")) this.params.harmLimit = clamp(Math.round(P.harmLimit), 1, this._maxHarmN);
       // 鳴っているボイスへ即反映できるもの
-      const liveKeys = (keys === "*") ? "*" : keys.filter((k) => ["fineCents", "transposeSemis", "inharmMul", "glideMs", "brightness", "harmRolloff", "oddEvenBal", "harmLimit", "harmGains", "noiseHpHz", "noiseLpHz"].indexOf(k) >= 0);
+      const liveKeys = (keys === "*") ? "*" : keys.filter((k) => ["fineCents", "transposeSemis", "inharmMul", "glideMs", "brightness", "harmRolloff", "oddEvenBal", "harmLimit", "harmGains", "brassLayerMix", "brassLayerDetuneCents", "noiseHpHz", "noiseLpHz"].indexOf(k) >= 0);
       if (liveKeys === "*" || (liveKeys && liveKeys.length)) for (const v of this.voices) v.refreshLive(liveKeys);
     }
 
@@ -661,7 +1013,11 @@ window.SL = window.SL || {};
       out.fx = {
         note: "sound_lab スタジオで設定。再合成の本体合成には不要 / Processing 現行版は未対応",
         transpose_semis: P.transposeSemis, fine_cents: P.fineCents, glide_ms: P.glideMs, humanize_cents: P.humanizeCents,
+        modulation: { vibrato_depth_cents: P.vibDepthCents, vibrato_rate_hz: P.vibRateHz, vibrato_onset_sec: P.vibOnsetSec, vibrato_shape: P.vibShape, tremolo_depth: P.tremDepth, tremolo_rate_hz: P.tremRateHz, tremolo_shape: P.tremShape },
         env_mode: P.envMode, harm_follow_env: P.harmFollowEnv, decay_stretch: P.decayStretch, attack_curve: P.attackCurve,
+        attack_sample_mix: P.attackSampleMix, trumpet_wave_mix: P.trumpetWaveMix, sustain_sample_mix: P.sustainSampleMix, drum_sample_mix: P.drumSampleMix, drum_pitch_follow: P.drumPitchFollow,
+        brass_layer: { mix: P.brassLayerMix, detune_cents: P.brassLayerDetuneCents },
+        trumpet_resonance: P.trumpetResonance,
         noise_mode: P.noiseMode, noise_hp_hz: P.noiseHpHz, noise_lp_hz: P.noiseLpHz, attack_noise: P.attackNoise, breath_amount: P.breathAmount,
         reverb: { mix: P.reverbMix, size_sec: P.reverbSizeSec, damping: P.reverbDamping, pre_ms: P.reverbPreMs, width: P.reverbWidth },
         drive: { amount: P.driveAmount, tone_hz: P.driveToneHz },
