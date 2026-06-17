@@ -1,0 +1,150 @@
+\documentclass[a4j,11pt,dvipdfmx]{jsarticle}
+\usepackage{float}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{graphicx}
+\usepackage{comment}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{float}
+
+\titleformat*{\section}{\bfseries}
+\titleformat*{\subsection}{\bfseries}
+
+\makeatletter
+  \renewcommand{\section}{%
+    \@startsection{section}{1}{\z@}%
+    {0.4\Cvs}{0.1\Cvs}%
+    {\normalfont\headfont\raggedright}}
+\makeatother
+
+\makeatletter
+  % sectionの下マージンを小さく
+  \renewcommand{\subsection}{%
+    \@startsection{subsection}{1}{\z@}%
+    {0.1\Cvs}{0.1\Cvs}%
+    {\normalfont\headfont\raggedright}}
+\makeatother
+
+\renewcommand{\thesubsection}{\thesection-\arabic{subsection}.}
+
+
+%---------------------------------------------------
+% ページの設定
+%---------------------------------------------------
+\setlength{\textwidth}{160truemm}
+\setlength{\textheight}{250truemm}
+\setlength{\topmargin}{-4.5truemm}
+\setlength{\oddsidemargin}{0.5truemm}
+\pagestyle{empty}
+\setlength{\headheight}{0truemm}
+\setlength{\parindent}{1zw}
+\newcolumntype{b}{!{\vrule width 1pt}}
+\newcommand{\bhline}{\noalign{\hrule height 1pt}}   
+
+
+\begin{document}
+提出日: \today
+\begin{center}
+%\huge{実験計画書}
+\huge{第8回ハッカソン議事録}
+\end{center}
+
+\begin{table}[htbp]
+    \begin{tabular}{llrr}
+    \textgt{開催日時}: & \today 12:00〜16:00& &\\
+    \textgt{開催場所}: &津田沼校舎 7号館3F 732講義室& &\\
+
+     \textgt{班名}:& 23班 & & \\
+     \textgt{メンバー}:& 24G1038 片岡聖 & & \\%k
+                      & 24G1075 地曳賢人 (議事録作成者) & & \\%z
+                    & 24G1131 御代川稜 & & \\%m
+                    & 25G1021 梅澤颯太 & & \\%u
+                    & 25G1053 齋藤翔太 & & \\%s
+                    & 25G1065 塩澤匠生 & & \\%ta
+        \textgt{欠席者}: & なし & &  \\
+        \textgt{目的}: &第8週授業までの1週間の各自取り組み内容と進捗確認&&\\
+        &および発生した課題の共有と今後の調整の議論．
+
+    \end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{議題一覧}
+ \begin{itemize}
+    \item {今週までの成果報告}
+    \item {今回の実施内容詳細}
+    \item {結合テスト}
+    \item{これからの実施内容}
+\end{itemize}
+\section{討議内容}
+\subsection{今週までの成果報告}
+\textbf{梅澤}
+\begin{itemize}
+	\item{作業時間は約1.5〜2時間}
+	\item {指揮棒作成のためのモデリング練習}
+	\item {性能評価の確認のために，MOPのマークダウン方式の確認}
+\end{itemize}
+
+\textbf{塩澤}
+\begin{itemize}
+	\item{作業時間は約2時間}
+	\item{回路図作成}
+	\item{輪唱の改善}
+\end{itemize}
+
+\textbf{齋藤}
+\begin{itemize}
+	\item{作業時間は約2時間}
+	\item{音色全音の微調整}
+	\item{ドラム音改善}
+\end{itemize}
+
+\subsection{今回の実施内容詳細}
+今回のメインタスクとして，指揮棒回路のはんだ付けを含めた結合を行う\par
+梅澤→指揮棒用3Dモデル作成\par
+塩澤→はんだ付けを含む実機作成\par
+齋藤→別楽器音作成\\
+
+齋藤：現在トランペット，ホルン，トロンボーン，チューバ，ドラムの5楽器だが，全て金管のため音の違いがわかりにくいのではないか．\par
+御代川：確かにね，実際のオーケストラではどうなの？\\
+　地曵：実際は弦主体で木管金管は規模にもよるけど，各パート2,3人とかチューバは1人ということもある\\
+　片岡：じゃあ今余裕あるし，他の楽器の作成も試してみてもいいかもね\\
+　齋藤：では弦楽器の作成を試してみます
+\subsection{結合テスト}
+
+
+
+\section{TAとの議論}
+\begin{itemize}
+	\item{各メンバーの役割，現状確認}
+	\item{Q1. システム要件は達成されているか - 輪唱やドラムのリズム，テンポ変更など}
+	\item{A1. 単体テストや仮結合でも問題ないことが確認できている}
+	\item{Q2. 予定より早まって進行しているため，要素の追加を行なっているが，最低ラインを設定してるか}
+	\item{A2. 音色のクオリティ→ゲーム性とラインはクリアしているが，完全な結合ができていないため，直近で結合していく予定である}
+\end{itemize}
+
+
+\section{次回の会議の日時・場所・予定議題}
+
+\begin{table}[htbp]
+    \begin{tabular}{llrr}
+    \textgt{開催日時}: & 2026年6月24日12:00〜16:00 & &\\
+    \textgt{開催場所}: &津田沼校舎 7号館3F 732講義室& &\\
+
+        \textgt{予定議題}: &実機での本格的な結合テストおよび数値目標達成確認\\
+    \end{tabular}
+\end{table}
+\section{その他，特記事項}
+%未定
+
+はんだ付けで問題が発生し，独自に購入したマイコンが破損．\par
+既に購入し，来週には手元に届く予定であるが今週はTAへのデモ披露は実施不可．
+
+
+\end{document}
