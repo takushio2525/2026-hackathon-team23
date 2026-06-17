@@ -108,6 +108,17 @@ bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
         sNavVertAccum   = 0.0f;
         sNavHorizAccum  = 0.0f;
         sNavHorizVec[0] = sNavHorizVec[1] = sNavHorizVec[2] = 0.0f;
+    } else if (sNavFired &&
+               data.imu.dynNorm > NAV_SWING_THRESHOLD_G &&
+               (now - sLastNavMs) >= NAV_REFRACTORY_MS) {
+        // 発火済み Armed セッション中に新しい振りを検出 → セッションをリセット。
+        // LPF の尾引きで release (dynNorm < 0.30) が遅れると、2 回目以降の
+        // 振りが発火済みセッションに吸い込まれて無視される問題を修正。
+        sNavArmedAtMs   = now;
+        sNavFired       = false;
+        sNavVertAccum   = 0.0f;
+        sNavHorizAccum  = 0.0f;
+        sNavHorizVec[0] = sNavHorizVec[1] = sNavHorizVec[2] = 0.0f;
     }
 
     // Armed 中: 振り加速度を重力軸成分と水平面成分に分解して積算する
