@@ -4,6 +4,7 @@
 :root{
   --accent-from:#818CF8; --accent-to:#C084FC;
   --metal-from:#14B8A6; --metal-to:#F59E0B;
+  --string-from:#22C55E; --string-to:#0EA5E9;
   --ink:#1E1B4B; --ink-muted:#6366F1; --ink-dim:#8b8fc7;
   --glass-bg:rgba(255,255,255,.55); --glass-bg-hi:rgba(255,255,255,.74);
   --glass-bg-lo:rgba(255,255,255,.40); --glass-border:rgba(255,255,255,.70);
@@ -52,6 +53,9 @@ button,.btn{font-family:inherit;font-size:.9rem;font-weight:600;border:none;curs
 .btn-metal{background:linear-gradient(135deg,var(--metal-from),var(--metal-to));color:#fff;box-shadow:0 8px 24px -8px rgba(20,184,166,.45)}
 .btn-metal:hover{filter:brightness(1.05)}
 .btn-metal:disabled{opacity:.48;cursor:default;filter:none}
+.btn-string{background:linear-gradient(135deg,var(--string-from),var(--string-to));color:#fff;box-shadow:0 8px 24px -8px rgba(14,165,233,.42)}
+.btn-string:hover{filter:brightness(1.05)}
+.btn-string:disabled{opacity:.48;cursor:default;filter:none}
 .btn-ghost{background:var(--glass-bg-hi);color:var(--ink);border:1px solid var(--glass-border)}
 .btn-ghost:hover{background:#fff}
 .btn-ghost:disabled{opacity:.45;cursor:default}

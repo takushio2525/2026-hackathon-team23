@@ -39,6 +39,7 @@ ONE_CYCLE_POINTS = 1024          # 単一周期波形の点数
 NOISE_BANDS_HZ = [0, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, SR // 2]
 ATTACK_SAMPLE_SR = 22050         # 原音アタック波形の保存サンプルレート
 ATTACK_SAMPLE_SEC = 0.18         # トランペットのタンギング/バズ感として重ねる原音先頭の長さ
+STRING_ATTACK_SAMPLE_SEC = 0.28  # ヴァイオリンの弓の立ち上がりとして重ねる原音先頭の長さ
 SUSTAIN_SAMPLE_SR = 44100        # トランペット定常部の保存サンプルレート
 SUSTAIN_SAMPLE_SEC = 0.22        # トランペットの管鳴り/唇のバズ感として薄くループする長さ
 DRUM_ATTACK_SAMPLE_SEC = 0.45     # ドラム用に保存する原音アタック/胴鳴りの長さ
@@ -50,6 +51,8 @@ INSTRUMENT_PROFILES = {
     "auto": {"label": "自動", "fmin": FMIN, "fmax": FMAX},
     # トランペットは倍音が明るく、基音候補を低く取りすぎると 1/2 倍音側に誤認しやすい。
     "trumpet": {"label": "トランペット", "fmin": 120.0, "fmax": 1400.0},
+    # 主旋律 C4〜A4 の弦楽器音源はヴァイオリン相当として扱う。下限は G3 近辺まで少し余裕を持たせる。
+    "violin": {"label": "ヴァイオリン / 弦楽器", "fmin": 180.0, "fmax": 1800.0},
     # ドラムは明確な基音が無い音も多いため、低域ピークを再生時の便宜的な基準音として使う。
     "drum": {"label": "ドラム / 打楽器", "fmin": 35.0, "fmax": 900.0, "percussive": True},
 }
@@ -213,6 +216,9 @@ def analyze_file(path: str, name: str | None = None, profile: str = "auto") -> d
     drum_sample = None
     if profile == "trumpet":
         attack_sample = _extract_attack_sample(y, SR, midi, ATTACK_SAMPLE_SEC)
+        sustain_sample = _extract_sustain_sample(steady, SR, midi, fundamental)
+    elif profile == "violin":
+        attack_sample = _extract_attack_sample(y, SR, midi, STRING_ATTACK_SAMPLE_SEC)
         sustain_sample = _extract_sustain_sample(steady, SR, midi, fundamental)
     elif is_percussive:
         attack_sample = _extract_attack_sample(y, SR, midi, DRUM_ATTACK_SAMPLE_SEC)
@@ -740,9 +746,9 @@ def _extract_attack_sample(y: np.ndarray, sr: int, midi: float, duration_sec: fl
 
 
 def _extract_sustain_sample(steady: np.ndarray, sr: int, midi: float, f0: float) -> dict | None:
-    """トランペットの定常部を短いループ素材として保存する。
+    """持続音の定常部を短いループ素材として保存する。
 
-    倍音加算だけでは出にくい唇の細かいバズと管鳴りを、薄く混ぜるための補助素材。
+    倍音加算だけでは出にくい管鳴り・弓でこすれる芯を、薄く混ぜるための補助素材。
     ループ境界で大きなクリックが出ないよう、基音周期の整数倍に近い長さで切り出す。
     """
     if steady.size < int(0.06 * sr) or not np.isfinite(f0) or f0 <= 0:

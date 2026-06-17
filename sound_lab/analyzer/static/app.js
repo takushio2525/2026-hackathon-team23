@@ -51,8 +51,10 @@
   let latch = false;            // クリックで保持モード
   const heldByEvent = new Set();// マウス/タッチ/PCキーで押している MIDI(離す用)
   let rafId = 0;
+  const BATCH_MAX_FILES = 12;
   const batch = { files: [], tracks: [], metalApplied: false };
   const compare = { A: null, B: null, active: "B", noteA: "初期値", noteB: "現在" };
+  const NOTE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
   // 解析プレビューが無いとき(JSON 直接読込)のためのダミー
   const DEMO_INSTRUMENT = {
@@ -95,6 +97,12 @@
         { type: "range", key: "brassLayerDetuneCents", label: "重なりのピッチ差", min: 0, max: 18, step: 0.5, fmt: (v) => v.toFixed(1) + " ¢" },
         { type: "range", key: "trumpetResonance", label: "トランペット管の共鳴", min: 0, max: 1, step: 0.01, fmt: fmtPct },
         { type: "buttons", items: [["原音に近い", () => applyTrumpetPreset("natural")], ["明るく抜ける", () => applyTrumpetPreset("bright")], ["太く厚く", () => applyTrumpetPreset("thick")], ["ノイズ控えめ", () => applyTrumpetPreset("clean")], ["金管レイヤー強め", () => applyTrumpetPreset("layer")], ["ドラムを太く整える", applyDrumPunchPreset], ["金属楽器プリセットを適用", applyMetalQualityPreset], ["アタックを強める", applyMetalAttackPreset], ["明るさを少し戻す", softenMetalPreset]] },
+      ],
+    },
+    {
+      id: "strings", icon: "🎻", title: "弦楽器 / ヴァイオリン調整", keys: ["brightness", "harmRolloff", "oddEvenBal", "inharmMul", "attackSampleMix", "sustainSampleMix", "noiseLevel", "noiseHpHz", "noiseLpHz", "attackNoise", "vibDepthCents", "vibRateHz", "vibOnsetSec", "chorusMix", "chorusRateHz", "chorusDepth", "reverbMix", "eqLowGain", "eqMidFreq", "eqMidGain", "eqPresGain", "eqHighGain"], controls: [
+        { type: "note", html: "C4〜A4 の主旋律をヴァイオリン相当として扱うための調整です。弓の立ち上がり、こすれるノイズ、少し暗めの倍音、細い揺れ、胴鳴りをまとめて整えます。" },
+        { type: "buttons", items: [["ヴァイオリン向けに整える", applyStringQualityPreset], ["弦らしさ強め", () => applyStringPreset("bowed")], ["弓感最大", () => applyStringPreset("rosin")], ["やわらかめ", () => applyStringPreset("soft")], ["明るめ", () => applyStringPreset("bright")], ["弓ノイズ控えめ", () => applyStringPreset("clean")]] },
       ],
     },
     {
@@ -215,6 +223,7 @@
   drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) setFile(f); });
   $("#analyzeBtn").addEventListener("click", analyze);
   $("#singleMetalBtn").addEventListener("click", async () => { await ensureAudio(); applyMetalQualityPreset(); });
+  $("#singleStringBtn").addEventListener("click", async () => { await ensureAudio(); applyStringQualityPreset(); });
   $("#singleDrumBtn").addEventListener("click", async () => { await ensureAudio(); applyDrumPunchPreset(); });
   $("#demoBtn").addEventListener("click", () => { instrument = JSON.parse(JSON.stringify(DEMO_INSTRUMENT)); preview = null; pickedFile = null; setStatus("内蔵デモ音色を読み込みました（波形プレビューはありません）"); openStudio(); });
   $("#loadJsonBtn").addEventListener("click", () => $("#jsonFile").click());
@@ -228,8 +237,10 @@
   ["dragleave", "drop"].forEach((ev) => batchDrop.addEventListener(ev, (e) => { e.preventDefault(); batchDrop.classList.remove("hot"); }));
   batchDrop.addEventListener("drop", (e) => { setBatchFiles(e.dataTransfer.files); });
   $("#analyzeBatchBtn").addEventListener("click", analyzeBatch);
-  $("#batchMetalBtn").addEventListener("click", () => { applyMetalToBatch(); renderBatchList(); setBatchStatus("4音源に金属楽器向け補正を適用しました"); });
+  $("#batchMetalBtn").addEventListener("click", () => { applyMetalToBatch(); renderBatchList(); setBatchStatus("複数音源に金属楽器向け補正を適用しました"); });
   $("#autoBalanceBtn").addEventListener("click", () => { autoBalanceBatch(); renderBatchList(); setBatchStatus("解析ピークを目安に音量をそろえました"); });
+  $("#exportMultiNoteBtn").addEventListener("click", exportMultiNoteJson);
+  $("#exportRepresentativeBtn").addEventListener("click", exportRepresentativeJson);
   $("#exportBatchZipBtn").addEventListener("click", exportBatchZip);
 
   function setFile(f) {
@@ -244,6 +255,8 @@
     if (b) $("#batchStatus").innerHTML = '<span class="spinner"></span>' + (msg || "解析中…");
     $("#analyzeBatchBtn").disabled = b || batch.files.length === 0;
     $("#exportBatchZipBtn").disabled = b || batch.tracks.length === 0;
+    $("#exportMultiNoteBtn").disabled = b || batch.tracks.length === 0;
+    $("#exportRepresentativeBtn").disabled = b || batch.tracks.length === 0;
     $("#autoBalanceBtn").disabled = b || batch.tracks.length === 0;
     $("#batchMetalBtn").disabled = b || batch.tracks.length === 0;
   }
@@ -257,6 +270,7 @@
       setStatus("解析完了 ✓  下のスタジオで鳴らしながら調整できます");
       openStudio();
       $("#singleMetalBtn").disabled = false;
+      $("#singleStringBtn").disabled = false;
       $("#singleDrumBtn").disabled = false;
     } catch (err) {
       if (location.protocol === "file:" || /Failed to fetch|NetworkError/.test(err.message)) {
@@ -284,19 +298,24 @@
       setStatus("JSON を読み込みました（波形プレビューは無し。鳴らして編集できます）");
       openStudio();
       $("#singleMetalBtn").disabled = false;
+      $("#singleStringBtn").disabled = false;
       $("#singleDrumBtn").disabled = false;
     } catch (e) { setStatus("JSON を読めませんでした: " + e.message, true); }
   }
 
   function setBatchFiles(filesLike) {
-    const files = Array.from(filesLike || []).slice(0, 4);
+    const selected = Array.from(filesLike || []);
+    const files = selected.slice(0, BATCH_MAX_FILES);
     batch.files = files; batch.tracks = []; batch.metalApplied = false;
-    batchDrop.querySelector(".big").textContent = files.length ? `🎚 ${files.length} 個の音源を選択中` : "🎚 4つの音源ファイルをまとめて選択";
+    batchDrop.querySelector(".big").textContent = files.length ? `🎚 ${files.length} 個の音源を選択中` : "🎚 複数の音源ファイルをまとめて選択";
     $("#analyzeBatchBtn").disabled = files.length === 0;
     $("#exportBatchZipBtn").disabled = true;
+    $("#exportMultiNoteBtn").disabled = true;
+    $("#exportRepresentativeBtn").disabled = true;
     $("#autoBalanceBtn").disabled = true;
     $("#batchMetalBtn").disabled = true;
-    setBatchStatus(files.length < 4 ? `${files.length} 個を選択しました。4個未満でも書き出せます。` : "4 個を選択しました。解析できます。");
+    const clipped = selected.length > BATCH_MAX_FILES ? `（先頭 ${BATCH_MAX_FILES} 個だけ使います）` : "";
+    setBatchStatus(files.length ? `${files.length} 個を選択しました。${clipped}` : "");
     renderBatchList();
   }
   async function analyzeBatch() {
@@ -347,6 +366,7 @@
     synth.setOriginalBuffer(null); decodeTried = false;
     $("#playOrigBtn").disabled = !pickedFile;
     $("#singleMetalBtn").disabled = false;
+    $("#singleStringBtn").disabled = false;
     $("#singleDrumBtn").disabled = false;
     $("#curNoteLbl").textContent = SL.midiName(curNote) + " (" + curNote + ")";
     $("#tVol").value = synth.params.masterVol;
@@ -555,6 +575,67 @@
     }
     return P;
   }
+  function applyStringParams(P, I, strength, tone) {
+    strength = strength == null ? 1 : strength;
+    tone = tone || "natural";
+    const f0 = I && I.fundamental_hz ? +I.fundamental_hz : 440;
+    const soft = tone === "soft";
+    const bright = tone === "bright";
+    const clean = tone === "clean";
+    const bowed = tone === "bowed";
+    const rosin = tone === "rosin";
+
+    P.envMode = "adsr";
+    P.attackCurve = "lin";
+    P.attackMs = clamp(Math.max(P.attackMs || 0, soft ? 95 : rosin ? 90 : bowed ? 76 : 60), 1, 2000);
+    P.decayMs = clamp(Math.max(P.decayMs || 0, soft ? 270 : rosin ? 300 : bowed ? 250 : 190), 1, 3000);
+    P.sustainLvl = clamp(Math.max(P.sustainLvl == null ? 0.72 : P.sustainLvl, soft ? 0.78 : rosin ? 0.80 : bowed ? 0.76 : 0.72), 0, 1);
+    P.releaseMs = clamp(Math.max(P.releaseMs || 0, soft ? 760 : rosin ? 920 : bowed ? 720 : 560), 5, 4000);
+
+    P.brightness = clamp(bright ? 0.10 : soft ? -0.20 : rosin ? 0.02 : bowed ? -0.02 : -0.10, -1.5, 1.5);
+    P.harmRolloff = clamp(bright ? 0.012 : soft ? 0.075 : rosin ? 0.022 : bowed ? 0.032 : 0.052, -0.15, 0.6);
+    P.oddEvenBal = clamp(soft ? -0.12 : rosin ? 0.08 : bowed ? 0.04 : -0.05, -1, 1);
+    P.inharmMul = clamp(clean ? 0.22 : rosin ? 0.62 : bowed ? 0.52 : 0.38, 0, 4);
+    P.harmFollowEnv = rosin;
+
+    if (I && I.attack_sample) P.attackSampleMix = clamp(clean ? 0.14 : soft ? 0.26 : rosin ? 0.68 : bowed ? 0.52 : 0.36, 0, 1.2);
+    if (I && I.sustain_sample) P.sustainSampleMix = clamp(soft ? 0.28 : rosin ? 0.52 : bowed ? 0.40 : 0.24, 0, 0.9);
+    P.trumpetWaveMix = 0;
+    P.brassLayerMix = 0;
+    P.brassLayerDetuneCents = 0;
+    P.trumpetResonance = 0;
+
+    P.noiseMode = "recorded";
+    P.noiseLevel = clamp(clean ? 0.05 : soft ? 0.12 : rosin ? 0.42 : bowed ? 0.30 : 0.18, 0, 3);
+    P.attackNoise = clamp(clean ? 0.10 : soft ? 0.22 : rosin ? 0.95 : bowed ? 0.70 : 0.36, 0, 3);
+    P.noiseHpHz = clamp(rosin ? 650 : bowed ? 540 : Math.max(P.noiseHpHz || 20, 420), 20, 3000);
+    P.noiseLpHz = clamp(bright ? 11000 : rosin ? 12000 : bowed ? 9800 : 8400, 500, 18000);
+    P.breathAmount = 0;
+
+    P.vibDepthCents = clamp(Math.max(P.vibDepthCents || 0, soft ? 12 : rosin ? 26 : bowed ? 22 : 16), 0, 120);
+    P.vibRateHz = clamp(Math.max(P.vibRateHz || 0, rosin ? 5.9 : bowed ? 5.6 : 5.2), 0.1, 12);
+    P.vibOnsetSec = clamp(Math.max(P.vibOnsetSec || 0, rosin ? 0.08 : bowed ? 0.12 : 0.18), 0, 2);
+    P.vibShape = "sine";
+
+    P.chorusMix = clamp(Math.max(P.chorusMix || 0, soft ? 0.14 : rosin ? 0.24 : bowed ? 0.18 : 0.10), 0, 1);
+    P.chorusRateHz = clamp(rosin ? 0.18 : 0.22, 0.05, 3);
+    P.chorusDepth = clamp(soft ? 0.42 : rosin ? 0.62 : bowed ? 0.52 : 0.34, 0, 1);
+    P.chorusWidth = clamp(rosin ? 0.82 : 0.70, 0, 1);
+    P.reverbMix = clamp(Math.max(P.reverbMix || 0, soft ? 0.16 : rosin ? 0.18 : bowed ? 0.15 : 0.12), 0, 1);
+    P.reverbSizeSec = clamp(Math.max(P.reverbSizeSec || 2.2, 2.4), 0.1, 6);
+    P.reverbDamping = clamp(Math.max(P.reverbDamping == null ? 0.35 : P.reverbDamping, 0.42), 0, 0.98);
+
+    P.driveAmount = clamp(bright ? 0.025 : rosin ? 0.035 : bowed ? 0.022 : 0.01, 0, 1);
+    P.driveToneHz = clamp(bright ? 15000 : rosin ? 14500 : bowed ? 13000 : 11500, 600, 18000);
+    P.eqLowGain = clamp((f0 < 260 ? 1.0 : 0.3) + (soft ? 0.7 : rosin ? 0.45 : bowed ? 0.35 : 0), -15, 15);
+    P.eqMidFreq = clamp(f0 < 330 ? 420 : rosin ? 620 : 540, 150, 6000);
+    P.eqMidGain = clamp(soft ? 1.7 : rosin ? 2.8 : bowed ? 2.4 : 1.4, -15, 15);
+    P.eqMidQ = clamp(rosin ? 1.2 : 1.0, 0.3, 8);
+    P.eqPresGain = clamp(bright ? 2.6 : soft ? 0.7 : rosin ? 3.8 : bowed ? 2.7 : 1.7, -15, 15);
+    P.eqHighGain = clamp(bright ? 1.2 : soft ? -1.0 : rosin ? 0.8 : bowed ? 0.25 : -0.4, -15, 15);
+    P.filterMode = "off";
+    return P;
+  }
   function applyMetalQualityPreset() {
     if (!instrument) return;
     beginPresetCompare();
@@ -575,6 +656,20 @@
     const lab = instrument.features && instrument.features.drum_type_label || "ドラム";
     finishPresetCompare(`${lab}向け`);
     setStatus(`${lab} 向けにアタック・胴鳴り・ノイズ包絡を整えました。`);
+  }
+  function applyStringQualityPreset() {
+    applyStringPreset("natural");
+  }
+  function applyStringPreset(kind) {
+    if (!instrument) return;
+    beginPresetCompare();
+    applyStringParams(synth.params, instrument, 1, kind);
+    syncControlsFromParams();
+    if (synth.ctx) synth.applyAll();
+    if (synth.drone) synth.setDrone(true, curNote);
+    const labels = { natural: "ヴァイオリン向け", bowed: "弦らしさ強め", rosin: "弓感最大", soft: "やわらかめ", bright: "明るめ", clean: "弓ノイズ控えめ" };
+    finishPresetCompare(labels[kind] || labels.natural);
+    setStatus(`弦楽器調整プリセット「${labels[kind] || labels.natural}」を適用しました。A/Bで前後を比較できます。`);
   }
   function applyTrumpetPreset(kind) {
     if (!instrument) return;
@@ -667,7 +762,18 @@
   function makeBatchTrack(file, I) {
     const tmp = new SL.LiveSynth();
     tmp.load(I);
-    return { file, instrument: I, params: deepCopy(tmp.params), volume: 0.6, note: I.midi_note || 60 };
+    const filenameNote = midiFromFilename(file.name);
+    return { file, instrument: I, params: deepCopy(tmp.params), volume: 0.6, note: filenameNote || I.midi_note || 60 };
+  }
+  function midiFromFilename(name) {
+    const m = String(name || "").match(/(?:^|[_\-\s])([A-Ga-g])([#b♯♭]?)(-?\d)(?=\.|[_\-\s]|$)/);
+    if (!m) return null;
+    const pc0 = NOTE_PC[m[1].toUpperCase()];
+    if (pc0 == null) return null;
+    const acc = m[2];
+    const pc = pc0 + (acc === "#" || acc === "♯" ? 1 : acc === "b" || acc === "♭" ? -1 : 0);
+    const oct = parseInt(m[3], 10);
+    return clamp((oct + 1) * 12 + pc, 0, 127);
   }
   function applyMetalToBatch() {
     for (const t of batch.tracks) if (!t.error) applyMetalParams(t.params, t.instrument, 0.95);
@@ -697,7 +803,8 @@
         card.appendChild(el("div", { class: "meta", text: "解析エラー: " + t.error }));
       } else if (I) {
         const hc = I.features && I.features.harmonic_count != null ? I.features.harmonic_count : (I.harmonics || []).length;
-        card.appendChild(el("div", { class: "meta", html: `${I.note_name} / ${I.fundamental_hz} Hz<br>倍音 ${hc} 本 / RMS ${I.features && I.features.rms_peak != null ? I.features.rms_peak : "?"}` }));
+        const mapped = t.note != null ? SL.midiName(t.note) : (I.note_name || "?");
+        card.appendChild(el("div", { class: "meta", html: `パック音程 ${mapped} / 解析 ${I.note_name} / ${I.fundamental_hz} Hz<br>倍音 ${hc} 本 / RMS ${I.features && I.features.rms_peak != null ? I.features.rms_peak : "?"}` }));
         const val = el("span", { class: "volval", text: Math.round(t.volume * 100) + "%" });
         const inp = el("input", { type: "range", min: "0", max: "1.2", step: "0.01", value: t.volume });
         inp.addEventListener("input", () => { t.volume = +inp.value; t.params.masterVol = t.volume; val.textContent = Math.round(t.volume * 100) + "%"; });
@@ -953,6 +1060,7 @@
     // マスター音量(トランスポート側) ↔ perf セクションのスライダーを同期
     $("#tVol").addEventListener("input", () => { const v = +$("#tVol").value; setParam("masterVol", v); });
     $("#qualityBtn").addEventListener("click", async () => { await ensureAudio(); applyMetalQualityPreset(); });
+    $("#stringQualityBtn").addEventListener("click", async () => { await ensureAudio(); applyStringQualityPreset(); });
     $("#abSaveA").addEventListener("click", () => saveCompareSlot("A"));
     $("#abSaveB").addEventListener("click", () => saveCompareSlot("B"));
     $("#abApplyA").addEventListener("click", () => applyCompareSlot("A"));
@@ -980,6 +1088,293 @@
     $("#reAnalyzeBtn").addEventListener("click", () => { if (pickedFile) analyze(); else setStatus("再解析するには音源ファイルから始めてください。", true); });
   }
 
+  function adjustedBatchInstrument(t) {
+    const tmp = new SL.LiveSynth();
+    tmp.load(t.instrument);
+    tmp.params = deepCopy(t.params);
+    tmp.params.masterVol = t.volume;
+    const json = tmp.exportInstrument();
+    json.fx = json.fx || {};
+    json.fx.balance_master_volume = +t.volume.toFixed(3);
+    json.fx.balance_export_note = SL.midiName(t.note || t.instrument.midi_note || 60);
+    return json;
+  }
+
+  function batchReadyTracks() {
+    return batch.tracks
+      .filter((t) => !t.error)
+      .slice()
+      .sort((a, b) => (a.note || a.instrument.midi_note || 0) - (b.note || b.instrument.midi_note || 0));
+  }
+
+  function finiteNumbers(values) {
+    return (values || []).filter((v) => v != null && v !== "").map((v) => +v).filter((v) => Number.isFinite(v));
+  }
+
+  function average(values, fallback) {
+    const nums = finiteNumbers(values);
+    if (!nums.length) return fallback == null ? 0 : fallback;
+    return nums.reduce((s, v) => s + v, 0) / nums.length;
+  }
+
+  function resampleNumeric(values, n, fallback) {
+    const src = finiteNumbers(values);
+    const out = new Array(Math.max(1, n | 0));
+    if (!src.length) return out.fill(fallback == null ? 0 : fallback);
+    if (src.length === 1 || out.length === 1) return out.fill(src[0]);
+    const scale = (src.length - 1) / (out.length - 1);
+    for (let i = 0; i < out.length; i++) {
+      const x = i * scale;
+      const j = Math.floor(x);
+      const f = x - j;
+      out[i] = src[j] * (1 - f) + src[Math.min(src.length - 1, j + 1)] * f;
+    }
+    return out;
+  }
+
+  function roundList(values, digits) {
+    const mul = Math.pow(10, digits == null ? 5 : digits);
+    return (values || []).map((v) => Math.round((Number.isFinite(+v) ? +v : 0) * mul) / mul);
+  }
+
+  function normalizePeak(values, peak, absMode) {
+    const nums = finiteNumbers(values);
+    if (!nums.length) return [];
+    const mx = nums.reduce((m, v) => Math.max(m, absMode ? Math.abs(v) : v), 0);
+    if (mx <= 1e-9) return nums.map(() => 0);
+    const scale = (peak == null ? 1 : peak) / mx;
+    return nums.map((v) => v * scale);
+  }
+
+  function representativeHarmonics(instruments) {
+    const maxN = Math.max(1, Math.min(96, ...instruments.map((I) => Math.max(0, ...(I.harmonics || []).map((h) => h.n || 0)))));
+    const harmonics = [];
+    for (let n = 1; n <= maxN; n++) {
+      const present = instruments.map((I) => (I.harmonics || []).find((h) => h.n === n) || null);
+      const avgAmp = average(present.map((h) => h ? h.amp : 0), 0);
+      if (avgAmp <= 0.00002) continue;
+      const ratio = average(present.map((h) => h ? h.ratio : null), n);
+      const phase = average(present.map((h) => h ? h.phase : null), 0);
+      const env = new Array(32).fill(0);
+      for (const h of present) {
+        const hv = h ? resampleNumeric(h.env || [1], 32, 0) : new Array(32).fill(0);
+        for (let i = 0; i < env.length; i++) env[i] += hv[i] / instruments.length;
+      }
+      harmonics.push({ n, ratio, amp: avgAmp, phase, env });
+    }
+    const mx = Math.max(1e-9, ...harmonics.map((h) => h.amp));
+    return harmonics.map((h) => {
+      const amp = h.amp / mx;
+      return {
+        n: h.n,
+        ratio: +h.ratio.toFixed(5),
+        amp: +amp.toFixed(5),
+        amp_db: +(20 * Math.log10(amp + 1e-9)).toFixed(2),
+        phase: +h.phase.toFixed(5),
+        env: roundList(h.env, 5),
+      };
+    });
+  }
+
+  function representativeEnvelope(instruments) {
+    const rate = 200;
+    const durations = instruments.map((I) => I.duration_sec || (I.envelope && I.envelope.values && I.envelope.rate_hz ? (I.envelope.values.length - 1) / I.envelope.rate_hz : 2.0));
+    const duration = clamp(average(durations, 2.0), 0.3, 12);
+    const len = clamp(Math.round(duration * rate) + 1, 80, 1600);
+    const values = new Array(len).fill(0);
+    for (const I of instruments) {
+      const e = I.envelope || {};
+      const ev = resampleNumeric(e.values || [0, 1, e.sustain_level || 0.7, 0], len, 0);
+      for (let i = 0; i < len; i++) values[i] += ev[i] / instruments.length;
+    }
+    const norm = normalizePeak(values, 1, false);
+    const loopStart = clamp(average(instruments.map((I) => I.envelope && I.envelope.loop_start_sec), duration * 0.28), 0, duration * 0.95);
+    const loopEnd = clamp(average(instruments.map((I) => I.envelope && I.envelope.loop_end_sec), duration * 0.72), loopStart + 0.02, duration);
+    return {
+      rate_hz: rate,
+      values: roundList(norm, 5),
+      attack_sec: +average(instruments.map((I) => I.envelope && I.envelope.attack_sec), 0.03).toFixed(4),
+      decay_sec: +average(instruments.map((I) => I.envelope && I.envelope.decay_sec), 0.18).toFixed(4),
+      sustain_level: +clamp(average(instruments.map((I) => I.envelope && I.envelope.sustain_level), 0.7), 0, 1).toFixed(4),
+      release_sec: +average(instruments.map((I) => I.envelope && I.envelope.release_sec), 0.2).toFixed(4),
+      loop_start_sec: +loopStart.toFixed(4),
+      loop_end_sec: +loopEnd.toFixed(4),
+    };
+  }
+
+  function representativeNoise(instruments) {
+    const noises = instruments.map((I) => I.noise || {});
+    const envLen = 64;
+    const envelope = new Array(envLen).fill(0);
+    for (const n of noises) {
+      const ev = resampleNumeric(n.envelope || [1, 0.4], envLen, 0);
+      for (let i = 0; i < envLen; i++) envelope[i] += ev[i] / noises.length;
+    }
+    const maxBands = Math.max(2, ...noises.map((n) => (n.band_levels || []).length));
+    const refBands = (noises.find((n) => (n.bands_hz || []).length === maxBands) || noises[0] || {}).bands_hz || [0, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, 22050];
+    const bandLevels = new Array(maxBands).fill(0);
+    for (const n of noises) {
+      const lv = resampleNumeric(n.band_levels || [0], maxBands, 0);
+      for (let i = 0; i < maxBands; i++) bandLevels[i] += lv[i] / noises.length;
+    }
+    return {
+      level: +clamp(average(noises.map((n) => n.level), 0), 0, 1).toFixed(4),
+      rate_hz: 200,
+      envelope: roundList(normalizePeak(envelope, 1, false), 5),
+      bands_hz: roundList(resampleNumeric(refBands, maxBands, 0), 1),
+      band_levels: roundList(normalizePeak(bandLevels, 1, false), 5),
+    };
+  }
+
+  function representativeWaveform(instruments) {
+    const len = 1024;
+    const cycles = instruments
+      .map((I) => I.waveform && I.waveform.one_cycle ? normalizePeak(resampleNumeric(I.waveform.one_cycle, len, 0), 1, true) : null)
+      .filter(Boolean);
+    if (!cycles.length) return { one_cycle_points: 4, one_cycle: [0, 1, 0, -1] };
+    const base = cycles[0];
+    const sum = new Array(len).fill(0);
+    for (const cyc of cycles) {
+      let dot = 0;
+      for (let i = 0; i < len; i++) dot += base[i] * cyc[i];
+      const sign = dot < 0 ? -1 : 1;
+      for (let i = 0; i < len; i++) sum[i] += sign * cyc[i] / cycles.length;
+    }
+    return { one_cycle_points: len, one_cycle: roundList(normalizePeak(sum, 1, true), 5) };
+  }
+
+  function representativeModulation(instruments) {
+    const vib = instruments.map((I) => (I.modulation && I.modulation.vibrato) || {});
+    const trem = instruments.map((I) => (I.modulation && I.modulation.tremolo) || {});
+    const vibDepth = average(vib.map((v) => v.depth_cents), 0);
+    const tremDepth = average(trem.map((v) => v.depth), 0);
+    return {
+      vibrato: {
+        rate_hz: +average(vib.map((v) => v.rate_hz), 0).toFixed(2),
+        depth_cents: +vibDepth.toFixed(1),
+        depth: +(vibDepth / 100).toFixed(3),
+        onset_sec: +average(vib.map((v) => v.onset_sec), 0).toFixed(3),
+        shape: (vib.find((v) => v.shape) || {}).shape || "sine",
+        regularity: +average(vib.map((v) => v.regularity), 0).toFixed(3),
+        detected: vibDepth > 0.5,
+      },
+      tremolo: {
+        rate_hz: +average(trem.map((v) => v.rate_hz), 0).toFixed(2),
+        depth: +tremDepth.toFixed(3),
+        depth_cents: 0.0,
+        onset_sec: 0.0,
+        shape: (trem.find((v) => v.shape) || {}).shape || "sine",
+        regularity: +average(trem.map((v) => v.regularity), 0).toFixed(3),
+        detected: tremDepth > 0.005,
+      },
+    };
+  }
+
+  function exportRepresentativeJson() {
+    const tracks = batchReadyTracks();
+    if (!tracks.length) { setBatchStatus("代表音色にできる解析済み音源がありません。", true); return; }
+    const instruments = tracks.map((t) => adjustedBatchInstrument(t));
+    const rootTrack = tracks[Math.floor((tracks.length - 1) / 2)];
+    const rootInst = instruments[Math.floor((instruments.length - 1) / 2)] || rootTrack.instrument;
+    const rootNote = rootTrack.note || rootInst.midi_note || 60;
+    const profileSet = Array.from(new Set(instruments.map((I) => I.instrument_profile || "auto")));
+    const first = instruments[0] || {};
+    const harmonics = representativeHarmonics(instruments);
+    const features = {};
+    for (const key of ["spectral_centroid_hz", "spectral_rolloff_hz", "spectral_bandwidth_hz", "zero_crossing_rate", "spectral_flatness"]) {
+      const nums = finiteNumbers(instruments.map((I) => I.features && I.features[key]));
+      if (nums.length) features[key] = +(nums.reduce((s, v) => s + v, 0) / nums.length).toFixed(4);
+    }
+    features.harmonic_count = harmonics.length;
+    features.representative_source_count = tracks.length;
+    features.representative_sources = tracks.map((t) => {
+      const note = t.note || t.instrument.midi_note || 60;
+      return { source_file: t.file.name, note: SL.midiName(note), midi_note: note, volume: +t.volume.toFixed(3) };
+    });
+
+    const out = {
+      format: "sound_lab.instrument/1",
+      name: `${profileSet.length === 1 && profileSet[0] === "violin" ? "violin" : "representative"} average (調整)`,
+      source_file: tracks.map((t) => t.file.name).join(" + "),
+      created_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+      sample_rate: rootInst.sample_rate || first.sample_rate || 44100,
+      fundamental_hz: +(rootInst.fundamental_hz || SL.midiToHz && SL.midiToHz(rootNote) || 440).toFixed(4),
+      midi_note: rootNote,
+      note_name: SL.midiName(rootNote),
+      duration_sec: +average(instruments.map((I) => I.duration_sec), rootInst.duration_sec || 2).toFixed(4),
+      sustaining: instruments.some((I) => I.sustaining !== false),
+      envelope: representativeEnvelope(instruments),
+      inharmonicity_b: +average(instruments.map((I) => I.inharmonicity_b), 0).toExponential(3),
+      modulation: representativeModulation(instruments),
+      harmonics,
+      noise: representativeNoise(instruments),
+      waveform: representativeWaveform(instruments),
+      features,
+      instrument_profile: profileSet.length === 1 ? profileSet[0] : "mixed",
+      instrument_profile_label: profileSet.length === 1 ? (first.instrument_profile_label || profileSet[0]) : "混合",
+      edited_by: "sound_lab studio",
+    };
+    out.fx = {
+      note: "複数音源から作った代表音色。各音程を切り替える音色パックではなく、通常の単音インストゥルメント定義として扱う。",
+      representative_mode: "average_harmonics_envelope_noise_waveform",
+      source_notes: tracks.map((t) => SL.midiName(t.note || t.instrument.midi_note || 60)),
+      source_count: tracks.length,
+    };
+
+    const blob = new Blob([JSON.stringify(out, null, 1)], { type: "application/json" });
+    downloadBlob(blob, `${safeName(out.name)}.representative.instrument.json`);
+    setBatchStatus(`代表音色JSONを書き出しました（${tracks.length} 音を平均 / 基準 ${SL.midiName(rootNote)}）`);
+  }
+
+  function exportMultiNoteJson() {
+    const tracks = batchReadyTracks();
+    if (!tracks.length) { setBatchStatus("書き出せる解析済み音源がありません。", true); return; }
+    const sorted = tracks;
+    const seen = new Set();
+    for (const t of sorted) {
+      const note = t.note || t.instrument.midi_note || 60;
+      if (seen.has(note)) {
+        setBatchStatus(`${SL.midiName(note)} が重複しています。ファイル名か解析結果を確認してください。`, true);
+        return;
+      }
+      seen.add(note);
+    }
+
+    const first = sorted[0].instrument || {};
+    const profileSet = Array.from(new Set(sorted.map((t) => t.instrument.instrument_profile || "auto")));
+    const pack = {
+      format: "sound_lab.multinote_instrument/1",
+      name: `${profileSet.length === 1 && profileSet[0] === "violin" ? "violin" : "multi-note"} pack (調整)`,
+      created_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+      instrument_profile: profileSet.length === 1 ? profileSet[0] : "mixed",
+      instrument_profile_label: profileSet.length === 1 ? (first.instrument_profile_label || profileSet[0]) : "混合",
+      note_order: sorted.map((t) => t.note || t.instrument.midi_note || 60),
+      note_map: {},
+      sounds: {},
+      edited_by: "sound_lab studio",
+    };
+
+    for (const t of sorted) {
+      const note = t.note || t.instrument.midi_note || 60;
+      const key = String(note);
+      const json = adjustedBatchInstrument(t);
+      json.name = `${t.instrument.name || safeName(t.file.name)} (${SL.midiName(note)})`;
+      pack.note_map[key] = {
+        label: SL.midiName(note),
+        source_file: t.file.name,
+        instrument_name: t.instrument.name || safeName(t.file.name),
+        detected_note: t.instrument.note_name || null,
+        detected_midi_note: t.instrument.midi_note || null,
+        volume: +t.volume.toFixed(3),
+      };
+      pack.sounds[key] = json;
+    }
+
+    const blob = new Blob([JSON.stringify(pack, null, 1)], { type: "application/json" });
+    downloadBlob(blob, `${safeName(pack.name)}.multinote.instrument.json`);
+    setBatchStatus(`1つの音色パックJSONを書き出しました（${sorted.length} 音 / ${sorted.map((t) => SL.midiName(t.note || t.instrument.midi_note || 60)).join(", ")}）`);
+  }
+
   async function exportBatchZip() {
     const tracks = batch.tracks.filter((t) => !t.error);
     if (!tracks.length) { setBatchStatus("書き出せる解析済み音源がありません。", true); return; }
@@ -991,7 +1386,7 @@
       const files = [];
       const manifest = {
         created_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
-        mode: "sound_lab 4音源バランス調整",
+        mode: "sound_lab 複数音源バランス調整",
         metal_preset_applied: !!batch.metalApplied,
         wav_duration_sec: dur,
         tracks: [],
@@ -999,18 +1394,15 @@
       for (let i = 0; i < tracks.length; i++) {
         const t = tracks[i];
         setBatchStatus(`ZIP 作成中… ${i + 1} / ${tracks.length} (${t.file.name})`);
+        const note = t.note || t.instrument.midi_note || 60;
+        const base = `${String(i + 1).padStart(2, "0")}_${safeName(t.instrument.name || t.file.name)}`;
         const tmp = new SL.LiveSynth();
         tmp.load(t.instrument);
         tmp.params = deepCopy(t.params);
         tmp.params.masterVol = t.volume;
-        const note = t.note || t.instrument.midi_note || 60;
-        const base = `${String(i + 1).padStart(2, "0")}_${safeName(t.instrument.name || t.file.name)}`;
         const wav = await tmp.renderWav(note, dur);
-        const json = tmp.exportInstrument();
-        json.name = (t.instrument.name || safeName(t.file.name)) + " (4音源バランス調整)";
-        json.fx = json.fx || {};
-        json.fx.balance_master_volume = +t.volume.toFixed(3);
-        json.fx.balance_export_note = SL.midiName(note);
+        const json = adjustedBatchInstrument(t);
+        json.name = (t.instrument.name || safeName(t.file.name)) + " (複数音源バランス調整)";
         files.push({ name: `${base}_${SL.midiName(note)}.wav`, blob: wav });
         files.push({ name: `${base}.tweaked.instrument.json`, blob: new Blob([JSON.stringify(json, null, 1)], { type: "application/json" }) });
         manifest.tracks.push({ index: i + 1, source_file: t.file.name, note: SL.midiName(note), midi_note: note, volume: +t.volume.toFixed(3), json: `${base}.tweaked.instrument.json`, wav: `${base}_${SL.midiName(note)}.wav` });
