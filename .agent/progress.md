@@ -5,6 +5,11 @@
 
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
+- 2026-06-17: **test_v3 Processing 音色データを最新金管 JSON に差し替え**。
+  `/Users/shota/Documents/3S/` の `trumpets`/`horns`/`trombones`/`tuba` を
+  `pc_app/test_v3/orchestra_resynth/data/0_〜3_*.instrument.json` へ番号付き命名で取り込み。
+  元ファイルと byte 単位一致、`python3 -m json.tool` で 4 ファイル構文 OK。ファーム変更なし。
+
 - 2026-06-10: **4 台輪唱の実機問題を机上検証＝ファームにバグなし**（`390e4ac`、`tools/canon_sim/` 新設）。
   サイクル窓ロジックを Python 再現し拍 1〜120 で 20 アサーション全 PASS。原因は実機側の可能性大
   （楽器ファーム古い/取り違え・3 台構成では拍 49〜56 無音が仕様）。全 6 ノード pio run SUCCESS。

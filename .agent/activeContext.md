@@ -5,29 +5,25 @@
 
 ## 現在の対象
 
-- **test_v3 4 台輪唱の実機問題を机上検証済み**（2026-06-10、`tools/canon_sim/` 追加・`390e4ac`）。
-  実機テスト（node_01+02/03/04）で node_03/04 が輪唱に聞こえなかった件を受け、
-  applyPattern のサイクル窓ロジック（CANON_CYCLE_BEATS=56・headRestBeats 0/8/16/24）を
-  Python で再現し拍 1〜120 を全数検証 → **20 アサーション全 PASS＝ファームのロジックにバグなし**。
-  全 6 ノード pio run SUCCESS（コード変更なし）。
-- **原因はコードではなく実機側の可能性が高い**。有力仮説:
-  1. 楽器 3 台に書き込まれたファームが古い/取り違え（progress 上 test_v3 の楽器書き込み記録なし。
-     最後は 2026-05-27 の test_v2。3 台とも同一ノード用なら「遅延ゼロ」症状に一致）
-  2. 3 台構成の仕様上の聞こえ方: 拍 33 で node_02 沈黙→拍 49〜56 全無音（node_05 区間）
-  3. ゲームモードは GAME_LENGTH_BEATS=32 で打ち切り（node_04 は 16 拍しか弾けない）
+- **test_v3 Processing 音色データを 2026-06-17 に差し替え済み**。
+  `/Users/shota/Documents/3S/` の金管 4 種 JSON を
+  `pc_app/test_v3/orchestra_resynth/data/` の番号付きファイル名へ上書き取り込み:
+  - `trumpets.tweaked.instrument.json` → `0_trumpets.tweaked.instrument.json`
+  - `horns.tweaked.instrument.json` → `1_horns.tweaked.instrument.json`
+  - `trombones.tweaked.instrument.json` → `2_trombones.tweaked.instrument.json`
+  - `tuba.tweaked.instrument.json` → `3_tuba.tweaked.instrument.json`
+- 取り込み後、4 ファイルは元ファイルと byte 単位一致。`python3 -m json.tool` で JSON 構文 OK。
+- ドラム系 `4_kick`〜`7_crash` と README は未変更。
 
 ## 次の一手
 
-- **実機切り分け（ユーザー作業）**:
-  ① test_v3 現行 main を node_02/03/04（+ あれば 4 台目に node_05）へ書き込み直す。
-  ② Processing 画面の part=0x02/0x03/0x04 表示と音色（トランペット/ホルン/トロンボーン）が
-    3 台で異なるか確認（全部同じなら書き込み取り違え確定）。
-  ③ 自由演奏で 60 拍以上振り、入りが拍 1/9/17 で 8 拍ずつズレるか、
-    拍 33 以降の尻すぼみ→無音 8 拍→拍 57 再入が起きるかを聴感確認。
+- 必要なら Processing 4 で `pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde` を起動し、
+  楽器定義パネルに `0_trumpets`〜`3_tuba` が表示されることと音色差を聴感確認する。
+- ファーム変更はなし。PIO ビルド・実機 upload は不要。
 
 ## 現フェーズで Read すべき設計書
 
-- 輪唱検証: `tools/canon_sim/README.md`（発音表とアサーションの読み方）
+- Processing 音色データ作業: `pc_app/test_v3/orchestra_resynth/data/README.md`
 - ゲームモード設計: `.agent/test_v3-game-design.md`
 - プロトコル仕様: `.agent/api.md`
 
