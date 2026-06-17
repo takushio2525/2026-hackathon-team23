@@ -138,22 +138,27 @@ bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
     if (!sNavFired && (windowDone || release)) {
         sNavFired  = true;
         sLastNavMs = now;
+        int     dom    = 0;
+        float   dir    = 0.0f;
+        uint8_t curBefore = data.game.navCursor;
         if (sNavVertAccum >= sNavHorizAccum * NAV_VERT_DOMINANCE) {
             decide = true;   // 縦振りが支配的 → 決定
         } else {
             // 横振りが支配的 → カーソル移動。向きは水平積算ベクトルの支配軸の符号で決める
             // (どの軸が水平に対応するかは取り付けに依存するが、支配軸選択で自動追従する。
             //  左右の向きが実機で逆なら NAV_LR_SIGN を反転する)。
-            int dom = 0;
             for (int i = 1; i < 3; ++i) {
                 if (fabsf(sNavHorizVec[i]) > fabsf(sNavHorizVec[dom])) dom = i;
             }
-            const float dir = sNavHorizVec[dom] * NAV_LR_SIGN;
+            dir = sNavHorizVec[dom] * NAV_LR_SIGN;
             if (dir < 0.0f) { if (data.game.navCursor > 0)             data.game.navCursor--; }
             else            { if (data.game.navCursor + 1 < itemCount) data.game.navCursor++; }
         }
-        DBG_PRINTF("[N1 NAV vert=%5.2f horiz=%5.2f -> %s]\n",
+        DBG_PRINTF("[N1 NAV vert=%5.2f horiz=%5.2f grav=(%5.2f,%5.2f,%5.2f) hvec=(%5.1f,%5.1f,%5.1f) dom=%d dir=%+5.1f cur=%u->%u -> %s]\n",
                    sNavVertAccum, sNavHorizAccum,
+                   sNavGrav[0], sNavGrav[1], sNavGrav[2],
+                   sNavHorizVec[0], sNavHorizVec[1], sNavHorizVec[2],
+                   dom, dir, curBefore, data.game.navCursor,
                    decide ? "DECIDE" : "CURSOR");
     }
     if (release) sNavGate = NavGate::Idle;   // 振りが収まったら次操作に備える
