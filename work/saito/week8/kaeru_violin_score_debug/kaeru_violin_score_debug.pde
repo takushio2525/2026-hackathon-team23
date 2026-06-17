@@ -4,9 +4,9 @@ import ddf.minim.ugens.*;
 final int BPM = 96;
 final int NOTE_ON = 0x01;
 final int REST = 0x04;
-final int MAX_HARMONICS = 16;
-final String VIOLIN_FILE = "violin.representative.instrument.json";
-final float VIOLIN_AMPLITUDE = 0.23f;
+final int MAX_HARMONICS = 28;
+final String VIOLIN_FILE = "violin.tweaked.instrument.json";
+final float VIOLIN_AMPLITUDE = 0.18f;
 
 Minim minim;
 AudioOutput out;
@@ -55,6 +55,11 @@ class TimbreData {
   float decaySec;
   float sustainLevel;
   float releaseSec;
+  float vibratoRateHz;
+  float vibratoDepthCents;
+  float vibratoOnsetSec;
+  float chorusMix;
+  float chorusDepth;
 
   TimbreData(String filename) {
     JSONObject json = loadJSONObject(filename);
@@ -64,15 +69,39 @@ class TimbreData {
 
     name = json.getString("name");
     JSONObject sourceEnvelope = json.getJSONObject("envelope");
-    attackSec = sourceEnvelope.getFloat("attack_sec");
-    decaySec = sourceEnvelope.getFloat("decay_sec");
-    sustainLevel = sourceEnvelope.getFloat("sustain_level");
-    releaseSec = sourceEnvelope.getFloat("release_sec");
+    attackSec = max(0.04f, sourceEnvelope.getFloat("attack_sec"));
+    decaySec = max(0.05f, sourceEnvelope.getFloat("decay_sec"));
+    sustainLevel = constrain(sourceEnvelope.getFloat("sustain_level"), 0.0f, 1.0f);
+    releaseSec = max(0.08f, sourceEnvelope.getFloat("release_sec"));
 
     noiseLevel = 0;
     if (json.hasKey("noise")) {
       JSONObject sourceNoise = json.getJSONObject("noise");
       noiseLevel = sourceNoise.getFloat("level", 0);
+    }
+
+    vibratoRateHz = 5.4f;
+    vibratoDepthCents = 14.0f;
+    vibratoOnsetSec = 0.14f;
+    if (json.hasKey("modulation")) {
+      JSONObject modulation = json.getJSONObject("modulation");
+      if (modulation.hasKey("vibrato")) {
+        JSONObject vibrato = modulation.getJSONObject("vibrato");
+        vibratoRateHz = vibrato.getFloat("rate_hz", vibratoRateHz);
+        vibratoDepthCents = vibrato.getFloat("depth_cents", vibratoDepthCents);
+        vibratoOnsetSec = vibrato.getFloat("onset_sec", vibratoOnsetSec);
+      }
+    }
+
+    chorusMix = 0.18f;
+    chorusDepth = 0.30f;
+    if (json.hasKey("fx")) {
+      JSONObject fx = json.getJSONObject("fx");
+      if (fx.hasKey("chorus")) {
+        JSONObject chorus = fx.getJSONObject("chorus");
+        chorusMix = chorus.getFloat("mix", chorusMix);
+        chorusDepth = chorus.getFloat("depth", chorusDepth);
+      }
     }
 
     JSONArray sourceHarmonics = json.getJSONArray("harmonics");
@@ -85,6 +114,8 @@ class TimbreData {
       JSONObject harmonic = sourceHarmonics.getJSONObject(i);
       harmonicRatios[i] = harmonic.getFloat("ratio");
       harmonicGains[i] = harmonic.getFloat("amp");
+      // 高次倍音を少し抑えて、合成臭い金属感を減らす。
+      harmonicGains[i] *= 1.0f / (1.0f + i * 0.035f);
       gainSum += harmonicGains[i];
     }
 
@@ -136,27 +167,65 @@ ScoreEvent[] VIOLIN_SCORE = {
   new ScoreEvent(31,  0,   0, 256, REST)
 };
 
-class ViolinNote implements Instrument {
+class ViolinSynthNote implements Instrument {
   Summer mix;
-  Oscil[] harmonics;
-  Noise bowNoise;
   ADSR envelope;
+  Oscil[] tones;
+  Oscil[] vibratos;
+  Oscil[] chorusTones;
+  Oscil[] chorusVibratos;
+  Constant[] baseFrequencies;
+  Constant[] chorusBaseFrequencies;
+  Summer[] frequencyControls;
+  Summer[] chorusFrequencyControls;
+  Noise bowNoise;
 
-  ViolinNote(float frequency, float amplitude, TimbreData timbre) {
+  ViolinSynthNote(float frequency, float amplitude, TimbreData timbre) {
     mix = new Summer();
-    harmonics = new Oscil[timbre.harmonicRatios.length];
-    for (int i = 0; i < harmonics.length; i++) {
+    tones = new Oscil[timbre.harmonicRatios.length];
+    vibratos = new Oscil[timbre.harmonicRatios.length];
+    chorusTones = new Oscil[timbre.harmonicRatios.length];
+    chorusVibratos = new Oscil[timbre.harmonicRatios.length];
+    baseFrequencies = new Constant[timbre.harmonicRatios.length];
+    chorusBaseFrequencies = new Constant[timbre.harmonicRatios.length];
+    frequencyControls = new Summer[timbre.harmonicRatios.length];
+    chorusFrequencyControls = new Summer[timbre.harmonicRatios.length];
+
+    float chorusAmount = constrain(timbre.chorusMix, 0.0f, 0.35f);
+    float detuneCents = 4.5f + timbre.chorusDepth * 3.0f;
+    float detuneRatio = pow(2.0f, detuneCents / 1200.0f);
+    float vibScale = pow(2.0f, timbre.vibratoDepthCents / 1200.0f) - 1.0f;
+
+    for (int i = 0; i < tones.length; i++) {
       float partialFrequency = frequency * timbre.harmonicRatios[i];
-      float partialAmplitude = amplitude * timbre.harmonicGains[i];
-      harmonics[i] = new Oscil(partialFrequency, partialAmplitude, Waves.SINE);
-      harmonics[i].patch(mix);
+      float partialAmplitude = amplitude * timbre.harmonicGains[i] * (1.0f - chorusAmount * 0.35f);
+      tones[i] = new Oscil(partialFrequency, partialAmplitude, Waves.SINE);
+      tones[i].setPhase((i % 4) * 0.17f);
+
+      frequencyControls[i] = new Summer();
+      baseFrequencies[i] = new Constant(partialFrequency);
+      vibratos[i] = new Oscil(timbre.vibratoRateHz, partialFrequency * vibScale, Waves.SINE);
+      baseFrequencies[i].patch(frequencyControls[i]);
+      vibratos[i].patch(frequencyControls[i]);
+      frequencyControls[i].patch(tones[i].frequency);
+      tones[i].patch(mix);
+
+      float chorusFrequency = partialFrequency * detuneRatio;
+      float chorusAmplitude = amplitude * timbre.harmonicGains[i] * chorusAmount;
+      chorusTones[i] = new Oscil(chorusFrequency, chorusAmplitude, Waves.SINE);
+      chorusTones[i].setPhase(0.37f + (i % 5) * 0.11f);
+      chorusFrequencyControls[i] = new Summer();
+      chorusBaseFrequencies[i] = new Constant(chorusFrequency);
+      chorusVibratos[i] = new Oscil(timbre.vibratoRateHz * 1.04f, chorusFrequency * vibScale * 0.85f, Waves.SINE);
+      chorusBaseFrequencies[i].patch(chorusFrequencyControls[i]);
+      chorusVibratos[i].patch(chorusFrequencyControls[i]);
+      chorusFrequencyControls[i].patch(chorusTones[i].frequency);
+      chorusTones[i].patch(mix);
     }
 
-    float noiseAmplitude = amplitude * timbre.noiseLevel * 0.18f;
-    if (noiseAmplitude > 0.001f) {
-      bowNoise = new Noise(noiseAmplitude, Noise.Tint.WHITE);
-      bowNoise.patch(mix);
-    }
+    float noiseAmplitude = amplitude * max(0.035f, timbre.noiseLevel * 2.6f);
+    bowNoise = new Noise(noiseAmplitude, Noise.Tint.WHITE);
+    bowNoise.patch(mix);
 
     envelope = new ADSR(1.0f, timbre.attackSec, timbre.decaySec,
                         timbre.sustainLevel, timbre.releaseSec);
@@ -190,7 +259,7 @@ void draw() {
   textSize(26);
   text("かえるのうた ヴァイオリン単体版", 28, 42);
   textSize(15);
-  text("固定テンポ: " + BPM + " BPM   音域: C4〜A4   音色: " + violin.name, 28, 72);
+  text("固定テンポ: " + BPM + " BPM   音域: C4〜A4   音色: " + violin.name + " / JSON合成", 28, 72);
   text("P: 再生   再生中に押すと音が重なるため、終わってから押してください", 28, 98);
 
   int baseX = 28;
@@ -221,7 +290,7 @@ void draw() {
   textSize(15);
   text(currentMode, 28, 315);
   textSize(13);
-  text("Processing 側では harmonics / envelope / noise.level を使って簡易合成しています。", 28, 342);
+  text("Processing 側では harmonics / envelope / vibrato / noise / chorus風デチューンを使って合成しています。", 28, 342);
 }
 
 void keyPressed() {
@@ -250,7 +319,7 @@ void scheduleEvent(ScoreEvent event, int noteNumber, int velocity, int offsetQ8,
   float durationBeats = durationQ8 / 256.0f;
   float velocityScale = velocity / 127.0f;
   float amplitude = VIOLIN_AMPLITUDE * velocityScale;
-  out.playNote(startBeat, durationBeats, new ViolinNote(midiToFrequency(noteNumber), amplitude, violin));
+  out.playNote(startBeat, durationBeats, new ViolinSynthNote(midiToFrequency(noteNumber), amplitude, violin));
 }
 
 float midiToFrequency(int midiNote) {

@@ -1,13 +1,14 @@
 # data
 
-`kaeru_violin_score_debug.pde` が読み込む音色 JSON を置くフォルダです。
+`kaeru_violin_score_debug.pde` が読み込むヴァイオリン音色データを置くフォルダです。
 
 | ファイル | 用途 |
 |---|---|
-| `violin.representative.instrument.json` | ヴァイオリン単体版の音色 |
+| `violin.tweaked.instrument.json` | Processing 側で合成に使うヴァイオリン音色 JSON |
+| `violinC4.wav`〜`violinB4.wav` | GarageBand 書き出しの参考音源（このスケッチでは未使用） |
 
-スケッチは JSON の `harmonics` と `envelope` を使って倍音加算合成を行い、
-`noise.level` がある場合だけ、ごく薄く弓のこすれ成分としてノイズを足します。
+スケッチは JSON の `harmonics`, `envelope`, `modulation.vibrato`, `noise.level`,
+`fx.chorus` を読み、倍音加算、ビブラート、弓ノイズ、薄いデチューン重ねを使って合成します。
 
-解析アプリで作った代表音色JSONに差し替える場合も、ファイル名を
-`violin.representative.instrument.json` にそろえてください。
+解析アプリで音色JSONを作り直した場合は、ファイル名を
+`violin.tweaked.instrument.json` にそろえて置き換えてください。
