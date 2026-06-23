@@ -1,0 +1,188 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{titlesec}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+\begin{document}
+
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：齋藤　翔太\\
+報告日：2026年6月23日\\
+プロジェクト名：タクトーン〜IMUジェスチャーで奏でるArduinoオーケストラ〜
+
+\sectionrule
+
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 今回の作業進捗率：99\%
+  \item マイルストーン達成状況：week9の4声輪唱・ドラム確認用スケッチを作成し，mainブランチへ統合した．
+  \item 主要成果：
+    \begin{itemize}
+      \item {}week9にProcessingによる「かえるのうた」4声輪唱の確認用スケッチを作成した．
+      \item {}主旋律の楽譜を\texttt{MELODY\_SCORE}に統一し，4つの金管パートで共用する構成にした．
+      \item {}チューバを低音伴奏から，24拍遅れで入る4声目の主旋律へ変更した．
+      \item {}ドラムの音量を下げ，裏拍ハイハット，声部の入りのクラッシュ，終止前4拍のフィルを追加した．
+    \end{itemize}
+  \item 重大課題（影響度：高）：なし．ただし，実機環境での最終的な音量バランス確認は今後実施する．
+\end{itemize}
+
+\sectionrule
+
+\section{作業ログ（詳細トラッキング）}
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{35mm}>{\raggedright\arraybackslash}p{16mm}>{\raggedright\arraybackslash}p{16mm}>{\raggedright\arraybackslash}p{15mm}>{\raggedright\arraybackslash}p{12mm}X@{}}
+\hline
+作業項目 & 開始日 & 完了日 & 状態 & 進捗率 & コメント \\
+\hline
+week9の4声輪唱確認用スケッチ作成
+  & 6/21 & 6/22 & 完了 & 100\%
+  & \texttt{work/saito/week9/}にProcessingスケッチを追加した．\\
+主旋律楽譜の共通化と音域調整
+  & 6/21 & 6/21 & 完了 & 100\%
+  & 同じ\texttt{MELODY\_SCORE}を使い，開始拍とオクターブだけをパート別に設定した．\\
+チューバの主旋律化
+  & 6/21 & 6/21 & 完了 & 100\%
+  & 低音伴奏用の別楽譜を廃止し，チューバを4声目の輪唱へ組み込んだ．\\
+ドラム伴奏の調整
+  & 6/21 & 6/22 & 完了 & 100\%
+  & 音量を抑え，裏拍ハイハット，クラッシュ，終止前フィルを追加した．\\
+\hline
+\end{tabularx}
+}
+
+\sectionrule
+
+\section{担当箇所のGC}
+
+担当箇所の現在のGCを図\ref{fig:saito-gc-current}に示す．
+前回の作業ログで示したGCから，担当内容，作業計画，進捗に変更はない．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{Figs/GC.png}
+  \caption{担当箇所のGC（前回から変更なし）}
+  \label{fig:saito-gc-current}
+\end{figure}
+
+\sectionrule
+
+\section{日ごとの作業時間・作業内容}
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{18mm}>{\raggedright\arraybackslash}p{24mm}XX@{}}
+\hline
+日付 & 作業時間 & 作業内容 & 成果・残課題 \\
+\hline
+6/21 & 1時間 & 4声輪唱用楽譜の設計とProcessingスケッチ作成 & 共通楽譜，パートごとの開始拍・音域調整を実装した．\\
+6/22 & 1時間 & ドラム伴奏とクラッシュ音色の調整，起動不具合の修正 & ドラムの音量・リズムを調整し，クラッシュ音色の再生方式とJSON配置を見直した．\\
+\hline
+\end{tabularx}
+}
+
+\sectionrule
+
+\section{課題管理}
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{30mm}X>{\raggedright\arraybackslash}p{15mm}>{\raggedright\arraybackslash}p{15mm}X@{}}
+\hline
+課題 & 発生原因 & 影響度 & 状態 & 対策 \\
+\hline
+実機での音量バランス確認
+  & Processing上での確認まで完了し，実環境での聴感確認は未実施．
+  & 中 & 継続
+  & 発表前に全パートを通して再生し，必要に応じて音量を微調整する．\\
+\hline
+\end{tabularx}
+}
+
+\sectionrule
+
+\section{AI利用状況と検証（再現性重視）}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：楽譜の共通化方針，楽器ごとの音域設定，ドラム伴奏の調整案，Processing実装の補助．
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}同じ楽譜を各楽器に適したオクターブで演奏し，チューバも主旋律に加えるよう依頼した．
+      \item {}ドラムの音量を下げ，裏拍ハイハットと終止前のフィルを加えるよう依頼した．
+      \item {}クラッシュシンバルが不自然に聞こえる問題について，解析アプリでの再分析とProcessing側の再生方式の修正を依頼した．
+      \item {}week9単体で動作できるよう，音色JSONを同梱するよう依頼した．
+    \end{itemize}
+  \item 出力概要：共通楽譜とパート設定の分離，4声輪唱の開始拍，ドラムの裏拍ハイハットと終止前フィルの案が提示された．また，クラッシュシンバルを解析済み原音データで再生する方式が提示された．
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+\begin{itemize}
+  \item 検証手法：AIの出力をそのまま採用せず，リポジトリ内のスケッチ，README，音色JSONを照合した．
+  \item 検証手順：
+    \begin{enumerate}
+      \item {}\texttt{processing-java --build}でコンパイルを確認した．
+      \item {}\texttt{processing-java --run}で起動時例外がないことを確認した．
+      \item {}4声の開始拍が0，8，16，24拍であること，ドラムが56拍であることを確認した．
+      \item {}week9の\texttt{data/}フォルダに音色JSON 8ファイルがあることを確認した．
+    \end{enumerate}
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+  \item 一致点：\texttt{MELODY\_SCORE}を4つの金管パートで共用していること，チューバが4声目の主旋律であること，クラッシュが\texttt{drum\_sample}を持つ場合に原音再生へ切り替わることを確認した．
+  \item 未実施項目：Arduinoファームウェアへの楽譜反映と実機での音量バランス確認は未実施である．
+  \item 最終判断：week9のProcessing確認用スケッチは今回の成果として記載し，実機確認は次回の課題として扱う．
+\end{itemize}
+
+\sectionrule
+
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：Processing上で4声輪唱とドラムを通して再生し，音量バランスを確認する．
+  \item 達成基準：クラッシュシンバル，金管4声，ドラムの聞こえ方に大きな違和感がないことを確認する．
+  \item 次の作業：必要に応じて，クラッシュシンバルと終止部のドラムを聴感に合わせて調整する．
+  \item 将来の作業：Arduino側の楽譜データへ反映する必要が生じた場合は，実機での動作確認を行う．
+\end{itemize}
+
+\sectionrule
+
+\section{付録}
+
+\begin{itemize}
+  \item 成果物：\texttt{work/saito/week9/kaeru\_score\_debug/}以下のProcessingスケッチ，音色JSON，README．
+  \item リポジトリ：\texttt{https://github.com/takushio2525/2026-hackathon-team23}
+\end{itemize}
+
+\end{document}

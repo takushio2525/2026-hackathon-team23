@@ -6,3 +6,6 @@
 - クラッシュシンバルは `crash.tweaked.instrument.json` の `drum_sample`（3秒・44.1 kHz）を Minim `AudioSample` で直接再生する。`Sampler` の実行時例外を回避し、`processing-java --run` で起動時例外が出ないことを確認済み。実音の確認は未実施。
 - 解析アプリは停止済み。音色JSON 8ファイルと説明書は `work/saito/week9/kaeru_score_debug/data/` に同梱済み。
 - 4声の入り順はトランペット → ホルン → トロンボーン → チューバ（0 / 8 / 16 / 24拍）。チューバは24拍遅れで最後に入り、Processing ビルド済み。
+- `work/saito/week9/作業ログ/` にweek7相当の詳細構成を持つLaTeX作業ログを追加済み。主要作業4項目、GC、課題、AI利用と検証、次回計画、付録を記入し、作業時間のみ未計測として残した。uplatex・dvipdfmxでPDF生成を確認した。
+- 作業ログはweek7と同じ `geometry`、`array`、`tabularx`、`booktabs`、`enumitem`、`graphicx`、`titlesec` のパッケージ構成と体裁設定を使用する。PDF生成を確認済み。
+- week9作業ログに `Figs/GC.png` を追加し，「前回の作業ログから担当内容・作業計画・進捗に変更なし」と明記したGC節を掲載した。
