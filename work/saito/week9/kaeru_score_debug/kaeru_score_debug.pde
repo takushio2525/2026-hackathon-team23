@@ -9,7 +9,7 @@ final int KICK_DRUM = 36;
 final int SNARE_DRUM = 38;
 final int CLOSED_HI_HAT = 42;
 final int CRASH_CYMBAL = 49;
-final float RECORDED_CRASH_GAIN = 2.0f;
+final float RECORDED_DRUM_GAIN = 2.0f;
 // week9/data/ に同梱した音色JSONを読む。week7 への外部参照は不要。
 final String SOURCE_DATA_DIRECTORY = "data/";
 
@@ -24,7 +24,7 @@ Minim minim;
 AudioOutput out;
 TimbreData[] brassTimbres;
 TimbreData[] drumTimbres;
-AudioSample crashSample;
+AudioSample[] recordedDrumSamples;
 ScoreEvent[] drumScore;
 String currentMode = "P キーで4声の主旋律とドラムを再生します";
 
@@ -254,17 +254,19 @@ class DrumNote implements Instrument {
   void noteOff() { envelope.unpatchAfterRelease(out); envelope.noteOff(); }
 }
 
-// 倍音合成ではベル状になりやすいクラッシュだけは、解析元の原音1打をそのまま再生する。
-class RecordedCrashNote implements Instrument {
+// ドラムJSONに原音1打があれば優先して再生する。サンプルがないJSONは従来どおり合成する。
+class RecordedDrumNote implements Instrument {
+  AudioSample sample;
   float amplitude;
 
-  RecordedCrashNote(float amplitude) {
+  RecordedDrumNote(AudioSample sample, float amplitude) {
+    this.sample = sample;
     this.amplitude = amplitude;
   }
 
   void noteOn(float duration) {
-    crashSample.setGain(linearToDecibels(constrain(amplitude * RECORDED_CRASH_GAIN, 0.001f, 1.0f)));
-    crashSample.trigger();
+    sample.setGain(linearToDecibels(constrain(amplitude * RECORDED_DRUM_GAIN, 0.001f, 1.0f)));
+    sample.trigger();
   }
 
   // 原音に含まれる自然な減衰を最後まで鳴らすため、譜面上の短い長さでは停止しない。
@@ -281,7 +283,8 @@ void setup() {
   for (int i = 0; i < MELODY_PARTS.length; i++) brassTimbres[i] = new TimbreData(MELODY_PARTS[i].instrumentFile);
   drumTimbres = new TimbreData[DRUM_INSTRUMENT_FILES.length];
   for (int i = 0; i < DRUM_INSTRUMENT_FILES.length; i++) drumTimbres[i] = new TimbreData(DRUM_INSTRUMENT_FILES[i]);
-  crashSample = createRecordedCrashSample(drumTimbres[drumIndex(CRASH_CYMBAL)]);
+  recordedDrumSamples = new AudioSample[drumTimbres.length];
+  for (int i = 0; i < drumTimbres.length; i++) recordedDrumSamples[i] = createRecordedDrumSample(drumTimbres[i]);
   drumScore = createDrumScore();
   textFont(createFont("SansSerif", 16));
   // 起動直後には再生しない。P キー、または 1〜5 キーで再生する。
@@ -352,14 +355,15 @@ void schedulePart(int part) {
 
 Instrument noteInstrument(int part, int noteNumber, float amplitude) {
   if (part == MELODY_PARTS.length) {
-    if (noteNumber == CRASH_CYMBAL && crashSample != null) return new RecordedCrashNote(amplitude);
+    AudioSample sample = recordedDrumSamples[drumIndex(noteNumber)];
+    if (sample != null) return new RecordedDrumNote(sample, amplitude);
     return new DrumNote(noteNumber, amplitude);
   }
   int shiftedNote = noteNumber + MELODY_PARTS[part].octaveShift;
   return new BrassNote(midiToFrequency(shiftedNote), amplitude, brassTimbres[part]);
 }
 
-AudioSample createRecordedCrashSample(TimbreData timbre) {
+AudioSample createRecordedDrumSample(TimbreData timbre) {
   if (timbre.drumSample == null || timbre.drumSample.length == 0) return null;
   javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
     timbre.drumSampleRate, 16, 1, true, true

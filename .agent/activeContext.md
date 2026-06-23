@@ -6,7 +6,7 @@
 ## 現在の対象
 
 - **week9 の4声輪唱・ドラム確認用 Processing スケッチを main へ統合済み**（commit `8afce57`）。
-  `work/saito/week9/kaeru_score_debug/` は音色JSONを `data/` に同梱し、トランペット → ホルン → トロンボーン → チューバの順で輪唱する。クラッシュは解析済み原音1打を再生する。
+  `work/saito/week9/kaeru_score_debug/` は音色JSONを `data/` に同梱し、トランペット → ホルン → トロンボーン → チューバの順で輪唱する。再解析済みのキック、スネア、ハイハット、クラッシュは解析済み原音1打を再生し、サンプルのないJSONは従来の合成へフォールバックする。
 - **test_v3 Processing 音色データを 2026-06-17 に差し替え済み**。
   `/Users/shota/Documents/3S/` の金管 4 種 JSON を
   `pc_app/test_v3/orchestra_resynth/data/` の番号付きファイル名へ上書き取り込み:
@@ -19,7 +19,7 @@
 
 ## 次の一手
 
-- week9 は Processing 4 で実音のバランス（クラッシュ原音・チューバ終止）を必要に応じて確認する。
+- week9 は Processing 4 で実音のバランス（ドラム4音の原音再生・チューバ終止）を必要に応じて確認する。
 - 必要なら Processing 4 で `pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde` を起動し、
   楽器定義パネルに `0_trumpets`〜`3_tuba` が表示されることと音色差を聴感確認する。
 - ファーム変更はなし。PIO ビルド・実機 upload は不要。
