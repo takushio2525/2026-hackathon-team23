@@ -5,7 +5,7 @@
 //
 // 楽器ノード node_05 (輪唱の 1 声部) のエントリポイント (Arduino UNO R4 WiFi)
 // partId / instrumentId / headRestBeats は ProjectConfig.h で決める。
-// 3 フェーズループを loopIntervalMs (5 ms) 間隔で回す
+// 3 フェーズループを loopIntervalMs (2 ms) 間隔で回す
 #include <Arduino.h>
 
 #include "ProjectConfig.h"
@@ -40,7 +40,7 @@ void initWithRetry(IModule* m, const char* name) {
         if (!ok) delay(50);
     }
     m->enabled = ok;
-    DBG_PRINTF("[N4 INIT] %s = %s\n", name, ok ? "OK" : "NG");
+    DBG_PRINTF("[N5 INIT] %s = %s\n", name, ok ? "OK" : "NG");
 }
 
 #if SERIAL_DEBUG
@@ -63,23 +63,23 @@ uint32_t       gPrevCtrlMs   = 0;
 
 void dumpEdges(const SystemData& d) {
     if (d.performer.state != gPrevState) {
-        DBG_PRINTF("[N4 EVT STATE] %s -> %s\n",
+        DBG_PRINTF("[N5 EVT STATE] %s -> %s\n",
                    perfStateName(gPrevState),
                    perfStateName(d.performer.state));
         gPrevState = d.performer.state;
     }
     if (d.orcNet.wifiConnected != gPrevWifi) {
-        DBG_PRINTF("[N4 EVT WIFI] connected=%d\n",
+        DBG_PRINTF("[N5 EVT WIFI] connected=%d\n",
                    d.orcNet.wifiConnected ? 1 : 0);
         gPrevWifi = d.orcNet.wifiConnected;
     }
     if (d.sync.converged && !gPrevConverged) {
-        DBG_PRINTF("[N4 EVT SYNC_CONVERGED] off=%ld n=%u\n",
+        DBG_PRINTF("[N5 EVT SYNC_CONVERGED] off=%ld n=%u\n",
                    (long)d.sync.offsetMs, (unsigned)d.sync.sampleCount);
         gPrevConverged = true;
     }
     if (d.orcNet.hasNewCtrl && d.ctrl.lastReceivedMs != gPrevCtrlMs) {
-        DBG_PRINTF("[N4 EVT CTRL] bpm=%5.1f vel=%u st=%u seq=%lu off=%ld n=%u\n",
+        DBG_PRINTF("[N5 EVT CTRL] bpm=%5.1f vel=%u st=%u seq=%lu off=%ld n=%u\n",
                    d.ctrl.bpm, (unsigned)d.ctrl.velocity,
                    (unsigned)d.ctrl.state,
                    (unsigned long)d.orcNet.lastCtrl.header.seq,
@@ -91,7 +91,7 @@ void dumpEdges(const SystemData& d) {
         const int32_t ahead =
             (int32_t)d.orcNet.lastBeat.payload.playAtMasterMs -
             (int32_t)(millis() + (uint32_t)d.sync.offsetMs);
-        DBG_PRINTF("[N4 EVT BEAT] no=%u playAt=%lu ahead=%ld seq=%lu\n",
+        DBG_PRINTF("[N5 EVT BEAT] no=%u playAt=%lu ahead=%ld seq=%lu\n",
                    (unsigned)d.receiver.lastBeatNo,
                    (unsigned long)d.orcNet.lastBeat.payload.playAtMasterMs,
                    (long)ahead,
@@ -107,7 +107,7 @@ void dumpPeriodic(const SystemData& d) {
     const uint32_t ago = (d.receiver.lastBeatMs == 0)
                           ? 0 : (now - d.receiver.lastBeatMs);
     DBG_PRINTF(
-        "[N4 t=%lu st=%s wifi=%d sync=%s(off=%ld n=%u) ctrl=(bpm=%5.1f v=%u s=%u) "
+        "[N5 t=%lu st=%s wifi=%d sync=%s(off=%ld n=%u) ctrl=(bpm=%5.1f v=%u s=%u) "
         "recv=(no=%u ago=%lu) pend=%d score=(idx=%u)]\n",
         (unsigned long)now,
         perfStateName(d.performer.state),
@@ -143,13 +143,13 @@ void setup() {
     initWithRetry(&gNote, "NoteSenderModule");
     initWithRetry(&gLed,  "StatusLedModule");
 
-    DBG_PRINTLN("[N4 INIT] done");
+    DBG_PRINTLN("[N5 INIT] done");
 }
 
 void loop() {
     const uint32_t now = millis();
     if (now - gLastLoopMs < ORC_RECEIVER_CONFIG.loopIntervalMs) {
-        return;  // ループ周期 5 ms を維持
+        return;  // loopIntervalMs 周期を維持
     }
     gLastLoopMs = now;
 

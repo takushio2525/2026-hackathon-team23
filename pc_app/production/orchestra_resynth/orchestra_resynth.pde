@@ -17,7 +17,7 @@
      2  version     uint8   0x01
      3  type        uint8   3=NOTE / 4=UI (1=CTRL / 2=BEAT は USB には流れない)
      --- type=3 (NOTE) ---
-     12 partId      uint8   0x02-0x05
+     12 partId      uint8   0x02-0x06
      13 noteNumber  uint8   MIDI ノート番号
      14 velocity    uint8   0-127
      15 gate        uint8   1=NoteOn
@@ -916,7 +916,7 @@ void drawAnalyzerScreen(){
 
 // 画面下部の共通パネル: 左にキー操作ガイド、右に接続ステータス。
 // 接続ステータス = 役割 / UI リンク鮮度 (メイン UI のみ) / 声部別 NOTE 受信インジケータ。
-// 「4 台のうちどれが鳴っていないか」「指揮者との UI 中継が生きているか」を常時見せる。
+// 「5 台のうちどれが鳴っていないか」「指揮者との UI 中継が生きているか」を常時見せる。
 void drawHelpPanel(String helpText){
   float hx = 28, hy = height - 66, hw = width - 56, hh = 48;
   fill(255); noStroke();

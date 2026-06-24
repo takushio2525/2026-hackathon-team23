@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/production/node_02
-//   pio run -d firmware/production/node_02 -t upload
-//   pio device monitor -d firmware/production/node_02
+//   pio run -d firmware/production/node_06
+//   pio run -d firmware/production/node_06 -t upload
+//   pio device monitor -d firmware/production/node_06
 //
 // SERIAL_DEBUG=1 のときは Serial を「人間可読のデバッグ出力」専用に切替え、
 // バイナリ NotePacket は流さない (Processing 連携を一時停止する代わりに

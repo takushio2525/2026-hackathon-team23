@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/production/node_02
-//   pio run -d firmware/production/node_02 -t upload
-//   pio device monitor -d firmware/production/node_02
+//   pio run -d firmware/production/node_04
+//   pio run -d firmware/production/node_04 -t upload
+//   pio device monitor -d firmware/production/node_04
 
 #include "OrcReceiverModule.h"
 #include "SystemData.h"
