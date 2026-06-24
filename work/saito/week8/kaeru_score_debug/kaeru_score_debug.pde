@@ -1,0 +1,390 @@
+import ddf.minim.*;
+import ddf.minim.ugens.*;
+
+final int BPM = 96;
+final int NOTE_ON = 0x01;
+final int REST = 0x04;
+final int MAX_HARMONICS = 12;
+final int KICK_DRUM = 36;
+final int SNARE_DRUM = 38;
+final int CLOSED_HI_HAT = 42;
+final int CRASH_CYMBAL = 49;
+final float RECORDED_CRASH_GAIN = 2.0f;
+// week9/data/ に同梱した音色JSONを読む。week7 への外部参照は不要。
+final String SOURCE_DATA_DIRECTORY = "data/";
+
+final String[] DRUM_INSTRUMENT_FILES = {
+  "kick.tweaked.instrument.json",
+  "snare.tweaked.instrument.json",
+  "Hi-hat.tweaked.instrument.json",
+  "crash.tweaked.instrument.json"
+};
+
+Minim minim;
+AudioOutput out;
+TimbreData[] brassTimbres;
+TimbreData[] drumTimbres;
+AudioSample crashSample;
+ScoreEvent[] drumScore;
+String currentMode = "P キーで4声の主旋律とドラムを再生します";
+
+class ScoreEvent {
+  int beatAt;
+  int noteNumber;
+  int velocity;
+  int durationQ8;
+  int flags;
+  int subNote;
+  int subVelocity;
+  int subOffsetQ8;
+  int subDurationQ8;
+
+  ScoreEvent(int beatAt, int noteNumber, int velocity, int durationQ8, int flags) {
+    this(beatAt, noteNumber, velocity, durationQ8, flags, 0, 0, 0, 0);
+  }
+
+  ScoreEvent(int beatAt, int noteNumber, int velocity, int durationQ8, int flags,
+             int subNote, int subVelocity, int subOffsetQ8, int subDurationQ8) {
+    this.beatAt = beatAt;
+    this.noteNumber = noteNumber;
+    this.velocity = velocity;
+    this.durationQ8 = durationQ8;
+    this.flags = flags;
+    this.subNote = subNote;
+    this.subVelocity = subVelocity;
+    this.subOffsetQ8 = subOffsetQ8;
+    this.subDurationQ8 = subDurationQ8;
+  }
+
+  boolean isRest() {
+    return noteNumber == 0 || (flags & REST) != 0;
+  }
+}
+
+class PartDefinition {
+  String name;
+  String instrumentFile;
+  int startBeat;
+  int octaveShift;
+  float amplitude;
+
+  PartDefinition(String name, String instrumentFile, int startBeat, int octaveShift, float amplitude) {
+    this.name = name;
+    this.instrumentFile = instrumentFile;
+    this.startBeat = startBeat;
+    this.octaveShift = octaveShift;
+    this.amplitude = amplitude;
+  }
+}
+
+// 4パートともこの同じ譜面を使い、PartDefinition の octaveShift だけで音域を変える。
+final PartDefinition[] MELODY_PARTS = {
+  new PartDefinition("主旋律1 / トランペット", "trumpets.tweaked.instrument.json",  0,  12, 0.20f), // C5〜A5
+  new PartDefinition("主旋律2 / ホルン",       "horns.tweaked.instrument.json",      8,   0, 0.17f), // C4〜A4
+  new PartDefinition("主旋律3 / トロンボーン", "trombones.tweaked.instrument.json", 16, -12, 0.18f), // C3〜A3
+  new PartDefinition("主旋律4 / チューバ",     "tuba.tweaked.instrument.json",      24, -24, 0.15f)  // C2〜A2
+};
+final float DRUM_AMPLITUDE = 0.075f;
+
+class TimbreData {
+  String name;
+  float fundamentalHz;
+  float[] harmonicRatios;
+  float[] harmonicGains;
+  float noiseLevel;
+  float attackSec;
+  float decaySec;
+  float sustainLevel;
+  float releaseSec;
+  float[] drumSample;
+  float drumSampleRate;
+
+  TimbreData(String filename) {
+    JSONObject json = loadJSONObject(sketchPath(SOURCE_DATA_DIRECTORY + filename));
+    if (json == null) {
+      throw new RuntimeException("音色 JSON を読み込めません: " + filename);
+    }
+
+    name = json.getString("name");
+    fundamentalHz = json.getFloat("fundamental_hz", 440.0f);
+    JSONObject sourceEnvelope = json.getJSONObject("envelope");
+    attackSec = sourceEnvelope.getFloat("attack_sec");
+    decaySec = sourceEnvelope.getFloat("decay_sec");
+    sustainLevel = sourceEnvelope.getFloat("sustain_level");
+    releaseSec = sourceEnvelope.getFloat("release_sec");
+    noiseLevel = json.hasKey("noise") ? json.getJSONObject("noise").getFloat("level", 0) : 0;
+
+    JSONArray sourceHarmonics = json.getJSONArray("harmonics");
+    int harmonicCount = min(MAX_HARMONICS, sourceHarmonics.size());
+    harmonicRatios = new float[harmonicCount];
+    harmonicGains = new float[harmonicCount];
+    float gainSum = 0;
+    for (int i = 0; i < harmonicCount; i++) {
+      JSONObject harmonic = sourceHarmonics.getJSONObject(i);
+      harmonicRatios[i] = harmonic.getFloat("ratio");
+      harmonicGains[i] = harmonic.getFloat("amp");
+      gainSum += harmonicGains[i];
+    }
+    if (gainSum <= 0) {
+      throw new RuntimeException("倍音の振幅合計が 0 以下です: " + filename);
+    }
+    for (int i = 0; i < harmonicCount; i++) {
+      harmonicGains[i] /= gainSum;
+    }
+
+    // 打楽器プロファイルが持つ原音1打。クラッシュではこの非周期波形を優先する。
+    if (json.hasKey("drum_sample")) {
+      JSONObject sourceDrumSample = json.getJSONObject("drum_sample");
+      JSONArray sourceValues = sourceDrumSample.getJSONArray("values");
+      if (sourceValues != null && sourceValues.size() > 0) {
+        drumSample = new float[sourceValues.size()];
+        for (int i = 0; i < drumSample.length; i++) {
+          drumSample[i] = sourceValues.getFloat(i);
+        }
+        drumSampleRate = sourceDrumSample.getFloat("sample_rate", 44100.0f);
+      }
+    }
+  }
+}
+
+// 「かえるのうた」の基準譜。C4〜A4 を基準にして、各パートがオクターブ移調して演奏する。
+ScoreEvent[] MELODY_SCORE = {
+  new ScoreEvent( 0, 60, 96, 256, NOTE_ON), new ScoreEvent( 1, 62, 96, 256, NOTE_ON),
+  new ScoreEvent( 2, 64, 96, 256, NOTE_ON), new ScoreEvent( 3, 65, 96, 256, NOTE_ON),
+  new ScoreEvent( 4, 64, 96, 256, NOTE_ON), new ScoreEvent( 5, 62, 96, 256, NOTE_ON),
+  new ScoreEvent( 6, 60, 96, 512, NOTE_ON), new ScoreEvent( 7,  0,  0, 256, REST),
+  new ScoreEvent( 8, 64, 92, 256, NOTE_ON), new ScoreEvent( 9, 65, 92, 256, NOTE_ON),
+  new ScoreEvent(10, 67, 92, 256, NOTE_ON), new ScoreEvent(11, 69, 92, 256, NOTE_ON),
+  new ScoreEvent(12, 67, 92, 256, NOTE_ON), new ScoreEvent(13, 65, 92, 256, NOTE_ON),
+  new ScoreEvent(14, 64, 96, 512, NOTE_ON), new ScoreEvent(15,  0,  0, 256, REST),
+  new ScoreEvent(16, 60, 90, 256, NOTE_ON), new ScoreEvent(17,  0,  0, 256, REST),
+  new ScoreEvent(18, 60, 90, 256, NOTE_ON), new ScoreEvent(19,  0,  0, 256, REST),
+  new ScoreEvent(20, 60, 90, 256, NOTE_ON), new ScoreEvent(21,  0,  0, 256, REST),
+  new ScoreEvent(22, 60, 90, 256, NOTE_ON), new ScoreEvent(23,  0,  0, 256, REST),
+  new ScoreEvent(24, 60, 96, 128, NOTE_ON, 60, 96, 128, 128),
+  new ScoreEvent(25, 62, 96, 128, NOTE_ON, 62, 96, 128, 128),
+  new ScoreEvent(26, 64, 96, 128, NOTE_ON, 64, 96, 128, 128),
+  new ScoreEvent(27, 65, 96, 128, NOTE_ON, 65, 96, 128, 128),
+  new ScoreEvent(28, 64, 96, 256, NOTE_ON), new ScoreEvent(29, 62, 96, 256, NOTE_ON),
+  new ScoreEvent(30, 60,100, 512, NOTE_ON), new ScoreEvent(31,  0,  0, 256, REST)
+};
+
+// 56拍: 4声目（24拍遅れのチューバ）が終わる位置まで支える。
+// 旧版より小さい音量で、裏拍ハイハットと最後の4拍のフィルを加える。
+ScoreEvent[] createDrumScore() {
+  ScoreEvent[] score = new ScoreEvent[56];
+  for (int beat = 0; beat < score.length; beat++) {
+    int beatInBar = beat % 4;
+    int note = (beatInBar == 0 || beatInBar == 2) ? KICK_DRUM : SNARE_DRUM;
+    int velocity = (beatInBar == 0) ? 72 : (beatInBar == 2 ? 62 : 58);
+    int hatVelocity = (beatInBar == 0) ? 38 : 34;
+
+    // 各声部の入りを、控えめなクラッシュで知らせる。
+    if (beat == 0 || beat == 8 || beat == 16 || beat == 24) {
+      note = CRASH_CYMBAL;
+      velocity = 48;
+      hatVelocity = 0;
+      score[beat] = new ScoreEvent(beat, note, velocity, 64, NOTE_ON,
+                                   KICK_DRUM, 62, 0, 64);
+      continue;
+    }
+
+    // 最後の4拍だけ、主旋律の終止に向けて軽いフィルを入れる。
+    if (beat >= 52) {
+      int fillIndex = beat - 52;
+      int[] fillNotes = {KICK_DRUM, SNARE_DRUM, SNARE_DRUM, CRASH_CYMBAL};
+      int[] fillVelocities = {66, 52, 56, 50};
+      int[] fillSubNotes = {CLOSED_HI_HAT, CLOSED_HI_HAT, SNARE_DRUM, KICK_DRUM};
+      int[] fillSubVelocities = {32, 30, 38, 48};
+      score[beat] = new ScoreEvent(beat, fillNotes[fillIndex], fillVelocities[fillIndex], 64, NOTE_ON,
+                                   fillSubNotes[fillIndex], fillSubVelocities[fillIndex], 128, 64);
+      continue;
+    }
+
+    score[beat] = new ScoreEvent(beat, note, velocity, 64, NOTE_ON,
+                                 CLOSED_HI_HAT, hatVelocity, 128, 48);
+  }
+  return score;
+}
+
+class BrassNote implements Instrument {
+  Summer mix;
+  ADSR envelope;
+
+  BrassNote(float frequency, float amplitude, TimbreData timbre) {
+    mix = new Summer();
+    for (int i = 0; i < timbre.harmonicRatios.length; i++) {
+      Oscil harmonic = new Oscil(frequency * timbre.harmonicRatios[i],
+                                 amplitude * timbre.harmonicGains[i], Waves.SINE);
+      harmonic.patch(mix);
+    }
+    envelope = new ADSR(1.0f, timbre.attackSec, timbre.decaySec,
+                        timbre.sustainLevel, timbre.releaseSec);
+    mix.patch(envelope);
+  }
+
+  void noteOn(float duration) { envelope.noteOn(); envelope.patch(out); }
+  void noteOff() { envelope.unpatchAfterRelease(out); envelope.noteOff(); }
+}
+
+class DrumNote implements Instrument {
+  Summer mix;
+  Noise noise;
+  ADSR envelope;
+
+  DrumNote(int noteNumber, float amplitude) {
+    mix = new Summer();
+    TimbreData timbre = drumTimbres[drumIndex(noteNumber)];
+    for (int i = 0; i < timbre.harmonicRatios.length; i++) {
+      Oscil harmonic = new Oscil(timbre.fundamentalHz * timbre.harmonicRatios[i],
+                                 amplitude * timbre.harmonicGains[i], Waves.SINE);
+      harmonic.patch(mix);
+    }
+    float noiseAmplitude = amplitude * timbre.noiseLevel * drumNoiseScale(noteNumber);
+    if (noiseAmplitude > 0.001f) {
+      noise = new Noise(noiseAmplitude, Noise.Tint.WHITE);
+      noise.patch(mix);
+    }
+    envelope = new ADSR(1.0f, timbre.attackSec, timbre.decaySec,
+                        timbre.sustainLevel, timbre.releaseSec);
+    mix.patch(envelope);
+  }
+
+  void noteOn(float duration) { envelope.noteOn(); envelope.patch(out); }
+  void noteOff() { envelope.unpatchAfterRelease(out); envelope.noteOff(); }
+}
+
+// 倍音合成ではベル状になりやすいクラッシュだけは、解析元の原音1打をそのまま再生する。
+class RecordedCrashNote implements Instrument {
+  float amplitude;
+
+  RecordedCrashNote(float amplitude) {
+    this.amplitude = amplitude;
+  }
+
+  void noteOn(float duration) {
+    crashSample.setGain(linearToDecibels(constrain(amplitude * RECORDED_CRASH_GAIN, 0.001f, 1.0f)));
+    crashSample.trigger();
+  }
+
+  // 原音に含まれる自然な減衰を最後まで鳴らすため、譜面上の短い長さでは停止しない。
+  void noteOff() {
+  }
+}
+
+void setup() {
+  size(940, 490);
+  minim = new Minim(this);
+  out = minim.getLineOut(Minim.STEREO, 1024);
+  out.setTempo(BPM);
+  brassTimbres = new TimbreData[MELODY_PARTS.length];
+  for (int i = 0; i < MELODY_PARTS.length; i++) brassTimbres[i] = new TimbreData(MELODY_PARTS[i].instrumentFile);
+  drumTimbres = new TimbreData[DRUM_INSTRUMENT_FILES.length];
+  for (int i = 0; i < DRUM_INSTRUMENT_FILES.length; i++) drumTimbres[i] = new TimbreData(DRUM_INSTRUMENT_FILES[i]);
+  crashSample = createRecordedCrashSample(drumTimbres[drumIndex(CRASH_CYMBAL)]);
+  drumScore = createDrumScore();
+  textFont(createFont("SansSerif", 16));
+  // 起動直後には再生しない。P キー、または 1〜5 キーで再生する。
+}
+
+void draw() {
+  background(248, 246, 242);
+  fill(34);
+  textSize(26);
+  text("かえるのうた 4声輪唱・音域調整プレビュー", 28, 42);
+  textSize(15);
+  text("固定テンポ: " + BPM + " BPM   共通主旋律: " + MELODY_SCORE.length + " 拍   ドラム: " + drumScore.length + " 拍", 28, 72);
+  text("P: 全パート再生    1-5: 単独再生    再生完了後に次のキーを押してください", 28, 98);
+  for (int part = 0; part < MELODY_PARTS.length; part++) {
+    PartDefinition definition = MELODY_PARTS[part];
+    int y = 146 + part * 42;
+    fill(34);
+    text(definition.name + "   開始拍 = " + definition.startBeat + "   オクターブ = " + octaveLabel(definition.octaveShift), 28, y);
+    fill(70 + part * 24, 130, 180);
+    rect(410 + definition.startBeat * 7, y - 14, MELODY_SCORE.length * 7, 14, 3);
+  }
+  fill(34);
+  text("リズム / ドラム   開始拍 = 0   音量 = week7 の約半分", 28, 314);
+  fill(176, 112, 90);
+  rect(410, 300, drumScore.length * 7, 14, 3);
+  fill(34);
+  text(currentMode, 28, 368);
+  textSize(13);
+  text("共通譜をオクターブ移調: トランペット C5〜A5 / ホルン C4〜A4 / トロンボーン C3〜A3 / チューバ C2〜A2", 28, 410);
+  text("ドラム: 裏拍ハイハット、解析済み原音クラッシュ、終止前4拍のフィル", 28, 434);
+  text("音色 JSON はこのスケッチの data/ フォルダを参照", 28, 456);
+}
+
+void keyPressed() {
+  if (key == 'p' || key == 'P') playAllParts();
+  else if (key >= '1' && key <= '5') playPart(key - '1');
+}
+
+void playAllParts() {
+  out.pauseNotes();
+  for (int part = 0; part < MELODY_PARTS.length + 1; part++) schedulePart(part);
+  out.resumeNotes();
+  currentMode = "4声の主旋律輪唱（チューバを含む）と、控えめにアレンジしたドラムを再生中です。";
+}
+
+void playPart(int part) {
+  out.pauseNotes();
+  schedulePart(part);
+  out.resumeNotes();
+  currentMode = "単独再生中: " + partName(part) + "。";
+}
+
+void schedulePart(int part) {
+  ScoreEvent[] score = part == MELODY_PARTS.length ? drumScore : MELODY_SCORE;
+  int startBeat = part == MELODY_PARTS.length ? 0 : MELODY_PARTS[part].startBeat;
+  for (ScoreEvent event : score) {
+    if (event.isRest()) continue;
+    float amplitude = partAmplitude(part) * event.velocity / 127.0f;
+    float start = startBeat + event.beatAt;
+    out.playNote(start, event.durationQ8 / 256.0f, noteInstrument(part, event.noteNumber, amplitude));
+    if (event.subNote != 0 && event.subVelocity > 0) {
+      float subAmplitude = partAmplitude(part) * event.subVelocity / 127.0f;
+      out.playNote(start + event.subOffsetQ8 / 256.0f, event.subDurationQ8 / 256.0f,
+                   noteInstrument(part, event.subNote, subAmplitude));
+    }
+  }
+}
+
+Instrument noteInstrument(int part, int noteNumber, float amplitude) {
+  if (part == MELODY_PARTS.length) {
+    if (noteNumber == CRASH_CYMBAL && crashSample != null) return new RecordedCrashNote(amplitude);
+    return new DrumNote(noteNumber, amplitude);
+  }
+  int shiftedNote = noteNumber + MELODY_PARTS[part].octaveShift;
+  return new BrassNote(midiToFrequency(shiftedNote), amplitude, brassTimbres[part]);
+}
+
+AudioSample createRecordedCrashSample(TimbreData timbre) {
+  if (timbre.drumSample == null || timbre.drumSample.length == 0) return null;
+  javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
+    timbre.drumSampleRate, 16, 1, true, true
+  );
+  return minim.createSample(timbre.drumSample, format, 1024);
+}
+
+float partAmplitude(int part) { return part == MELODY_PARTS.length ? DRUM_AMPLITUDE : MELODY_PARTS[part].amplitude; }
+String partName(int part) { return part == MELODY_PARTS.length ? "リズム / ドラム" : MELODY_PARTS[part].name; }
+String octaveLabel(int semitones) { return (semitones > 0 ? "+" : "") + (semitones / 12) + " octave"; }
+
+int drumIndex(int noteNumber) {
+  if (noteNumber == KICK_DRUM) return 0;
+  if (noteNumber == SNARE_DRUM) return 1;
+  if (noteNumber == CLOSED_HI_HAT) return 2;
+  if (noteNumber == CRASH_CYMBAL) return 3;
+  return 2;
+}
+
+float drumNoiseScale(int noteNumber) {
+  if (noteNumber == KICK_DRUM) return 0.14f;
+  if (noteNumber == SNARE_DRUM) return 0.45f;
+  if (noteNumber == CRASH_CYMBAL) return 0.30f;
+  return 0.42f;
+}
+
+float linearToDecibels(float amplitude) { return 20.0f * log(amplitude) / log(10.0f); }
+float midiToFrequency(int midiNote) { return 440.0f * pow(2.0f, (midiNote - 69) / 12.0f); }
