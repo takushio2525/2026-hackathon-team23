@@ -56,7 +56,7 @@ final int  TYPE_UI       = 4;
 final int  MAX_POLYPHONY = 24;
 
 float   masterVolume  = 0.55f;
-boolean useSimpleADSR = false;
+boolean useSimpleADSR = true;
 
 // 指揮者の状態 (OrcProtocol.h と整合)
 final int ST_IDLE        = 0;
@@ -384,7 +384,8 @@ void handlePacket(byte[] buf){
     lastNoteMsByPart[partId] = millis();
     lastNoteAtMs = millis();
   } else {
-    releaseMatching(partId, noteNumber);
+    int releaseMidi = isDrumInstrument(instrumentId) ? noteNumber : noteNumber + brassOctaveShift(instrumentId);
+    releaseMatching(partId, releaseMidi);
   }
 }
 
@@ -405,6 +406,28 @@ int drumInstrIndex(int noteNumber){
 }
 boolean isDrumInstrument(int instrumentId){ return instrumentId >= 4; }
 
+// 齋藤版 (kaeru_score_debug) と同じオクターブ移調（楽譜は全声部 C4 基準）
+int brassOctaveShift(int instrumentId){
+  switch (instrumentId){
+    case 0: return  12;   // トランペット → C5
+    case 1: return   0;   // ホルン → C4
+    case 2: return -12;   // トロンボーン → C3
+    case 3: return -24;   // チューバ → C2
+    default: return  0;
+  }
+}
+
+// 齋藤版と同じパート別振幅
+float brassPartAmplitude(int instrumentId){
+  switch (instrumentId){
+    case 0: return 0.20f;  // トランペット
+    case 1: return 0.17f;  // ホルン
+    case 2: return 0.18f;  // トロンボーン
+    case 3: return 0.15f;  // チューバ
+    default: return 0.18f;
+  }
+}
+
 // ── 発音管理 ──────────────────────────────────────────────
 void triggerNote(int partId, int instrumentId, int midi, int velocity, int durationMs){
   int effectiveId = isDrumInstrument(instrumentId) ? drumInstrIndex(midi) : instrumentId;
@@ -414,8 +437,15 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
   while (countNonReleasing() >= MAX_POLYPHONY && guard++ < MAX_POLYPHONY){
     for (ResynthVoice v : activeVoices){ if (!v.releasing){ v.noteOff(); break; } }
   }
-  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) * masterVolume;
-  ResynthVoice v = new ResynthVoice(m, midi, g, useSimpleADSR);
+  int effectiveMidi = midi;
+  float g;
+  if (isDrumInstrument(instrumentId)){
+    g = constrain(velocity / 127.0f, 0.0f, 1.0f) * masterVolume;
+  } else {
+    effectiveMidi = midi + brassOctaveShift(instrumentId);
+    g = constrain(velocity / 127.0f, 0.0f, 1.0f) * brassPartAmplitude(instrumentId);
+  }
+  ResynthVoice v = new ResynthVoice(m, effectiveMidi, g, useSimpleADSR);
   v.partId        = partId;
   v.instrumentIdx = constrain(instrumentId, 0, max(0, models.size()-1));
   v.scheduledOffMs = millis() + max(40, durationMs);
@@ -1243,7 +1273,7 @@ class ResynthVoice extends UGen {
     if (done){ for (int i=0;i<channels.length;i++) channels[i]=0; return; }
     float a = ampAt(tSec);
     float pitchMul = 1.0f;
-    if (m.vibDepthCents > 0.01f && m.vibRateHz > 0.001f){
+    if (!simpleADSR && m.vibDepthCents > 0.01f && m.vibRateHz > 0.001f){
       float vg = m.vibOnsetSec > 0.001f ? min(1, tSec/m.vibOnsetSec) : 1;
       pitchMul = pow(2, (m.vibDepthCents*0.5f*vg*sin(vibPhase))/1200.0f);
       vibPhase += TWO_PI * m.vibRateHz / sr; if (vibPhase >= TWO_PI) vibPhase -= TWO_PI;
@@ -1256,16 +1286,16 @@ class ResynthVoice extends UGen {
       if (f >= sr*0.5f) continue;
       phase[k] += TWO_PI * f / sr;
       if (phase[k] >= TWO_PI) phase[k] -= TWO_PI;
-      s += amp * harmEnvAt(k, tSec) * sin(phase[k]);
+      s += amp * (simpleADSR ? 1.0f : harmEnvAt(k, tSec)) * sin(phase[k]);
     }
     s *= m.harmNorm;
-    if (m.noiseLevel > 0 && m.noiseTable.length > 1){
+    if (!simpleADSR && m.noiseLevel > 0 && m.noiseTable.length > 1){
       float relMul = releasing ? max(0, 1-(tSec-releaseStartT)/relSec()) : 1;
       float ne = noiseEnvAt(tSec) * m.noiseLevel * relMul;
       s += m.noiseTable[(int)noisePos] * ne;
       noisePos += 1; if (noisePos >= m.noiseTable.length) noisePos -= m.noiseTable.length;
     }
-    if (m.tremDepth > 0.001f && m.tremRateHz > 0.001f){
+    if (!simpleADSR && m.tremDepth > 0.001f && m.tremRateHz > 0.001f){
       s *= 1.0f - m.tremDepth*0.5f + m.tremDepth*0.5f*sin(tremPhase);
       tremPhase += TWO_PI * m.tremRateHz / sr; if (tremPhase >= TWO_PI) tremPhase -= TWO_PI;
     }
