@@ -1,44 +1,24 @@
-# firmware/common — 全ノード共通コードの置き場（例）
+# common — 共通層ライブラリ
 
-このディレクトリは「**複数のマイコンで同じコードを共有したいときはここに置く**」という**例**として用意されている。
+`firmware/test_v2/` 配下の全ノードが参照する共通モジュール置き場。
+各ノードの `platformio.ini` から `lib_extra_dirs = ../common/lib` で参照する。
 
-各ノード（`node_01` ～ `node_05`）はデフォルトでは独立したプロジェクトになっており、
-**ここにあるコードを自動で参照しているわけではない**。共有したくなったら各ノードの
-`platformio.ini` に1行足す、という使い方をする。
+## 構成
 
-## こんなときに使う
-
-- 複数マイコン間で同じ通信プロトコル実装を共有したい
-- 定数（プロトコルIDやパケットサイズ等）を1ヶ所で管理したい
-- チームで「共通基盤」を1人が作って、他の人が利用したい
-
-## 各ノードから参照する方法
-
-使いたいノードの `platformio.ini` に以下を追加する。
-
-```ini
-[env:uno_r4_wifi]
-platform = renesas-ra
-board = uno_r4_wifi
-framework = arduino
-
-; 共通ライブラリを読み込む
-lib_extra_dirs = ../common/lib
-```
-
-PlatformIO は `lib_extra_dirs` で指定したディレクトリ配下のサブディレクトリを
-すべてライブラリとして自動検出する。`#include "ExampleLibrary.h"` のように
-ヘッダ名を直接書けばインクルードできる。
-
-## 現在同梱されているサンプル
-
-| パス | 内容 |
+| ライブラリ | 内容 |
 |---|---|
-| `lib/ExampleLibrary/` | 最小サンプル（`exampleAdd(a, b)` だけ）。書き方の雛形 |
+| `lib/ModuleCore/` | `IModule` 抽象基底と `ModuleTimer` |
+| `lib/OrcProtocol/` | CTRL / BEAT / NOTE の 20 B パケット定義 (`magic=0x4F52`)。test_v2 では `NotePayload` の旧 `reserved[0]` を `instrumentId`（楽器番号）に充てている |
+| `lib/OrcNetModule/` | WiFi UDP マルチキャスト送受信 (SoftAp / Sta 切替) |
+| `lib/StatusLedModule/` | 状態に応じた LED 点滅出力 |
+| `lib/SerialDebug/` | `SERIAL_DEBUG` フラグで切替えるシリアルデバッグマクロ (`DBG_PRINTF` 等) |
 
-詳細は [lib/README.md](lib/README.md) を参照。
+## 約束事
 
-## 不要な班は
+- 共通モジュールは各ノードの `include/SystemData.h` に依存する。
+  各ノードは `OrcNetData` `StatusLedData` 等のフィールドを `SystemData` 内に
+  持たなければならない。
+- モジュール間の直接呼び出しは禁止 (EMA 規約)。
+  通信は必ず `SystemData` の該当フィールド経由で行う。
 
-共通ライブラリの仕組みを使わないなら `firmware/common/` ごと削除してよい。
-各ノードの `platformio.ini` も触っていなければ影響はない。
+詳細仕様は `meetings/0429_3回/事前課題共有/arduino_塩澤.pdf` 参照。
