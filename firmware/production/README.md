@@ -1,95 +1,80 @@
-# firmware — マイコン用ファームウェア（例）
+# firmware/production — ゲームモード（かえるのうた輪唱 + テンポ採点）
 
-このディレクトリは「**複数のマイコンを分担して開発するときのプロジェクト構成の例**」。
+`firmware/test_v2`（きらきら星→かえるのうた輪唱）の続編。**指揮者 1 + 楽器 4** の
+5 ノード構成・マスタクロック同期・拍番号駆動の楽譜進行を踏襲し、
+**ゲームモード**を追加した版：
 
-「ハッカソンで Arduino を何台か使い、それぞれ別の役割（センサ担当・表示担当・
-通信担当など）をチームで分担したい」というケースを想定した雛形。ハードウェアを
-使わない班は [`firmware/` ごと削除してよい](#使わない班は)。
+- **2 モード構成**: ①自由演奏（実振り BPM で輪唱）／②ゲーム（目標テンポ 100 BPM を
+  どれだけ維持できたかを 0–100 点で採点）
+- **IMU メニューナビ**: キャリブレーション完了後に `Menu` 状態へ入り、指揮棒の
+  左右振りでカーソル移動・縦振りで決定（`node_01/src/applyPattern.cpp` の `updateNav`）
+- **採点**: ゲーム中は拍ごとに「実振り間隔 − 目標拍間隔」の誤差を、メトロノームガイドが
+  薄い区間ほど重い重みで累積。32 拍（かえるのうた 1 周）で 0–100 点に写像して `Result` へ
+- **メトロノームガイド**: ゲーム序盤 8 拍は LED（node_01）と PC クリック音がフルガイド、
+  8〜16 拍で線形フェードアウト、以降はガイドなし（記憶でテンポ維持）
+- **CTRL 予約 4B をフィールド化**: `mode/navCursor/targetBpm/score` を指揮者→楽器に配信
+- **PKT_UI (type=4)**: node_02 だけが受信 CTRL の中身を USB シリアルで PC に中継する
+  （`UiRelayModule`）。UDP には流れないので同期経路（CTRL/BEAT/NOTE）に影響しない
+- **楽譜は「かえるのうた」32 拍**（`node_02〜05/src/score_data.cpp`）。8 分音符は
+  `subNote`（拍裏の予約発火）で表現
+- **4 台輪唱**: 声部が 8 拍（1 フレーズ）ずつ遅れて入る。周回は輪唱サイクル
+  `CANON_CYCLE_BEATS=56` 拍（曲長 32 + 最終声部の遅延 24）を全声部で共有し、
+  最終声部（node_05）が 1 周を終えるまで先頭声部は次の周回を始めない
 
-## コーディング方針（本チームの決定事項）
-
-本チームのファームウェアは、以下のリファレンス実装に**必ず**従って書く。
-
-> **Embedded-Module-Architecture**
-> <https://github.com/takushio2525/Embedded-Module-Architecture>
-
-- **3 フェーズループ**（入力 → ロジック → 出力）で `loop()` を構成する
-- 各機能は `IModule` インターフェース（`setup()` / `update()`）を実装した
-  モジュールとして書く
-- ノード内の共有状態は `SystemData` 構造体に集約する
-- ピン・定数・閾値などノード固有設定は `ProjectConfig` に集約する
-- 周期実行は `ModuleTimer` を使い、`delay()` でブロックしない
-- 新規モジュール追加時はリファレンスの `ARCHITECTURE.md` のチェックリストに従う
-
-共通コード（UDP 層・時間管理・共有プロトコル定義など）は [`common/lib/`](common/lib/) に置き、
-各ノードの `platformio.ini` から `lib_extra_dirs = ../common/lib` で参照する。
-
-詳細と判断の背景は `docs/` サイトの「アーキテクチャ > Embedded-Module-Architecture」、
-または [ADR-0005 のソース](../../docs/src/content/docs/decisions/0005-firmware-embedded-module-architecture.md) を参照。
-
-Arduino をベタ書きした経験しかないメンバーは、先にリファレンスの
-`ARCHITECTURE.md` と `example/` 系コードを読んでから実装を始めること。
-
-## 構成
-
-```
-firmware/
-├── common/            # 全ノード共通のコード（例: 共有ライブラリ）
-│   └── lib/
-│       └── ExampleLibrary/   # 共通ライブラリの書き方サンプル
-└── node_01〜05/       # 各マイコン 1台ごとの PlatformIO プロジェクト
-    ├── platformio.ini     # ビルド設定
-    ├── src/main.cpp       # エントリーポイント
-    ├── include/           # ヘッダファイル置き場
-    ├── lib/               # このノード固有のライブラリ
-    └── test/              # ユニットテスト置き場
-```
-
-各ノードは **PlatformIO の新規プロジェクトを作った直後と同じクリーンな状態**
-で用意してある。中身は自分たちのプロジェクトに合わせて書き換えていく。
-
-## ノード数の調整
-
-| 使う台数 | どうする |
+| ディレクトリ | 内容 |
 |---|---|
-| 5台 | そのまま |
-| 3台 | `node_04/` `node_05/` を削除 |
-| 1台 | `node_02/` 〜 `node_05/` を削除。`node_01/` を好きな名前にリネームしてもよい |
-| 6台以上 | `node_05/` をコピーして `node_06/` などを作る |
+| [`common/`](common/) | 全ノード共通ライブラリ（`OrcProtocol`（PKT_UI 追加） / `OrcNetModule` / `StatusLedModule` / `ModuleCore`） |
+| [`node_01/`](node_01/) | 指揮者ノード（XIAO ESP32-S3 Sense + GY-521）。Menu/Result 状態・IMU ナビ・採点 |
+| [`node_01_devkitc/`](node_01_devkitc/) | 指揮者の ESP32-S3-DevKitC-1 派生（ロジック同一・ビルド設定のみ差分） |
+| [`node_02/`](node_02/) | 輪唱 声部 1（partId=0x02, headRestBeats=0, instrumentId=0=トランペット）+ **UI 中継** |
+| [`node_03/`](node_03/) | 輪唱 声部 2（partId=0x03, headRestBeats=8, instrumentId=1=ホルン） |
+| [`node_04/`](node_04/) | 輪唱 声部 3（partId=0x04, headRestBeats=16, instrumentId=2=トロンボーン） |
+| [`node_05/`](node_05/) | 輪唱 声部 4（partId=0x05, headRestBeats=24, instrumentId=3=チューバ） |
 
-## 役割分担表（記入する）
+声部の楽譜（`score_data.cpp`）は 4 台とも同一（= 輪唱）。差分は ProjectConfig.h と
+node_02 のみ持つ `UiRelayModule` だけ。
 
-担当と役割が決まり次第、下の表を更新する。
-
-| ノード | 役割 | ハードウェア | 担当者 | 備考 |
-|---|---|---|---|---|
-| node_01 | 未定 | 未定 | 未定 | |
-| node_02 | 未定 | 未定 | 未定 | |
-| node_03 | 未定 | 未定 | 未定 | |
-| node_04 | 未定 | 未定 | 未定 | |
-| node_05 | 未定 | 未定 | 未定 | |
-
-## ビルド方法
-
-PlatformIO は VSCode 拡張として入れるのが簡単。
+## クイックスタート
 
 ```bash
-# 例: node_01 をビルドする
-cd firmware/node_01
-pio run                 # ビルドのみ
-pio run -t upload       # 書き込み
-pio device monitor      # シリアルモニタ
+# 1. 指揮者ノードを書き込む（XIAO 版。DevKitC なら node_01_devkitc）
+pio run -d firmware/production/node_01 -t upload
+
+# 2. 楽器ノードを書き込む
+pio run -d firmware/production/node_02 -t upload   # 声部 1（メイン操作 UI 用）
+pio run -d firmware/production/node_03 -t upload   # 声部 2
+pio run -d firmware/production/node_04 -t upload   # 声部 3
+pio run -d firmware/production/node_05 -t upload   # 声部 4（最終声部）
+
+# 3. Mac で Processing を起動し pc_app/production/orchestra_resynth/orchestra_resynth.pde を Run
+#    画面のポート一覧で繋いだ Arduino のポートをクリックして開く
+#    （node_02 を開いた Mac がメイン操作 UI、node_03〜05 はアナライザとして自動判定）
 ```
 
-各ノードの詳細は `firmware/node_XX/README.md` を参照。
+## 状態遷移（指揮者 node_01）
 
-## 共通ライブラリ
+```
+Idle ─(SoftAP up)→ Calibrating ─(2s)→ Menu
+Menu ─(左右振り=カーソル / 縦振り=決定)→ Conducting(自由演奏 or ゲーム)
+Conducting(ゲーム) ─(32 拍到達)→ Result ─(縦振り)→ Menu
+Conducting ←(IMU/WiFi 喪失)→ Fallback（復帰で元の状態へ）
+```
 
-複数ノードで同じコードを共有したいときに [`common/lib/`](common/lib/) を使う。
-詳細は [`common/README.md`](common/README.md)。
+LED: Idle=1Hz 点滅 / Calibrating=2Hz / Menu=約1.7Hz / Conducting=点灯
+（ゲーム序盤は目標テンポで点滅=LED メトロノーム）/ Result=高速点滅 / Fallback=5Hz。
 
-## 使わない班は
+## マスタクロック方式（test_v1/v2 から踏襲）
 
-ハードウェアを使わない班・Arduino 以外を使う班は、**`firmware/` ディレクトリを
-丸ごと削除してよい**。削除後に必要なら、自分たちの技術スタック用のフォルダを
-作り直す（例: `app/`, `src/`, `backend/` など）。
+指揮者の `millis()` をマスタ時刻として全ノードで共有する。BEAT は「マスタ時刻
+`playAtMasterMs` に発音せよ」という未来時刻指定で送り、楽器側は CTRL/BEAT 受信時に
+offset を EMA で学習、`millis() + offset` が `playAtMasterMs` に到達した瞬間に楽譜を
+1 拍進める。指揮者がリセットされて時計が巻き戻った場合は offset の大ジャンプを検知して
+スナップ追従する（`OrcReceiverModule` の clockSyncSnapThresholdMs）。
+
+## 詳細
+
+- ゲームモード設計の SSOT: `.agent/production-game-design.md`
+- プロトコル（CTRL 予約バイト / PKT_UI）: `common/lib/OrcProtocol/OrcProtocol.h`, `.agent/api.md`
+- 採点・ナビ・ガイドの実装: `node_01/src/applyPattern.cpp`, `node_01/include/ProjectConfig.h`
+- UI 中継: `node_02/lib/UiRelayModule/`
+- PC 側の画面・合成: `pc_app/production/orchestra_resynth/`

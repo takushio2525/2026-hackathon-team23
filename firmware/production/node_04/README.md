@@ -1,41 +1,24 @@
-# node_04
+# node_04 — 輪唱 声部 3（production）
 
-このマイコン（4台目）の役割を担当者が記入する。
+Arduino UNO R4 WiFi で「かえるのうた」輪唱の **声部 3** を担当する。**16 拍遅れて**入る。
 
-## 役割
+## この声部の設定（`include/ProjectConfig.h`）
 
-- 役割: 未定
-- 担当者: 未定
-
-## ハードウェア構成
-
-- ボード: 未定（暫定: Arduino Uno R4 WiFi）
-- 接続部品: 未定
-
-## ピンアサイン
-
-| ピン | 用途 | 備考 |
+| 項目 | 値 | 意味 |
 |---|---|---|
-| - | - | - |
+| `partId` | `0x04` | 輪唱のどの声部か（NOTE パケットに乗る） |
+| `headRestBeats` | `16` | 先頭に 16 拍ぶん休符を入れてから鳴り始める |
+| `instrumentId` | `2` | PC 側（orchestra_resynth）で `data/*.json` の何番目の楽器定義を使うか |
 
-## ビルド・書き込み
+node_02 は `headRestBeats=0 / instrumentId=0`、node_03 は `8 / 1`、node_05 は `24 / 3`。
+**楽譜 `src/score_data.cpp`（かえるのうた・32 拍）は 4 台とも同一**で、頭の休符ぶんずらして
+入ることで輪唱（カノン）になる。
 
-VSCode に PlatformIO 拡張を入れた状態で、このディレクトリを開くか、ターミナルで以下を実行する。
+設定値以外の動き・ビルド方法・SERIAL_DEBUG・構成は `node_02/README.md` と同じ
+（node_02 のコードをコピーし `ProjectConfig.h` だけ差し替えたもの）。デバッグ出力タグは `[N4 …]`。
 
 ```bash
-cd firmware/node_04
-pio run                 # ビルドのみ
-pio run -t upload       # 書き込み
-pio device monitor      # シリアルモニタ
+pio run -d firmware/production/node_04                  # ビルド
+pio run -d firmware/production/node_04 -t upload        # 書き込み
+pio device monitor -d firmware/production/node_04       # 注: Processing と同時に開けない (ポート競合)
 ```
-
-## 共通ライブラリを使いたくなったら
-
-`firmware/common/lib/` にチーム共通のライブラリを置けるようになっている。
-使う場合は `platformio.ini` に次の1行を足す。
-
-```ini
-lib_extra_dirs = ../common/lib
-```
-
-詳しくは [`firmware/common/README.md`](../common/README.md) を参照。
