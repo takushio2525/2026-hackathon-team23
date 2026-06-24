@@ -449,6 +449,9 @@ void applyPattern(SystemData& data) {
                 data.game.navCursor = 0;
                 data.game.targetBpm = 0;
                 data.game.score = 0xFF;
+                data.game.gameBeatCount = 0;
+                data.game.scoreErrAccum = 0.0f;
+                data.game.scoreWeightAccum = 0.0f;
             }
             break;
         }

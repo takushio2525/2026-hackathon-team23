@@ -142,15 +142,17 @@ namespace logic_params {
     constexpr uint32_t STATE_TRANSITION_DEADTIME_MS = 1000;
 
     // ── production ゲームモード: ゲーム進行・採点・ガイドフェード ──
-    constexpr uint16_t GAME_LENGTH_BEATS       = 32;    // ゲーム 1 セッションの拍数 (かえるのうた 1 周 = 32 拍)
+    // 全パートが演奏を完了するまで = CANON_CYCLE_BEATS (56 拍) をゲーム 1 セッションとする。
+    // 最終声部 (node_05, headRestBeats=24) は拍 25 から演奏を開始し拍 56 で完了する。
+    constexpr uint16_t GAME_LENGTH_BEATS       = 56;
     constexpr uint8_t  GAME_TARGET_BPM         = 100;   // 目標テンポ (固定・設定値)
     // メトロノームガイド強度の固定スケジュール (経過拍ベース):
     //   beat <  FULL          : 強度 1.0 (はっきり刻む)
     //   FULL <= beat <  ZERO  : 1.0→0 へ線形フェード
     //   beat >= ZERO          : 強度 0   (ガイドなし・記憶で維持)
     // 採点重み = 1 - 強度 (ガイドが薄い/無い区間ほど重く配点)。
-    constexpr uint16_t GAME_GUIDE_FULL_BEATS   = 8;
-    constexpr uint16_t GAME_GUIDE_ZERO_BEATS   = 16;
+    constexpr uint16_t GAME_GUIDE_FULL_BEATS   = 16;
+    constexpr uint16_t GAME_GUIDE_ZERO_BEATS   = 32;
     // 採点の許容誤差比: 拍間隔誤差が目標拍間隔のこの割合に達したら 0 点。0.5 = 半拍ずれで 0 点。
     constexpr float    GAME_SCORE_TOLERANCE_RATIO = 0.5f;
 }
