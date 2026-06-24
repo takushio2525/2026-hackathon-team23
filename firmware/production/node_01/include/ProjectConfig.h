@@ -113,23 +113,23 @@ namespace logic_params {
     // ついていても「地面に対して垂直に振れば縦 (決定) / 水平に振れば横 (カーソル)」
     // になる。旧方式のセンサ軸直読み (NAV_LR_AXIS/NAV_UD_AXIS) は取り付け角度で
     // 破綻したため廃止。
-    constexpr float    NAV_SWING_THRESHOLD_G   = 0.60f; // ナビ振り検出しきい値 (拍検出 1.20g より低め、メニュー操作は軽い振りで反応させる)
-    constexpr float    NAV_RELEASE_G           = 0.20f; // ナビゲート解放 (LPF 尾引きで 0.30 まで落ちず Idle 復帰が遅れる問題を解消)
-    constexpr uint32_t NAV_REFRACTORY_MS       = 250;   // ナビ不応期 (連続操作の応答速度を向上。max 4 回/秒)
+    constexpr float    NAV_SWING_THRESHOLD_G   = 1.00f; // ナビ振り検出しきい値 (拍検出 1.20g より低め)
+    constexpr float    NAV_RELEASE_G           = 0.30f; // ナビゲート解放 (1 振り=1 操作にするため)
+    constexpr uint32_t NAV_REFRACTORY_MS       = 400;   // ナビ不応期 (誤連打防止)
     // 縦/横の判定窓: Armed 突入からこの時間、重力軸/水平面の両成分を積算し、
     // 窓終了かリリース (dynNorm < NAV_RELEASE_G) の早い方で 1 回だけ判定・発火する。
     // 瞬時値判定だと振り始めの向きの暴れを拾うため、窓積算で振り全体の支配方向を見る。
-    constexpr uint32_t NAV_DECISION_WINDOW_MS  = 150;
+    constexpr uint32_t NAV_DECISION_WINDOW_MS  = 250;
     // 縦 (決定) と判定する優勢比: vertAccum >= horizAccum × この値 で縦。
     // 上げるほど縦判定が厳しくなる (横に寄る)。1.0 = 単純比較。
-    constexpr float    NAV_VERT_DOMINANCE      = 0.55f;
+    constexpr float    NAV_VERT_DOMINANCE      = 1.00f;
     // 横振りのカーソル移動方向の符号。実機で「右に振ったのに左へ動く」なら -1.0 に反転。
     constexpr float    NAV_LR_SIGN             = 1.0f;
     // 重力推定 LPF: accLpf をさらに遅い LPF に通す (5ms 周期 α=0.01 で時定数 ≈0.5s)。
     // dynNorm が NAV_GRAV_FREEZE_G 以上の間 (振り中) は更新を凍結し、
     // 振り加速度が重力推定へ漏れ込むのを防ぐ。
     constexpr float    NAV_GRAV_LPF_ALPHA      = 0.01f;
-    constexpr float    NAV_GRAV_FREEZE_G       = 0.20f;
+    constexpr float    NAV_GRAV_FREEZE_G       = 0.30f;
     constexpr uint8_t  MENU_ITEM_COUNT         = 2;     // メニュー項目数 (0=自由演奏 / 1=ゲーム)
 
     // ── production: 状態遷移直後のデッドタイム (ジェスチャ/拍検出の不感時間) ──
