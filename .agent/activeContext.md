@@ -5,14 +5,14 @@
 
 ## 現在の対象
 
-- **VS Code の Git 同期状態を復旧済み**。ローカル `main` と `origin/main` は共通祖先を持たない別履歴だったため、共有リポジトリの現行履歴である `origin/main`（`1dcdb4b`）へローカル `main` を合わせた。
-- 同期前のローカル履歴（先頭 `3b16b5b`、398 コミット）は `codex/backup-main-before-sync-20260624-0100` に完全退避済み。必要なファイルだけ戻す場合はこのブランチを参照する。
-- 現在 `git status --short --branch` は `## main...origin/main`（ahead / behind なし）。未コミット変更なし。
+- **分岐していた Git 履歴を `main` へ統合済み（コミット・push 前）**。共通祖先のない現行 `main` と退避側 398 コミットを `--allow-unrelated-histories` でマージし、week7〜9 の Processing 素材・議事録・個人作業成果物など、退避側だけにあった 112 ファイルを取り込んだ。
+- 競合は `.agent/activeContext.md`、`.agent/progress.md`、`.gitignore` のみ。現行 `main` の公開化ポリシーを採用し、講義資料・昨年度スライド・計画書テンプレートなど `.gitignore` で除外される 24 件は再公開しない。
+- マージ元 `codex/backup-main-before-sync-20260624-0100` は履歴保全のため維持する。
 
 ## 次の一手
 
-- VS Code のソース管理ビューを再読み込みすれば、同期ボタンの `371↓ 398↑` 表示は消える。
-- 退避ブランチ上だけに必要な変更が見つかった場合は、対象コミットまたはファイルを選んで現行 `main` へ取り込む。
+- ステージ済みマージの整合性を確認し、マージコミットを作成して `origin/main` へ push する。
+- push 後は VS Code を再読み込みし、`main...origin/main` に ahead / behind がないことを確認する。
 
 ## 現フェーズで Read すべき設計書
 

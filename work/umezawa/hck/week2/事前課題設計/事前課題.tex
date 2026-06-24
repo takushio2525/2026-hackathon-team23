@@ -1,0 +1,216 @@
+\documentclass[a4paper,12pt]{jsarticle}
+\usepackage{geometry}
+\geometry{top=25mm, bottom=25mm, left=25mm, right=25mm}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue}
+
+% ---- listings 設定（Processing は Java ベース）----
+\lstdefinestyle{processing}{
+  language=Java,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  breaklines=true,
+  frame=single,
+  tabsize=2,
+  captionpos=b,
+  showstringspaces=false
+}
+
+\title{チーム23 ハッカソン1\\
+       基本設計・詳細設計\\[0.5em]
+       }
+\author{梅澤颯太（学籍番号：25G1021）}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{基本設計}
+
+\subsection{117：音色合成 基本設計}
+
+\subsubsection{目的}
+Processingを使って，金管楽器らしい音色を
+作る方針を決める．
+「倍音の重ね合わせ（加算合成）」と「振幅エンベロープ（音の大きさの時間変化）」
+を組み合わせる．
+
+\subsubsection{音色の仕組み}
+楽器音の音色は以下の2つで決まる．
+
+\begin{itemize}
+  \item \textbf{倍音の含み方}：
+        基音（出したい音の周波数）の整数倍の周波数成分をいくつ，どの強さで重ねるか．
+        偶数倍音・奇数倍音の有無や強さが音色の違いに大きく影響する．
+  \item \textbf{倍音の立ち上がり方（エンベロープ）}：
+        音が鳴り始めてから消えるまでの音量の変化．
+        楽器らしさはここで決まることが多い．
+\end{itemize}
+
+\noindent
+\texttt{WavetableGenerator.gen10()} を使って倍音の振幅を指定する．
+
+\subsubsection{倍音構成の方針}
+
+金管楽器の特徴は「倍音が多く，明るくて力強い音」である．
+具体的には，基音（第1倍音）から第2・第3倍音あたりが特に強く，
+高次の倍音になるほど徐々に弱くなる．
+
+\begin{table}[h]
+  \centering
+  \caption{金管楽器風の倍音構成（案）}
+  \label{tab:harmonics}
+  \begin{tabular}{ccl}
+    \toprule
+    倍音次数 & 振幅の大きさ（0.0〜1.0） & 根拠・メモ \\
+    \midrule
+    第1倍音（基音） & 1.00 & 一番大きい成分 \\
+    第2倍音         & 0.70 & 金管では2倍音が強い \\
+    第3倍音         & 0.50 & 明るさを加える \\
+    第4倍音         & 0.30 & 厚みを加える \\
+    第5倍音         & 0.20 & 少しブライトにする \\
+    第6倍音         & 0.10 & 高次はだんだん弱く \\
+    第7倍音         & 0.05 & ごくわずかに含む \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{エンベロープの方針}
+
+授業で使った \texttt{HackInstrument} クラスでは，\texttt{Line} を使って
+「音が鳴り始めから時間をかけて音量をゼロに下げていく（減衰）」という処理をしている．
+金管楽器らしくするためには，さらに「鳴り始め（立ち上がり）」も加えたい．
+
+\begin{description}
+  \item[立ち上がり（Attack）] 音が鳴り始めてから最大音量に達するまでの時間．
+        約 20 ミリ秒（とても短い）．
+  \item[減衰・持続（Decay / Sustain）] 最大音量から少し落ち着いた音量で安定する．
+        息を吹き続けている感じ．
+  \item[余韻（Release）] 息を止めて音が消えるまでの時間．約 60 ミリ秒．
+\end{description}
+
+\noindent
+ただし，Minim の \texttt{Line} で表現できるのは「1本の直線的な変化」のみである．
+そのため音の出来次第でADSRクラスを使う方針とする．
+
+\section{詳細設計}
+
+\subsection{124：Arduino からの NOTE 受信と発音の仕組み}
+\label{sec:detail-124}
+
+\subsubsection{概要}
+Arduinoから Serial 通信で届く音の指令を
+Processing が受け取り，対応する音を鳴らす．
+通信フォーマットの詳細は115と130が
+確定してから決める．ここでは大まかな流れのみ示す．
+
+\subsubsection{処理の流れ（案）}
+
+\begin{enumerate}
+  \item Arduino が Serial 通信で「どの音を・どの長さで・どの大きさで鳴らすか」
+        という情報を Processing に送る．
+  \item Processing の \texttt{serialEvent()} 関数が自動で呼ばれ，データを受け取る．
+  \item 受け取ったデータから音名・長さ・振幅を取り出す．
+  \item 取り出した情報をもとに \texttt{HackInstrument} を生成し，
+        \texttt{out.playNote()} で音を鳴らす．
+\end{enumerate}
+
+\subsection{125：4パート発音管理}
+\label{sec:detail-125}
+
+4つの楽器パート（現段階では金管楽器）を
+それぞれ独立して鳴らせるように管理する仕組みを作る．
+授業では，melody・duration・startTime のような配列を使って
+音の情報を管理する方法を学んだ．
+同じ発想で，パートごとの音色（\texttt{Waveform}）を配列で管理する．
+
+\subsection{126：金管楽器風音色の具体実装}
+\label{sec:detail-126}
+
+\subsubsection{概要}
+タスク117で決めた倍音構成とエンベロープを，
+Processing のコードに実際に落とし込む．
+
+\subsubsection{倍音テーブルの実装（案）}
+
+授業で使った \texttt{WavetableGenerator.gen10()} にそのまま値を入れる．
+
+\begin{lstlisting}[style=processing, caption={金管楽器風の波形生成（案）}]
+Waveform makeBrassWaveform() {
+  return WavetableGenerator.gen10(
+    4096,  // サンプル数（2の累乗にすること）
+    new float[] {
+      1.00f,  // 第1倍音（基音）：最大
+      0.70f,  // 第2倍音：金管は2倍音が強い
+      0.50f,  // 第3倍音
+      0.30f,  // 第4倍音
+      0.20f,  // 第5倍音
+      0.10f,  // 第6倍音
+      0.05f   // 第7倍音：ほんの少し
+    }
+  );
+}
+\end{lstlisting}
+
+\subsubsection{エンベロープの実装（案）}
+
+既存の \texttt{HackInstrument} クラスの \texttt{noteOn()} 内で
+\texttt{ampEnv.activate(duration, maxAmp, 0)} を呼ぶ．
+これにより，音符の長さ全体をかけて最大音量からゼロへ直線的に減衰する．鳴り始めが最大音量で，そこから徐々に消えていく形になる．
+\texttt{Line} は一度に一本の直線変化しか持てないため，
+立ち上がり（Attack）の表現は行わない．（音の出来次第でADSRクラスを使う）
+
+
+\begin{table}[h]
+  \centering
+  \caption{\texttt{ampEnv.activate()} に渡す値}
+  \label{tab:line-params}
+  \begin{tabular}{ccc}
+    \toprule
+    時間 & 開始音量 & 終了音量 \\
+    \midrule
+    \texttt{duration}（音符の長さ全体） & \texttt{maxAmp} & 0.0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\subsubsection{パラメータ調整の方針}
+
+表\ref{tab:harmonics}・表\ref{tab:line-params}の値はいずれも仮置きである．
+実際に音を鳴らしながら耳で確認し，金管楽器らしく聞こえるよう調整する．
+127（FFT解析）の結果が得られた場合はその値に更新する．
+
+\subsection{127：Python による FFT 解析}
+\label{sec:detail-127}
+
+\subsubsection{概要}
+実際の金管楽器の音声ファイルを Python で周波数分析（FFT）し，
+倍音の強さとエンベロープの時定数を数値として取り出す．
+取り出した値を表\ref{tab:harmonics}および \texttt{attackTime} に反映する．
+
+\subsubsection{手順（案）}
+
+\begin{enumerate}
+  \item フリー素材から金管楽器の単音サンプルを入手する．
+  \item Python の \texttt{scipy.fft} または \texttt{librosa} で FFT を実施し，
+        各倍音成分のパワーを求める．
+  \item 基音のパワーを 1.0 として正規化し，第2〜第7倍音の比率を計算する．
+  \item 音量の時間変化（RMS カーブ）から立ち上がり時間を推定する．
+  \item 得られた値を \texttt{makeBrassWaveform()} の配列と
+        \texttt{attackTime} に反映する．
+\end{enumerate}
+
+\section{生成AIの利用について}
+本レポートを作成するにあたり，ClaudeAIを利用しました．生成された内容を吟味しつつ，修正・加筆して完成させました．
+
+\end{document}
