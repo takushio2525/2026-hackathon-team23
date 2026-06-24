@@ -81,10 +81,10 @@ final int ST_FALLBACK    = 3;
 final int ST_MENU        = 4;
 final int ST_RESULT      = 5;
 
-// ゲーム定数 (firmware ProjectConfig.h と整合)
-final int GAME_LENGTH_BEATS      = 32;
-final int GAME_GUIDE_FULL_BEATS  = 8;
-final int GAME_GUIDE_ZERO_BEATS  = 16;
+// ゲーム定数 (firmware ProjectConfig.h と整合。全輪唱完了 = CANON_CYCLE_BEATS = 56 拍)
+final int GAME_LENGTH_BEATS      = 56;
+final int GAME_GUIDE_FULL_BEATS  = 16;
+final int GAME_GUIDE_ZERO_BEATS  = 32;
 final int UI_TIMEOUT_MS          = 2000;
 
 // 役割
@@ -433,7 +433,7 @@ AudioSample createRecordedDrumSample(DrumTimbreData timbre){
   javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
     timbre.drumSampleRate, 16, 1, true, true
   );
-  return minim.createSample(timbre.drumSample, format, 1024);
+  return minim.createSample(timbre.drumSample, format, 512);
 }
 
 // 齋藤版 (kaeru_score_debug) と同じオクターブ移調（楽譜は全声部 C4 基準）
@@ -535,6 +535,14 @@ void onScreenChange(int fromScr, int toScr){
   if (toScr == SCR_GAME_PLAY){
     gameStartMs = millis();
     lastMetroBeat = -1;
+  }
+  if (toScr == SCR_MENU){
+    // Result→Menu 復帰時: ゲーム状態をクリーンアップして次セッションに備える
+    gameStartMs = 0;
+    lastMetroBeat = -1;
+    uiScore = 0xFF;
+    for (MetroClick mc : metroClicks) mc.unpatch(out);
+    metroClicks.clear();
   }
   if (toScr == SCR_WAITING){
     gameStartMs = 0;
@@ -818,7 +826,7 @@ void drawGamePlayScreen(){
   drawScope(28, 138, width - 56, 80);
 
   // ガイド進捗 (PC ローカルの目標テンポ基準。指揮者が実際に振った拍数とは別物で、
-  // ゲームの終了 = 指揮者が 32 拍振った時点。ここはメトロノームの進行を示す)
+  // ゲームの終了 = 指揮者が 56 拍振った時点。ここはメトロノームの進行を示す)
   float py = 228;
   drawPanel(28, py, width - 56, 60);
   fill(18, 54, 88); textSize(14); textAlign(LEFT, BASELINE);
@@ -840,7 +848,7 @@ void drawGamePlayScreen(){
   fill(18, 54, 88); textSize(50); textAlign(CENTER, CENTER);
   text(scoreStr, width/2, 348);
   fill(61, 86, 111); textSize(16);
-  text(uiScore == 0xFF ? "スコア (32 拍振り切ると結果画面へ)" : "スコア", width/2, 398);
+  text(uiScore == 0xFF ? "スコア (" + GAME_LENGTH_BEATS + " 拍振り切ると結果画面へ)" : "スコア", width/2, 398);
   textAlign(LEFT, BASELINE);
 
   // 目標テンポ
