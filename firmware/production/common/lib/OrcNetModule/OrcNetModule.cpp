@@ -167,13 +167,7 @@ void OrcNetModule::pollReceive(OrcNetData& net) {
 }
 
 void OrcNetModule::flushSend(OrcNetData& net) {
-    if (net.hasPendingCtrl) {
-        udp_.beginPacket(cfg_.multicastIp, cfg_.udpPort);
-        udp_.write(reinterpret_cast<const uint8_t*>(&net.pendingCtrl),
-                   sizeof(net.pendingCtrl));
-        udp_.endPacket();
-        net.hasPendingCtrl = false;
-    }
+    // BEAT を先に送る。playAtMasterMs のマージンが薄いため、CTRL より優先する。
     if (net.hasPendingBeat) {
         uint8_t reps = net.pendingBeatRedundancy ? net.pendingBeatRedundancy : 1;
         for (uint8_t i = 0; i < reps; ++i) {
@@ -189,5 +183,12 @@ void OrcNetModule::flushSend(OrcNetData& net) {
             }
         }
         net.hasPendingBeat = false;
+    }
+    if (net.hasPendingCtrl) {
+        udp_.beginPacket(cfg_.multicastIp, cfg_.udpPort);
+        udp_.write(reinterpret_cast<const uint8_t*>(&net.pendingCtrl),
+                   sizeof(net.pendingCtrl));
+        udp_.endPacket();
+        net.hasPendingCtrl = false;
     }
 }
