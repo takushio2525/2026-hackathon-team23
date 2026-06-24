@@ -70,7 +70,8 @@ final String[] DRUM_INSTRUMENT_FILES = {
   "7_crash.tweaked.instrument.json"
 };
 
-float   masterVolume  = 0.55f;
+// 金管4声とドラムに共通で掛ける全体音量。従来より約 +2.9 dB。
+float   instrumentVolume = 1.40f;
 boolean useSimpleADSR = true;
 
 // 指揮者の状態 (OrcProtocol.h と整合)
@@ -442,7 +443,7 @@ int brassOctaveShift(int instrumentId){
     case 0: return  12;   // トランペット → C5
     case 1: return   0;   // ホルン → C4
     case 2: return -12;   // トロンボーン → C3
-    case 3: return -12;   // チューバ → C3
+    case 3: return -24;   // チューバ → C2（共通譜 C4 から2オクターブ下）
     default: return  0;
   }
 }
@@ -471,7 +472,8 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
     for (ResynthVoice v : activeVoices){ if (!v.releasing){ v.noteOff(); break; } }
   }
   int effectiveMidi = midi + brassOctaveShift(instrumentId);
-  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) * brassPartAmplitude(instrumentId);
+  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) *
+            brassPartAmplitude(instrumentId) * instrumentVolume;
   ResynthVoice v = new ResynthVoice(m, effectiveMidi, g, useSimpleADSR);
   v.partId        = partId;
   v.instrumentIdx = constrain(instrumentId, 0, max(0, models.size()-1));
@@ -482,7 +484,8 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
 
 void triggerDrumNote(int noteNumber, int velocity, int durationMs){
   int idx = drumTimbreIndex(noteNumber);
-  float amplitude = DRUM_AMPLITUDE * constrain(velocity / 127.0f, 0.0f, 1.0f);
+  float amplitude = DRUM_AMPLITUDE * constrain(velocity / 127.0f, 0.0f, 1.0f) *
+                    instrumentVolume;
   AudioSample sample = recordedDrumSamples[idx];
   if (sample != null){
     sample.setGain(linearToDecibels(constrain(amplitude * RECORDED_DRUM_GAIN, 0.001f, 1.0f)));
@@ -577,7 +580,7 @@ void updateMetronome(){
   if (beatNum > lastMetroBeat && beatNum < GAME_LENGTH_BEATS){
     float guide = gameGuideIntensity(beatNum);
     if (guide > 0.01f){
-      MetroClick mc = new MetroClick(guide * masterVolume);
+      MetroClick mc = new MetroClick(guide * instrumentVolume);
       mc.patch(out);
       metroClicks.add(mc);
     }
@@ -769,7 +772,7 @@ void drawFreePlayScreen(){
   float bpm = uiBpmQ8 / 8.0f;
   drawPageTitle("自由演奏",
       "BPM: " + nf(bpm, 1, 1) + "  /  発音中 " + activeVoices.size() + " / " + MAX_POLYPHONY +
-      "  /  音量 " + nf(masterVolume, 1, 2));
+      "  /  音量 " + nf(instrumentVolume, 1, 2));
 
   drawScope(28, 96, width - 56, 100);
 
@@ -1070,8 +1073,8 @@ void keyPressed(){
   if (c=='i'){ rescanInstruments(); return; }
   if (c=='t'){ playTestChord(); return; }
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; println("包絡: " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ")); return; }
-  if (c=='+' || c=='='){ masterVolume = constrain(masterVolume + 0.05f, 0.05f, 1.5f); return; }
-  if (c=='-' || c=='_'){ masterVolume = constrain(masterVolume - 0.05f, 0.05f, 1.5f); return; }
+  if (c=='+' || c=='='){ instrumentVolume = constrain(instrumentVolume + 0.05f, 0.05f, 1.5f); return; }
+  if (c=='-' || c=='_'){ instrumentVolume = constrain(instrumentVolume - 0.05f, 0.05f, 1.5f); return; }
   if (c==' '){ stopAll(); return; }
   if (c>='0' && c<='3'){ playTestNoteOnInstrument(c - '0'); return; }
   if (c=='f'){
