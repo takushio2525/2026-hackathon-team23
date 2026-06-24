@@ -98,9 +98,6 @@ AudioOutput out;
 ArrayList<File>        instrumentFiles = new ArrayList<File>();
 ArrayList<InstrModel>  models          = new ArrayList<InstrModel>();
 ArrayList<String>      modelLabels     = new ArrayList<String>();
-boolean      forceSingleInstrument    = false;
-final String FORCED_INSTRUMENT_FILE   = "0_trumpets.tweaked.instrument.json";
-int          forcedInstrumentIdx      = -1;
 
 // ── シリアルポート ────────────────────────────────────────
 class PortConn {
@@ -170,7 +167,7 @@ void setup(){
 
   println("=== orchestra_resynth (production ゲームモード) ===");
   println("楽器定義 " + models.size() + " 個ロード。");
-  println("[click] ポート開閉  /  [r] ポート再列挙・画面リセット  /  [f] USBフィルタ  /  [t] テスト音  /  [Space] 停止");
+  println("[click] ポート開閉  /  [r] ポート再列挙・画面リセット  /  [f] USBフィルタ  /  [t] テスト音  /  [+/-] 音量  /  [Space] 停止");
 }
 
 PFont loadJapaneseFont(float sizePx){
@@ -212,20 +209,11 @@ void rescanInstruments(){
       println("[エラー] " + f.getName() + ": " + e);
     }
   }
-  forcedInstrumentIdx = -1;
-  for (int i = 0; i < instrumentFiles.size(); i++){
-    if (instrumentFiles.get(i).getName().equalsIgnoreCase(FORCED_INSTRUMENT_FILE) && models.get(i) != null){
-      forcedInstrumentIdx = i;
-      break;
-    }
-  }
 }
 
 InstrModel modelForId(int id){
   if (models.isEmpty()) return null;
-  int idx;
-  if (forceSingleInstrument && forcedInstrumentIdx >= 0) idx = forcedInstrumentIdx;
-  else                                                   idx = constrain(id, 0, models.size()-1);
+  int idx = constrain(id, 0, models.size()-1);
   InstrModel m = models.get(idx);
   if (m != null) return m;
   for (InstrModel mm : models) if (mm != null) return mm;
@@ -412,7 +400,7 @@ int brassOctaveShift(int instrumentId){
     case 0: return  12;   // トランペット → C5
     case 1: return   0;   // ホルン → C4
     case 2: return -12;   // トロンボーン → C3
-    case 3: return -12;   // チューバ → C3（埋もれにくくするため1オクターブ上げる）
+    case 3: return -12;   // チューバ → C3
     default: return  0;
   }
 }
@@ -423,7 +411,7 @@ float brassPartAmplitude(int instrumentId){
     case 0: return 0.20f;  // トランペット
     case 1: return 0.17f;  // ホルン
     case 2: return 0.18f;  // トロンボーン
-    case 3: return 0.25f;  // チューバ（低域が埋もれないよう増量）
+    case 3: return 0.25f;  // チューバ
     default: return 0.18f;
   }
 }
@@ -446,6 +434,9 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
     g = constrain(velocity / 127.0f, 0.0f, 1.0f) * brassPartAmplitude(instrumentId);
   }
   ResynthVoice v = new ResynthVoice(m, effectiveMidi, g, useSimpleADSR);
+  if (isDrumInstrument(instrumentId)){
+    v.targetF0 = m.fundamentalHz;
+  }
   v.partId        = partId;
   v.instrumentIdx = constrain(instrumentId, 0, max(0, models.size()-1));
   v.scheduledOffMs = millis() + max(40, durationMs);
@@ -629,7 +620,7 @@ void drawPageTitle(String title, String subtitle){
 void drawPortSelectScreen(){
   drawBackground();
   drawPageTitle("タクトーン — production",
-      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [t]テスト音  [p]音色切替");
+      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [t]テスト音");
   drawPortListAt(96);
 }
 
@@ -704,7 +695,7 @@ void drawMenuScreen(){
   text("指揮棒を 左右に振る = 選択を移動  /  縦に振る = 決定", width/2, modeY + modeH + 40);
   textAlign(LEFT, BASELINE);
 
-  drawHelpPanel("[r]ポート再選択  [t]テスト音  [p]音色切替  [+/-]音量");
+  drawHelpPanel("[r]ポート再選択  [t]テスト音  [+/-]音量");
 }
 
 // ── 自由演奏画面 ──────────────────────────────────────────
@@ -742,7 +733,7 @@ void drawFreePlayScreen(){
   text("BPM", width/2, 410);
   textAlign(LEFT, BASELINE);
 
-  drawHelpPanel("[r]リセット  [t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+  drawHelpPanel("[r]リセット  [t]テスト音  [+/-]音量  [Space]停止");
 }
 
 // ── ゲーム演奏画面 ────────────────────────────────────────
@@ -855,7 +846,7 @@ void drawAnalyzerScreen(){
     col++; if (col >= 2){ col = 0; ry += 18; }
   }
 
-  drawHelpPanel("[t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+  drawHelpPanel("[t]テスト音  [+/-]音量  [Space]停止");
 }
 
 // 画面下部の共通パネル: 左にキー操作ガイド、右に接続ステータス。
@@ -1012,11 +1003,6 @@ void keyPressed(){
     return;
   }
   if (c=='i'){ rescanInstruments(); return; }
-  if (c=='p'){
-    forceSingleInstrument = !forceSingleInstrument;
-    println("single-instrument: " + (forceSingleInstrument ? "ON (" + FORCED_INSTRUMENT_FILE + ")" : "OFF"));
-    return;
-  }
   if (c=='t'){ playTestChord(); return; }
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; println("包絡: " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ")); return; }
   if (c=='+' || c=='='){ masterVolume = constrain(masterVolume + 0.05f, 0.05f, 1.5f); return; }
