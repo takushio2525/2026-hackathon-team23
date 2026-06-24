@@ -412,7 +412,7 @@ int brassOctaveShift(int instrumentId){
     case 0: return  12;   // トランペット → C5
     case 1: return   0;   // ホルン → C4
     case 2: return -12;   // トロンボーン → C3
-    case 3: return -24;   // チューバ → C2
+    case 3: return -12;   // チューバ → C3（埋もれにくくするため1オクターブ上げる）
     default: return  0;
   }
 }
@@ -423,7 +423,7 @@ float brassPartAmplitude(int instrumentId){
     case 0: return 0.20f;  // トランペット
     case 1: return 0.17f;  // ホルン
     case 2: return 0.18f;  // トロンボーン
-    case 3: return 0.15f;  // チューバ
+    case 3: return 0.25f;  // チューバ（低域が埋もれないよう増量）
     default: return 0.18f;
   }
 }
