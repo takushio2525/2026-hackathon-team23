@@ -5,6 +5,15 @@
 
 ## 2026-06 — 本番プログラム構築フェーズ
 
+- 2026-06-24: **production 改善推奨8件＋提案7件を修正**（`3ff75d6`〜`e6c22e8`、7コミット）。
+  Processing DrumNote パッチ解除修正、ドラム楽譜 crash 延長＋ハイハット TODO、指揮者 beatLookahead 45ms化・LED 閾値修正・
+  Conducting 30秒タイムアウト、楽器 durationQ8ToMs オーバーフロー防止・BEAT 10秒タイムアウト、UiRelay コメント修正、
+  BEAT→CTRL 送信順入替、OrcReceiverModule/NoteSenderModule を common/lib/ へ共通化。全7ノード pio run SUCCESS。
+
+- 2026-06-24: **production コードのリファクタ**（`e23d324`、`fix/processing-sound-drop`）。
+  node_05 ログプレフィックス [N4→[N5、node_06 スペース抜け修正、node_03-06 ヘッダコメントパス修正、
+  ループ周期コメント 5ms→2ms、score_data.h コメント同期、Processing pde partId/台数修正。全7ノード pio run SUCCESS。
+
 - 2026-06-24: **実機テスト後の4点修正**（PR #31、`fix/test-feedback-v2` squash merge）。
   (1) ナビゲート発火後の強制 Idle 復帰で横振り2回目以降の検知を修復、
   (2) ドラム楽譜を頭打ちキック＋節目クラッシュに簡素化、
