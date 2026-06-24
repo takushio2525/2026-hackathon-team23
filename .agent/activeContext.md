@@ -5,23 +5,21 @@
 
 ## 現在の対象
 
-- **分岐していた Git 履歴を `main` へ統合・push 済み**（merge commit `4ba382b`）。共通祖先のない現行 `main` と退避側 398 コミットを `--allow-unrelated-histories` でマージし、week7〜9 の Processing 素材・議事録・個人作業成果物など、退避側だけにあった 112 ファイルを取り込んだ。
-- 競合は `.agent/activeContext.md`、`.agent/progress.md`、`.gitignore` のみ。現行 `main` の公開化ポリシーを採用し、講義資料・昨年度スライド・計画書テンプレートなど `.gitignore` で除外される 24 件は再公開しない。
-- マージ元 `codex/backup-main-before-sync-20260624-0100` は履歴保全のため維持する。
-- **本番版のチューバを聴こえやすく調整済み（コミット・push 前）**。`pc_app/production/orchestra_resynth/orchestra_resynth.pde` で音域を C2→C3（移調 `-24`→`-12`）、パート振幅を `0.15`→`0.25`（約 +4.4 dB）へ変更。Processing ビルド成功。
+- **実機テスト後の4点修正を完了・マージ済み**（PR #31、`fix/test-feedback-v2` → main squash merge）。
+  - 修正1: ナビゲート発火後の強制 Idle 復帰（横振り2回目以降の検知修復）
+  - 修正2: ドラム楽譜を頭打ちキック＋節目クラッシュに簡素化
+  - 修正3: Fallback 状態遷移の全無効化
+  - 修正4: NAV_* 6パラメータを PR #30 以前の値に復元
 
 ## 次の一手
 
-- VS Code を再読み込みし、`main...origin/main` に ahead / behind がないことを確認する。
-- 退避ブランチは履歴保全用として残している。不要と判断した段階で削除を検討する。
-- 実機構成で4声＋ドラムを鳴らし、チューバが他声部を覆わず聴き取れるかを聴感確認する。
+- 実機で4点修正の動作確認（テストプラン参照）
+- 特にナビの横振りが連続で効くか、ドラムがシンプルに聞こえるか、Fallback が出ないかを検証
 
 ## 現フェーズで Read すべき設計書
 
-- Git 操作: `.agent/conventions.md`
-- Processing 音色データ作業: `pc_app/test_v3/orchestra_resynth/data/README.md`
-- ゲームモード設計: `.agent/test_v3-game-design.md`
 - プロトコル仕様: `.agent/api.md`
+- ゲームモード設計: `.agent/test_v3-game-design.md`
 
 ## ユーザーの好み
 

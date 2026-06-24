@@ -5,6 +5,11 @@
 
 ## 2026-06 — 本番プログラム構築フェーズ
 
+- 2026-06-24: **実機テスト後の4点修正**（PR #31、`fix/test-feedback-v2` squash merge）。
+  (1) ナビゲート発火後の強制 Idle 復帰で横振り2回目以降の検知を修復、
+  (2) ドラム楽譜を頭打ちキック＋節目クラッシュに簡素化、
+  (3) Fallback 遷移を全無効化、(4) NAV_* 6パラメータを PR #30 以前に復元。全7ノード pio run SUCCESS。
+
 - 2026-06-24: **本番版チューバを増量・1オクターブ上へ移調**。`pc_app/production/orchestra_resynth/orchestra_resynth.pde` のチューバを C2→C3（`-24`→`-12`）、パート振幅を `0.15`→`0.25`（約 +4.4 dB）へ変更。Processing ビルド成功、実機で聴感確認待ち。
 
 - 2026-06-24: **本番プログラム構築（`feature/production-program` ブランチ、4コミット）**。
