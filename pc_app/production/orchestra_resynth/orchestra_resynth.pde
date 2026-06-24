@@ -433,7 +433,7 @@ AudioSample createRecordedDrumSample(DrumTimbreData timbre){
   javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
     timbre.drumSampleRate, 16, 1, true, true
   );
-  return minim.createSample(timbre.drumSample, format, 1024);
+  return minim.createSample(timbre.drumSample, format, 512);
 }
 
 // 齋藤版 (kaeru_score_debug) と同じオクターブ移調（楽譜は全声部 C4 基準）
