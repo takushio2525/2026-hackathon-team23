@@ -49,6 +49,11 @@ struct OrcNetData {
     orc::CtrlPacket lastCtrl{};
     orc::BeatPacket lastBeat{};
 
+    // pollReceive で 2 つ以上の異なる beatNo が同一サイクルに到着したとき、
+    // 2 つ目を退避して次の updateInput で昇格させる (上書きロスの防止)。
+    bool hasDeferredBeat = false;
+    orc::BeatPacket deferredBeat{};
+
     // 送信側 (送信したいモジュールが書く)
     bool hasPendingCtrl = false;
     orc::CtrlPacket pendingCtrl{};

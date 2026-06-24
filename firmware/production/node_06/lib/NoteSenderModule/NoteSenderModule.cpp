@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/production/node_06
-//   pio run -d firmware/production/node_06 -t upload
-//   pio device monitor -d firmware/production/node_06
+//   pio run -d firmware/production/node_02
+//   pio run -d firmware/production/node_02 -t upload
+//   pio device monitor -d firmware/production/node_02
 //
 // SERIAL_DEBUG=1 のときは Serial を「人間可読のデバッグ出力」専用に切替え、
 // バイナリ NotePacket は流さない (Processing 連携を一時停止する代わりに
@@ -52,11 +52,12 @@ void buildAndSend(uint8_t partId, uint8_t instrumentId, uint8_t gate,
 
 void NoteSenderModule::updateOutput(SystemData& data) {
     const uint32_t now = millis();
+    // メインスロット (4 分音符の拍頭)
     if (data.noteOut.pendingOn) {
         const uint32_t seq = ++data.noteSender.noteSeq;
 #if SERIAL_DEBUG
         (void)seq;
-        DBG_PRINTF("[N4 NOTE_ON ] part=0x%02X instr=%u note=%u vel=%u dur=%u seq=%lu t=%lu\n",
+        DBG_PRINTF("[N2 NOTE_ON ] part=0x%02X instr=%u note=%u vel=%u dur=%u seq=%lu t=%lu\n",
                    (unsigned)cfg_.partId,
                    (unsigned)cfg_.instrumentId,
                    (unsigned)data.noteOut.noteNumber,
@@ -70,5 +71,23 @@ void NoteSenderModule::updateOutput(SystemData& data) {
         data.noteSender.lastSentMs = now;
         data.noteOut.pendingOn = false;
     }
-    // NoteOff パケットは送らない: Processing 側が durationMs から自動消音する。
+    // 細分音符スロット (8 分裏等)。メインと同一ループ反復で発火しても衝突しない。
+    if (data.noteOutSub.pendingOn) {
+        const uint32_t seq = ++data.noteSender.noteSeq;
+#if SERIAL_DEBUG
+        (void)seq;
+        DBG_PRINTF("[N2 NOTE_SUB] part=0x%02X instr=%u note=%u vel=%u dur=%u seq=%lu t=%lu\n",
+                   (unsigned)cfg_.partId,
+                   (unsigned)cfg_.instrumentId,
+                   (unsigned)data.noteOutSub.noteNumber,
+                   (unsigned)data.noteOutSub.velocity,
+                   (unsigned)data.noteOutSub.durationMs,
+                   (unsigned long)seq,
+                   (unsigned long)now);
+#else
+        buildAndSend(cfg_.partId, cfg_.instrumentId, /*gate=*/1, seq, now, data.noteOutSub);
+#endif
+        data.noteSender.lastSentMs = now;
+        data.noteOutSub.pendingOn = false;
+    }
 }

@@ -68,6 +68,8 @@ void fireScoreEvent(SystemData& data, const ScoreEvent& ev, uint32_t now) {
 
 // 予約された細分音符の時刻が来ていれば NoteOn を出す。
 // applyPattern の先頭で呼び、楽譜進行 (4 分 BEAT 受信) と同一ループに重ならないようにする。
+// noteOutSub (専用スロット) に書く。noteOut (メイン) とは独立なので、
+// 同一ループ反復で fireScoreEvent が noteOut を書いても衝突しない。
 void firePendingSub(SystemData& data, uint32_t now) {
     if (!data.score.pendingSub) return;
     if ((int32_t)(now - data.score.pendingSubAtMs) < 0) return;
@@ -75,10 +77,10 @@ void firePendingSub(SystemData& data, uint32_t now) {
     uint16_t v = ((uint16_t)data.score.pendingSubVelocity *
                   (uint16_t)data.ctrl.velocity) / 127;
     if (v > 127) v = 127;
-    data.noteOut.noteNumber = data.score.pendingSubNote;
-    data.noteOut.velocity   = (uint8_t)v;
-    data.noteOut.durationMs = data.score.pendingSubDurationMs;
-    data.noteOut.pendingOn  = true;
+    data.noteOutSub.noteNumber = data.score.pendingSubNote;
+    data.noteOutSub.velocity   = (uint8_t)v;
+    data.noteOutSub.durationMs = data.score.pendingSubDurationMs;
+    data.noteOutSub.pendingOn  = true;
     DBG_PRINTF("[SUB] note=%u vel=%u dur=%u delay=%lu now=%lu\n",
                (unsigned)data.score.pendingSubNote,
                (unsigned)v,

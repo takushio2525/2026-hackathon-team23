@@ -65,6 +65,14 @@ void OrcNetModule::updateInput(SystemData& data) {
     data.orcNet.hasNewCtrl = false;
     data.orcNet.hasNewBeat = false;
 
+    // 前サイクルの pollReceive で退避された 2 つ目のビートを昇格させる。
+    // この時点で lastBeat/hasNewBeat はクリア済みなので安全に上書きできる。
+    if (data.orcNet.hasDeferredBeat) {
+        data.orcNet.lastBeat    = data.orcNet.deferredBeat;
+        data.orcNet.hasNewBeat  = true;
+        data.orcNet.hasDeferredBeat = false;
+    }
+
     bool linkUp = isLinkUp();
     data.orcNet.wifiConnected = linkUp;
 
@@ -107,16 +115,21 @@ void OrcNetModule::deinit() {
 }
 
 void OrcNetModule::pollReceive(OrcNetData& net) {
+    // このサイクルで最初に保存した beatNo を追跡し、異なる beatNo が来たら
+    // deferredBeat に退避して while を抜ける。同一 beatNo の連送 (redundancy)
+    // は lastBeat を上書きし続けてよい (OrcReceiverModule が重複処理する)。
+    bool     sawBeat     = false;
+    uint16_t firstBeatNo = 0;
+
     int packetSize;
     while ((packetSize = udp_.parsePacket()) > 0) {
         if (packetSize != (int)orc::PACKET_SIZE) {
-            // 不正サイズは破棄
             uint8_t scratch[64];
             int rem = packetSize;
             while (rem > 0) {
-                int n = udp_.read(scratch, sizeof(scratch));
-                if (n <= 0) break;
-                rem -= n;
+                int rd = udp_.read(scratch, sizeof(scratch));
+                if (rd <= 0) break;
+                rem -= rd;
             }
             continue;
         }
@@ -125,12 +138,30 @@ void OrcNetModule::pollReceive(OrcNetData& net) {
         if (n != (int)orc::PACKET_SIZE) continue;
         orc::PacketHeader hdr;
         if (!orc::parseHeader(buf, orc::PACKET_SIZE, hdr)) continue;
+
         if (hdr.type == orc::PKT_CTRL) {
             memcpy(&net.lastCtrl, buf, sizeof(net.lastCtrl));
             net.hasNewCtrl = true;
         } else if (hdr.type == orc::PKT_BEAT) {
-            memcpy(&net.lastBeat, buf, sizeof(net.lastBeat));
-            net.hasNewBeat = true;
+            orc::BeatPacket incoming;
+            memcpy(&incoming, buf, sizeof(incoming));
+            const uint16_t bn = incoming.payload.beatNo;
+
+            if (!sawBeat) {
+                // このサイクル最初のビート → lastBeat に保存
+                net.lastBeat   = incoming;
+                net.hasNewBeat = true;
+                firstBeatNo    = bn;
+                sawBeat        = true;
+            } else if (bn == firstBeatNo) {
+                // 同一 beatNo の連送 (redundancy) → 最新で上書き
+                net.lastBeat = incoming;
+            } else {
+                // 異なる beatNo → deferredBeat に退避して次サイクルで昇格
+                net.deferredBeat    = incoming;
+                net.hasDeferredBeat = true;
+                break;  // 残りは次の pollReceive で読む
+            }
         }
     }
 }
