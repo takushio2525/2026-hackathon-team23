@@ -5,7 +5,7 @@
 //
 // 楽器ノード node_06 (ドラム) のエントリポイント (Arduino UNO R4 WiFi)
 // partId / instrumentId / headRestBeats は ProjectConfig.h で決める。
-// 3 フェーズループを loopIntervalMs (5 ms) 間隔で回す
+// 3 フェーズループを loopIntervalMs (2 ms) 間隔で回す
 #include <Arduino.h>
 
 #include "ProjectConfig.h"
