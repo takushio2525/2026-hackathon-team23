@@ -3,14 +3,18 @@
 //   pio run -d firmware/production/node_06 -t upload
 //   pio device monitor -d firmware/production/node_06
 //
-// ドラム楽譜データ — 56 拍分 (輪唱サイクル全体を担当)。
-// 4 分音符の頭打ちのみのシンプルなパターン。裏拍 (subNote) なし。
+// 輪唱用の楽譜データ — 全声部 (node_02〜05) で同一の「かえるのうた」(32 拍) を持つ。
+// 1 拍 = 1 ScoreEvent。指揮者の BEAT を 1 個受けるたびに kScore のインデックスを
+// 1 個進める (= 拍番号で引く)。周回は輪唱サイクル (CANON_CYCLE_BEATS = 56 拍) の
+// 窓方式で、最終声部が 1 周を終えるまで先頭声部は次の周回を始めない。
 //
-// GM ドラムマップ: 36=キック, 38=スネア, 42=ハイハット, 49=クラッシュ
-// 基本はキック。各声部の入り (0/8/16/24 拍) とフレーズ区切り (32/40/48 拍) に
-// クラッシュで変化をつける。最終 4 拍はスネアフィル→クラッシュで締める。
+// 輪唱 (canon) は「先頭に休符を入れて声部ごとにずらす」方式:
+//   各ノードの ProjectConfig.h の headRestBeats だけ頭の拍を読み飛ばしてから
+//   kScore[0] を鳴らし始める (node_02=0, node_03=8, node_04=16, node_05=24 拍ずらし)。
+//   applyPattern が firedBeatNo と headRestBeats から実インデックスを算出する。
 //
-// headRestBeats=0 でサイクル全体を通しで演奏する（金管のように頭ずらししない）。
+// 細分音符 (8 分音符など) は ScoreEvent 1 行内に subNote として持たせる。
+// かえるのうたフレーズ 4 (ゲロゲロ部) で subNote=拍裏の 8 分音符として使用中。
 #pragma once
 #include <Arduino.h>
 
