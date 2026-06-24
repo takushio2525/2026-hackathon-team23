@@ -5,29 +5,18 @@
 
 ## 現在の対象
 
-- **test_v3 Processing 音色データを 2026-06-17 に差し替え済み**。
-  `/Users/shota/Documents/3S/` の金管 4 種 JSON を
-  `pc_app/test_v3/orchestra_resynth/data/` の番号付きファイル名へ上書き取り込み:
-  - `trumpets.tweaked.instrument.json` → `0_trumpets.tweaked.instrument.json`
-  - `horns.tweaked.instrument.json` → `1_horns.tweaked.instrument.json`
-  - `trombones.tweaked.instrument.json` → `2_trombones.tweaked.instrument.json`
-  - `tuba.tweaked.instrument.json` → `3_tuba.tweaked.instrument.json`
-- 取り込み後、4 ファイルは元ファイルと byte 単位一致。`python3 -m json.tool` で JSON 構文 OK。
-- ドラム系 `4_kick`〜`7_crash` と README は未変更。
+- **本番プログラム構築** (`feature/production-program` ブランチ)。レビュー＆リファクタ完了。
+  - 前の子の4コミット（ベロシティ・ドラム音色・node_06 新設・マスターリセット修正）は全て正しく反映
+  - Processing ドラム対応を追加実装（noteNumber → 音色インデックス変換）
+  - node_03〜06 のコメントパス修正
 
 ## 次の一手
 
-- 必要なら Processing 4 で `pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde` を起動し、
-  楽器定義パネルに `0_trumpets`〜`3_tuba` が表示されることと音色差を聴感確認する。
-- ファーム変更はなし。PIO ビルド・実機 upload は不要。
+- PR 作成 → main マージの判断はユーザー
+- 実機 upload はユーザー作業
+- crash の drum_sample 原音再生は未対応（倍音合成で鳴る。実機で音を聞いて判断）
 
 ## 現フェーズで Read すべき設計書
 
-- Processing 音色データ作業: `pc_app/test_v3/orchestra_resynth/data/README.md`
-- ゲームモード設計: `.agent/test_v3-game-design.md`
 - プロトコル仕様: `.agent/api.md`
-
-## ユーザーの好み
-
-- 大規模作業は計画を作ってから着手。短い指示は行間を読み，前提のズレを感じたら着手前に指摘。
-- 実機未テストの .ino/.cpp に Claude 起点で変更を入れたらコンパイル確認まで＝upload はユーザー。
+- さいとうくんの参照実装: `work/saito/week9/kaeru_score_debug/kaeru_score_debug.pde`（saitou-work ブランチ）
