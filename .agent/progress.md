@@ -5,8 +5,6 @@
 
 ## 2026-06 — 本番プログラム構築フェーズ
 
-- 2026-06-24: **齋藤の発表用個人担当まとめPDFを作成・mainへpush**。`work/saito/week10/saito_presentation_summary.pdf` に、楽譜データ設計・4声輪唱・ドラム／音色データ・検証結果をまとめた横長6ページの発表資料を作成。PDFへ日本語フォントを埋め込み、Popplerで全ページをレンダリングして文字欠け・重なり・はみ出しがないことを確認。
-
 - 2026-06-24: **本番版チューバを増量・1オクターブ上へ移調**。`pc_app/production/orchestra_resynth/orchestra_resynth.pde` のチューバを C2→C3（`-24`→`-12`）、パート振幅を `0.15`→`0.25`（約 +4.4 dB）へ変更。Processing ビルド成功、実機で聴感確認待ち。
 
 - 2026-06-24: **本番プログラム構築（`feature/production-program` ブランチ、4コミット）**。
