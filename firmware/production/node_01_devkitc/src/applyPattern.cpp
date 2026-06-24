@@ -172,7 +172,15 @@ bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
                    dom, dir, curBefore, data.game.navCursor,
                    decide ? "DECIDE" : "CURSOR");
     }
-    if (release) sNavGate = NavGate::Idle;   // 振りが収まったら次操作に備える
+    // 振りが収まったら (release) 次操作に備える。
+    // 発火済みで不応期を越えた場合は release を待たず強制的に Idle へ戻す。
+    // dynNorm が NAV_RELEASE_G と NAV_SWING_THRESHOLD_G の間に留まって Armed から
+    // 抜けられなくなり、2 回目以降の振りを検知できなくなる問題を修正。
+    if (release) {
+        sNavGate = NavGate::Idle;
+    } else if (sNavFired && (now - sLastNavMs) >= NAV_REFRACTORY_MS) {
+        sNavGate = NavGate::Idle;
+    }
     return decide;
 }
 
@@ -374,41 +382,20 @@ void applyPattern(SystemData& data) {
             break;
         }
 
-        case ConductorState::Conducting: {
-            const bool imuOk = data.imu.ready ||
-                               (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
-            if (!imuOk || !data.orcNet.wifiConnected) {
-                sStateBeforeFallback = ConductorState::Conducting;
-                // 復帰後最初の拍間隔は Fallback 滞在時間を含み無意味なので、
-                // 1 拍目扱い (間隔計算なし) に戻して EMA と採点を汚さない。
-                // BPM 自体は維持する (resetTempoTracking はしない)。
-                sLastBeatMs = 0;
-                data.conductor.state = ConductorState::Fallback;
-            }
+        case ConductorState::Conducting:
+            // Fallback 遷移は無効化: 実機テストで IMU 瞬断により演奏が遮られるため。
             break;
-        }
 
-        case ConductorState::Fallback: {
-            const bool imuOk = data.imu.ready ||
-                               (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
-            if (imuOk && data.orcNet.wifiConnected) {
-                // 落ちる前の状態へ戻す (Conducting 中断なら演奏へ、Menu/Result なら画面へ)
-                data.conductor.state = sStateBeforeFallback;
-                sNavGate = NavGate::Idle;   // ナビの撃ちかけ状態を破棄 (復帰直後の誤発火防止)
-            }
+        case ConductorState::Fallback:
+            // Fallback への遷移経路を全て無効化したので到達しないが、
+            // 万一入った場合は直前の状態に即復帰する。
+            data.conductor.state = sStateBeforeFallback;
+            sNavGate = NavGate::Idle;
             break;
-        }
 
         // ── production: メニュー (IMU ナビでモード選択。拍検出は止まる) ──
         case ConductorState::Menu: {
-            const bool imuOk = data.imu.ready ||
-                               (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
-            if (!imuOk || !data.orcNet.wifiConnected) {
-                // Menu 中に IMU が止まると操作不能のまま固まるので Fallback で異常を示す
-                sStateBeforeFallback = ConductorState::Menu;
-                data.conductor.state = ConductorState::Fallback;
-                break;
-            }
+            // Fallback 遷移は無効化済み (修正3)
             if (!inTransitionDeadtime(now) && updateNav(data, now, MENU_ITEM_COUNT)) {
                 if (data.game.navCursor == 1) {
                     // ゲーム開始: 目標テンポ提示・採点カウンタをリセット
@@ -441,13 +428,7 @@ void applyPattern(SystemData& data) {
 
         // ── production: 結果表示 (縦振り=決定で Menu へ戻る。拍検出は止まる) ──
         case ConductorState::Result: {
-            const bool imuOk = data.imu.ready ||
-                               (now - data.imu.sampleAtMs < IMU_TIMEOUT_MS);
-            if (!imuOk || !data.orcNet.wifiConnected) {
-                sStateBeforeFallback = ConductorState::Result;
-                data.conductor.state = ConductorState::Fallback;
-                break;
-            }
+            // Fallback 遷移は無効化済み (修正3)
             if (!inTransitionDeadtime(now) && updateNav(data, now, 1)) {
                 data.conductor.state = ConductorState::Menu;
                 data.game.mode = 0;
