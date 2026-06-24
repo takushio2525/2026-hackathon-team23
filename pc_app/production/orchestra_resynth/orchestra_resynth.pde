@@ -62,6 +62,7 @@ final int CLOSED_HI_HAT = 42;
 final int CRASH_CYMBAL = 49;
 final float RECORDED_DRUM_GAIN = 2.0f;
 final int MAX_DRUM_HARMONICS = 12;
+final int   MAX_DRUM_POLYPHONY = 12;
 final float DRUM_AMPLITUDE = 0.075f;
 final String[] DRUM_INSTRUMENT_FILES = {
   "4_kick.tweaked.instrument.json",
@@ -393,7 +394,8 @@ void handlePacket(byte[] buf){
     lastNoteMsByPart[partId] = millis();
     lastNoteAtMs = millis();
   } else {
-    int releaseMidi = isDrumInstrument(instrumentId) ? noteNumber : noteNumber + brassOctaveShift(instrumentId);
+    if (isDrumInstrument(instrumentId)) return; // ドラムは打楽器: gate=0 は無視（自然減衰）
+    int releaseMidi = noteNumber + brassOctaveShift(instrumentId);
     releaseMatching(partId, releaseMidi);
   }
 }
@@ -471,7 +473,7 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
     for (ResynthVoice v : activeVoices){ if (!v.releasing){ v.noteOff(); break; } }
   }
   int effectiveMidi = midi + brassOctaveShift(instrumentId);
-  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) * brassPartAmplitude(instrumentId);
+  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) * brassPartAmplitude(instrumentId) * masterVolume;
   ResynthVoice v = new ResynthVoice(m, effectiveMidi, g, useSimpleADSR);
   v.partId        = partId;
   v.instrumentIdx = constrain(instrumentId, 0, max(0, models.size()-1));
@@ -482,12 +484,16 @@ void triggerNote(int partId, int instrumentId, int midi, int velocity, int durat
 
 void triggerDrumNote(int noteNumber, int velocity, int durationMs){
   int idx = drumTimbreIndex(noteNumber);
-  float amplitude = DRUM_AMPLITUDE * constrain(velocity / 127.0f, 0.0f, 1.0f);
+  float amplitude = DRUM_AMPLITUDE * constrain(velocity / 127.0f, 0.0f, 1.0f) * masterVolume;
   AudioSample sample = recordedDrumSamples[idx];
   if (sample != null){
     sample.setGain(linearToDecibels(constrain(amplitude * RECORDED_DRUM_GAIN, 0.001f, 1.0f)));
     sample.trigger();
     return;
+  }
+  while (activeDrumSynths.size() >= MAX_DRUM_POLYPHONY && !activeDrumSynths.isEmpty()){
+    ActiveDrumSynth oldest = activeDrumSynths.remove(0);
+    if (!oldest.released) oldest.note.noteOff();
   }
   DrumNote dn = new DrumNote(noteNumber, amplitude);
   dn.noteOn(0);

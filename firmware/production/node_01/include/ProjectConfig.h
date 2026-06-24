@@ -122,7 +122,7 @@ namespace logic_params {
     constexpr uint32_t NAV_DECISION_WINDOW_MS  = 250;
     // 縦 (決定) と判定する優勢比: vertAccum >= horizAccum × この値 で縦。
     // 上げるほど縦判定が厳しくなる (横に寄る)。1.0 = 単純比較。
-    constexpr float    NAV_VERT_DOMINANCE      = 1.00f;
+    constexpr float    NAV_VERT_DOMINANCE      = 0.55f;
     // 横振りのカーソル移動方向の符号。実機で「右に振ったのに左へ動く」なら -1.0 に反転。
     constexpr float    NAV_LR_SIGN             = 1.0f;
     // 重力推定 LPF: accLpf をさらに遅い LPF に通す (5ms 周期 α=0.01 で時定数 ≈0.5s)。
