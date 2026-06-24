@@ -1796,7 +1796,7 @@
    "ratio": 40.184
   }
  ],
- "inharmonicity_b": 1e-06,
+ "inharmonicity_b": 0.000001,
  "midi_note": 42,
  "modulation": {
   "vibrato": {
