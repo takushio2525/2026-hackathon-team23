@@ -39,7 +39,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
     /*beatRedundancy=*/  4,    // 同一 BEAT を 4 連送 (旧 2 だが ESP32-S3 SoftAP の radio ロス対策。連送間隔は OrcNetModule の beatGapMs で設定)
-    /*beatLookaheadMs=*/ 30,   // playAtMasterMs = masterNow + 30 ms (連送受信完了 ~23ms にマージン約7ms)
+    /*beatLookaheadMs=*/ 45,   // playAtMasterMs = masterNow + 45 ms (連送 ~8ms + WiFi ジッタ余裕)
 };
 
 inline const StatusLedConfig STATUS_LED_CONFIG = {

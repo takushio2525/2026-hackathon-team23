@@ -226,7 +226,7 @@ void updateLed(SystemData& data) {
             // ゲーム中でガイドが残っている区間は目標テンポで点滅 (LED メトロノームガイド)。
             // ガイドが切れたら点灯のまま (自由演奏も常時点灯)。
             if (data.game.mode == 1 && data.game.targetBpm > 0 &&
-                gameGuideIntensity(data.game.gameBeatCount) > 0.5f) {
+                gameGuideIntensity(data.game.gameBeatCount) > 0.0f) {
                 data.led.solidOn = false;
                 data.led.blinkIntervalMs = (uint16_t)(30000u / data.game.targetBpm);
             } else {
@@ -377,9 +377,24 @@ void applyPattern(SystemData& data) {
             break;
         }
 
-        case ConductorState::Conducting:
+        case ConductorState::Conducting: {
             // Fallback 遷移は無効化: 実機テストで IMU 瞬断により演奏が遮られるため。
+            // 30 秒間拍が検出されなかったらメニューに自動復帰する
+            const uint32_t lastActivity = (sLastBeatMs > 0) ? sLastBeatMs : sStateEnteredMs;
+            if ((now - lastActivity) > 30000) {
+                data.conductor.state = ConductorState::Menu;
+                data.game.mode = 0;
+                data.game.navCursor = 0;
+                data.game.targetBpm = 0;
+                data.game.score = 0xFF;
+                data.game.gameBeatCount = 0;
+                data.game.scoreErrAccum = 0.0f;
+                data.game.scoreWeightAccum = 0.0f;
+                gateToIdle();
+                resetTempoTracking(data);
+            }
             break;
+        }
 
         case ConductorState::Fallback:
             // Fallback への遷移経路を全て無効化したので到達しないが、
