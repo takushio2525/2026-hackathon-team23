@@ -497,7 +497,8 @@ void triggerDrumNote(int noteNumber, int velocity, int durationMs){
   }
   DrumNote dn = new DrumNote(noteNumber, amplitude);
   dn.noteOn(0);
-  activeDrumSynths.add(new ActiveDrumSynth(dn, millis() + max(40, durationMs)));
+  int drumDurMs = max(durationMs, 500);
+  activeDrumSynths.add(new ActiveDrumSynth(dn, millis() + drumDurMs));
 }
 int countNonReleasing(){
   int n = 0; for (ResynthVoice v : activeVoices) if (!v.releasing) n++; return n;
@@ -618,7 +619,7 @@ void draw(){
   for (Iterator<ActiveDrumSynth> it = activeDrumSynths.iterator(); it.hasNext();){
     ActiveDrumSynth ds = it.next();
     if (!ds.released && now >= ds.offAtMs){ ds.note.noteOff(); ds.released = true; ds.releaseMs = now; }
-    if (ds.released && now - ds.releaseMs > 500) it.remove();
+    if (ds.released && now - ds.releaseMs > 500){ ds.note.envelope.unpatch(out); it.remove(); }
   }
 
   updateMetronome();
