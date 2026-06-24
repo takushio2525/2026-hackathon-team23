@@ -31,7 +31,8 @@ namespace {
 // BPM は CTRL から受け取った参考値。NoteOff の予定時刻計算に使う補助。
 uint16_t durationQ8ToMs(uint16_t durationQ8, float bpm) {
     const float beats = (float)durationQ8 / 256.0f;
-    return (uint16_t)(beats * 60000.0f / (bpm < 1.0f ? logic_params::DEFAULT_BPM : bpm));
+    const float ms = beats * 60000.0f / (bpm < 10.0f ? logic_params::DEFAULT_BPM : bpm);
+    return (uint16_t)(ms > 60000.0f ? 60000.0f : ms);
 }
 
 // 楽譜の 1 イベントを発火 (NoteOn 予約のみ)。
@@ -107,6 +108,8 @@ void updatePerformerLed(SystemData& data) {
     }
 }
 
+uint32_t sLastBeatRecvMs = 0;
+
 }  // namespace
 
 void applyPattern(SystemData& data) {
@@ -133,7 +136,12 @@ void applyPattern(SystemData& data) {
             }
             break;
         case PerformerState::Playing:
-            // BEAT が長く来なくても Playing に留まる。次の BEAT で自然に再開する。
+            // 指揮者からの BEAT が 10 秒以上途絶えたら待機に戻して LED を点滅に切り替える
+            if (sLastBeatRecvMs > 0 && (now - sLastBeatRecvMs) > 10000) {
+                data.performer.state = PerformerState::WaitStart;
+                data.receiver.hasFirstBeat = false;
+                sLastBeatRecvMs = 0;
+            }
             break;
     }
 
@@ -155,6 +163,7 @@ void applyPattern(SystemData& data) {
             fired       = true;
             firedBeatNo = data.receiver.pending.beatNo;
             data.receiver.pending.valid = false;
+            sLastBeatRecvMs = now;
         }
         // waitMs > 0: 次ループで再評価 (pending は valid のまま残す)
     }
