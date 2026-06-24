@@ -388,27 +388,9 @@ void handlePacket(byte[] buf){
   }
 }
 
-// ── ドラム noteNumber → 音色インデックス変換 ─────────────
-// GM ドラムマップ: noteNumber で打楽器音色を選ぶ (data/ のファイル名昇順 index)
-//   36 (kick)  → 4  (4_kick.tweaked.instrument.json)
-//   38 (snare) → 5  (5_snare.tweaked.instrument.json)
-//   42 (hihat) → 6  (6_hi_hat.tweaked.instrument.json)
-//   49 (crash) → 7  (7_crash.tweaked.instrument.json)
-int drumInstrIndex(int noteNumber){
-  switch (noteNumber){
-    case 36: return 4;
-    case 38: return 5;
-    case 42: return 6;
-    case 49: return 7;
-    default: return 4;
-  }
-}
-boolean isDrumInstrument(int instrumentId){ return instrumentId >= 4; }
-
 // ── 発音管理 ──────────────────────────────────────────────
 void triggerNote(int partId, int instrumentId, int midi, int velocity, int durationMs){
-  int effectiveId = isDrumInstrument(instrumentId) ? drumInstrIndex(midi) : instrumentId;
-  InstrModel m = modelForId(effectiveId);
+  InstrModel m = modelForId(instrumentId);
   if (m == null) return;
   int guard = 0;
   while (countNonReleasing() >= MAX_POLYPHONY && guard++ < MAX_POLYPHONY){
@@ -696,11 +678,10 @@ void drawFreePlayScreen(){
   text("受信パケット: " + totalReceived +
        (lastNoteAtMs > 0 ? "   (最後の NOTE から " + (millis()-lastNoteAtMs) + " ms)" : ""), 50, sy + 44);
   float ry = sy + 64; int col = 0;
-  for (int p = 0x02; p <= 0x06; p++){
+  for (int p = 0x02; p <= 0x05; p++){
     String ev = lastEventByPart[p];
-    String label = (p == 0x06) ? "ドラム" : "声部";
     fill(ev != null ? color(28, 54, 80) : color(150, 160, 180));
-    text(label + " 0x" + hex(p, 2) + ": " + (ev != null ? ev : "(未受信)"), 50 + col * ((width - 120) / 2), ry);
+    text("声部 0x" + hex(p, 2) + ": " + (ev != null ? ev : "(未受信)"), 50 + col * ((width - 120) / 2), ry);
     col++; if (col >= 2){ col = 0; ry += 18; }
   }
 
@@ -818,7 +799,7 @@ void drawAnalyzerScreen(){
   text("直近イベント", 50, sy + 24);
   fill(28, 54, 80); textSize(12);
   float ry = sy + 44; int col = 0;
-  for (int p = 0x02; p <= 0x06; p++){
+  for (int p = 0x02; p <= 0x05; p++){
     String ev = lastEventByPart[p];
     if (ev == null) continue;
     text("0x" + hex(p, 2) + ": " + ev, 50 + col * ((width - 120) / 2), ry);
@@ -846,7 +827,7 @@ void drawHelpPanel(String helpText){
   int now = millis();
 
   // 声部別 NOTE インジケータ (右端)。緑=2 秒以内に受信 / 灰=受信歴あり / 輪郭のみ=未受信
-  for (int p = 0x06; p >= 0x02; p--){
+  for (int p = 0x05; p >= 0x02; p--){
     boolean seen   = lastNoteMsByPart[p] > 0;
     boolean active = seen && (now - lastNoteMsByPart[p] < 2000);
     float cxp = sx - 8;
