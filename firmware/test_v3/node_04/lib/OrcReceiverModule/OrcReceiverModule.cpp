@@ -1,7 +1,7 @@
 // Build / Upload / Monitor (run from project root):
-//   pio run -d firmware/test_v3/node_04
-//   pio run -d firmware/test_v3/node_04 -t upload
-//   pio device monitor -d firmware/test_v3/node_04
+//   pio run -d firmware/test_v3/node_02
+//   pio run -d firmware/test_v3/node_02 -t upload
+//   pio device monitor -d firmware/test_v3/node_02
 
 #include "OrcReceiverModule.h"
 #include "SystemData.h"
@@ -44,11 +44,13 @@ bool updateClockOffset(SystemData& data, uint32_t timestampMs, float alpha,
 // マスターリセット (offset スナップ) 検知時の後始末。
 // pending.playAtMasterMs は旧マスタ時計の値で、新 offset では発火判定が壊れるため破棄。
 // lastBeatNo は新しい連番 (1 から再開) と偶然一致して初拍を重複扱いで飲む事故を
-// 防ぐためリセットする。
+// 防ぐためリセットする。performer.state を WaitStart に戻すことで、新マスタの
+// 最初の BEAT を受信してから演奏を再開する（リセット直後の不安定な期間を飛ばす）。
 void resetAfterMasterReset(SystemData& data) {
     data.receiver.pending.valid = false;
     data.receiver.hasFirstBeat  = false;
     data.receiver.lastBeatNo    = 0;
+    data.performer.state        = PerformerState::WaitStart;
 }
 
 }  // namespace
