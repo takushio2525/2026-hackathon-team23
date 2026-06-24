@@ -5,6 +5,8 @@
 
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
+- 2026-06-24: **VS Code の Git 同期分岐を復旧**。ローカル `main`（398 ahead）と `origin/main`（371 behind）が共通祖先を持たない別履歴であることを確認し、旧ローカル履歴を `codex/backup-main-before-sync-20260624-0100` へ退避したうえで、`main` を共有リポジトリの現行 `origin/main`（`1dcdb4b`）に合わせた。未コミット変更なし・ahead/behind なし。
+
 - 2026-06-17: **test_v3 Processing 音色データを最新金管 JSON に差し替え**。
   `/Users/shota/Documents/3S/` の `trumpets`/`horns`/`trombones`/`tuba` を
   `pc_app/test_v3/orchestra_resynth/data/0_〜3_*.instrument.json` へ番号付き命名で取り込み。

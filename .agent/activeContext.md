@@ -5,24 +5,18 @@
 
 ## 現在の対象
 
-- **test_v3 Processing 音色データを 2026-06-17 に差し替え済み**。
-  `/Users/shota/Documents/3S/` の金管 4 種 JSON を
-  `pc_app/test_v3/orchestra_resynth/data/` の番号付きファイル名へ上書き取り込み:
-  - `trumpets.tweaked.instrument.json` → `0_trumpets.tweaked.instrument.json`
-  - `horns.tweaked.instrument.json` → `1_horns.tweaked.instrument.json`
-  - `trombones.tweaked.instrument.json` → `2_trombones.tweaked.instrument.json`
-  - `tuba.tweaked.instrument.json` → `3_tuba.tweaked.instrument.json`
-- 取り込み後、4 ファイルは元ファイルと byte 単位一致。`python3 -m json.tool` で JSON 構文 OK。
-- ドラム系 `4_kick`〜`7_crash` と README は未変更。
+- **VS Code の Git 同期状態を復旧済み**。ローカル `main` と `origin/main` は共通祖先を持たない別履歴だったため、共有リポジトリの現行履歴である `origin/main`（`1dcdb4b`）へローカル `main` を合わせた。
+- 同期前のローカル履歴（先頭 `3b16b5b`、398 コミット）は `codex/backup-main-before-sync-20260624-0100` に完全退避済み。必要なファイルだけ戻す場合はこのブランチを参照する。
+- 現在 `git status --short --branch` は `## main...origin/main`（ahead / behind なし）。未コミット変更なし。
 
 ## 次の一手
 
-- 必要なら Processing 4 で `pc_app/test_v3/orchestra_resynth/orchestra_resynth.pde` を起動し、
-  楽器定義パネルに `0_trumpets`〜`3_tuba` が表示されることと音色差を聴感確認する。
-- ファーム変更はなし。PIO ビルド・実機 upload は不要。
+- VS Code のソース管理ビューを再読み込みすれば、同期ボタンの `371↓ 398↑` 表示は消える。
+- 退避ブランチ上だけに必要な変更が見つかった場合は、対象コミットまたはファイルを選んで現行 `main` へ取り込む。
 
 ## 現フェーズで Read すべき設計書
 
+- Git 操作: `.agent/conventions.md`
 - Processing 音色データ作業: `pc_app/test_v3/orchestra_resynth/data/README.md`
 - ゲームモード設計: `.agent/test_v3-game-design.md`
 - プロトコル仕様: `.agent/api.md`
