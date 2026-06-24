@@ -5,21 +5,19 @@
 
 ## 現在の対象
 
-- **分岐していた Git 履歴を `main` へ統合・push 済み**（merge commit `4ba382b`）。共通祖先のない現行 `main` と退避側 398 コミットを `--allow-unrelated-histories` でマージし、week7〜9 の Processing 素材・議事録・個人作業成果物など、退避側だけにあった 112 ファイルを取り込んだ。
-- 競合は `.agent/activeContext.md`、`.agent/progress.md`、`.gitignore` のみ。現行 `main` の公開化ポリシーを採用し、講義資料・昨年度スライド・計画書テンプレートなど `.gitignore` で除外される 24 件は再公開しない。
-- マージ元 `codex/backup-main-before-sync-20260624-0100` は履歴保全のため維持する。
+- **齋藤の発表用個人担当まとめPDFを作成・mainへ反映済み**。`work/saito/week10/saito_presentation_summary.pdf` は横長6ページで、楽譜データ設計、4声輪唱の開始拍・音域設定、ドラム／音色データ、作業の流れ、検証結果と残課題を扱う。
+- 根拠は `docs/roles.md`、`work/saito/week5/`〜`week9/`、`work/saito/week9/作業ログ/`。実機で未確認の音量バランスは、未検証として明記した。
+- PDFはAppleGothicを埋め込んで日本語表示を担保し、Popplerで全6ページをPNGへレンダリングしてレイアウトを目視確認済み。
 
 ## 次の一手
 
-- VS Code を再読み込みし、`main...origin/main` に ahead / behind がないことを確認する。
-- 退避ブランチは履歴保全用として残している。不要と判断した段階で削除を検討する。
+- 発表前に実機で4声＋ドラムを鳴らし、チューバを含む音量バランスを聴感確認する。
 
 ## 現フェーズで Read すべき設計書
 
-- Git 操作: `.agent/conventions.md`
-- Processing 音色データ作業: `pc_app/test_v3/orchestra_resynth/data/README.md`
-- ゲームモード設計: `.agent/test_v3-game-design.md`
-- プロトコル仕様: `.agent/api.md`
+- 担当範囲: `docs/roles.md`
+- 楽譜方針: `docs/design/score_format.md`
+- 個人成果: `work/saito/week9/README.md`、`work/saito/week9/作業ログ/作業ログ_25G1053.tex`
 
 ## ユーザーの好み
 

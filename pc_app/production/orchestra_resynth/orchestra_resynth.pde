@@ -55,8 +55,23 @@ final int  TYPE_NOTE     = 3;
 final int  TYPE_UI       = 4;
 final int  MAX_POLYPHONY = 24;
 
+// ── ドラム定数 (齋藤版 kaeru_score_debug と同一) ─────────────
+final int KICK_DRUM = 36;
+final int SNARE_DRUM = 38;
+final int CLOSED_HI_HAT = 42;
+final int CRASH_CYMBAL = 49;
+final float RECORDED_DRUM_GAIN = 2.0f;
+final int MAX_DRUM_HARMONICS = 12;
+final float DRUM_AMPLITUDE = 0.075f;
+final String[] DRUM_INSTRUMENT_FILES = {
+  "4_kick.tweaked.instrument.json",
+  "5_snare.tweaked.instrument.json",
+  "6_hi_hat.tweaked.instrument.json",
+  "7_crash.tweaked.instrument.json"
+};
+
 float   masterVolume  = 0.55f;
-boolean useSimpleADSR = false;
+boolean useSimpleADSR = true;
 
 // 指揮者の状態 (OrcProtocol.h と整合)
 final int ST_IDLE        = 0;
@@ -98,9 +113,6 @@ AudioOutput out;
 ArrayList<File>        instrumentFiles = new ArrayList<File>();
 ArrayList<InstrModel>  models          = new ArrayList<InstrModel>();
 ArrayList<String>      modelLabels     = new ArrayList<String>();
-boolean      forceSingleInstrument    = false;
-final String FORCED_INSTRUMENT_FILE   = "0_trumpets.tweaked.instrument.json";
-int          forcedInstrumentIdx      = -1;
 
 // ── シリアルポート ────────────────────────────────────────
 class PortConn {
@@ -122,6 +134,11 @@ ConcurrentLinkedQueue<byte[]> packetQueue = new ConcurrentLinkedQueue<byte[]>();
 
 // ── 発音中ボイス ──────────────────────────────────────────
 ArrayList<ResynthVoice> activeVoices = new ArrayList<ResynthVoice>();
+
+// ── ドラム再生 (齋藤版と同じ方式) ────────────────────────────
+DrumTimbreData[] drumTimbres;
+AudioSample[] recordedDrumSamples;
+ArrayList<ActiveDrumSynth> activeDrumSynths = new ArrayList<ActiveDrumSynth>();
 
 // ── 表示用 ────────────────────────────────────────────────
 int      totalReceived = 0;
@@ -166,11 +183,12 @@ void setup(){
   out = minim.getLineOut(Minim.STEREO, 512, 44100);
 
   rescanInstruments();
+  loadDrumTimbres();
   refreshPorts();
 
   println("=== orchestra_resynth (production ゲームモード) ===");
-  println("楽器定義 " + models.size() + " 個ロード。");
-  println("[click] ポート開閉  /  [r] ポート再列挙・画面リセット  /  [f] USBフィルタ  /  [t] テスト音  /  [Space] 停止");
+  println("楽器定義 " + models.size() + " 個ロード。ドラム音色 " + drumTimbres.length + " 個。");
+  println("[click] ポート開閉  /  [r] ポート再列挙・画面リセット  /  [f] USBフィルタ  /  [t] テスト音  /  [+/-] 音量  /  [Space] 停止");
 }
 
 PFont loadJapaneseFont(float sizePx){
@@ -212,20 +230,11 @@ void rescanInstruments(){
       println("[エラー] " + f.getName() + ": " + e);
     }
   }
-  forcedInstrumentIdx = -1;
-  for (int i = 0; i < instrumentFiles.size(); i++){
-    if (instrumentFiles.get(i).getName().equalsIgnoreCase(FORCED_INSTRUMENT_FILE) && models.get(i) != null){
-      forcedInstrumentIdx = i;
-      break;
-    }
-  }
 }
 
 InstrModel modelForId(int id){
   if (models.isEmpty()) return null;
-  int idx;
-  if (forceSingleInstrument && forcedInstrumentIdx >= 0) idx = forcedInstrumentIdx;
-  else                                                   idx = constrain(id, 0, models.size()-1);
+  int idx = constrain(id, 0, models.size()-1);
   InstrModel m = models.get(idx);
   if (m != null) return m;
   for (InstrModel mm : models) if (mm != null) return mm;
@@ -384,43 +393,105 @@ void handlePacket(byte[] buf){
     lastNoteMsByPart[partId] = millis();
     lastNoteAtMs = millis();
   } else {
-    releaseMatching(partId, noteNumber);
+    int releaseMidi = isDrumInstrument(instrumentId) ? noteNumber : noteNumber + brassOctaveShift(instrumentId);
+    releaseMatching(partId, releaseMidi);
   }
 }
 
-// ── ドラム noteNumber → 音色インデックス変換 ─────────────
-// GM ドラムマップ: noteNumber で打楽器音色を選ぶ (data/ のファイル名昇順 index)
-//   36 (kick)  → 4  (4_kick.tweaked.instrument.json)
-//   38 (snare) → 5  (5_snare.tweaked.instrument.json)
-//   42 (hihat) → 6  (6_hi_hat.tweaked.instrument.json)
-//   49 (crash) → 7  (7_crash.tweaked.instrument.json)
-int drumInstrIndex(int noteNumber){
-  switch (noteNumber){
-    case 36: return 4;
-    case 38: return 5;
-    case 42: return 6;
-    case 49: return 7;
-    default: return 4;
+// ── ドラム ─────────────────────────────────────────────────
+boolean isDrumInstrument(int instrumentId){ return instrumentId >= 4; }
+
+// 齋藤版 drumIndex(): noteNumber → drumTimbres[] のインデックス (0-3)
+int drumTimbreIndex(int noteNumber){
+  if (noteNumber == KICK_DRUM) return 0;
+  if (noteNumber == SNARE_DRUM) return 1;
+  if (noteNumber == CLOSED_HI_HAT) return 2;
+  if (noteNumber == CRASH_CYMBAL) return 3;
+  return 2;
+}
+
+float drumNoiseScale(int noteNumber){
+  if (noteNumber == KICK_DRUM) return 0.14f;
+  if (noteNumber == SNARE_DRUM) return 0.45f;
+  if (noteNumber == CRASH_CYMBAL) return 0.30f;
+  return 0.42f;
+}
+
+float linearToDecibels(float amplitude){ return 20.0f * log(amplitude) / log(10.0f); }
+
+void loadDrumTimbres(){
+  drumTimbres = new DrumTimbreData[DRUM_INSTRUMENT_FILES.length];
+  for (int i = 0; i < DRUM_INSTRUMENT_FILES.length; i++)
+    drumTimbres[i] = new DrumTimbreData(DRUM_INSTRUMENT_FILES[i]);
+  recordedDrumSamples = new AudioSample[drumTimbres.length];
+  for (int i = 0; i < drumTimbres.length; i++)
+    recordedDrumSamples[i] = createRecordedDrumSample(drumTimbres[i]);
+}
+
+AudioSample createRecordedDrumSample(DrumTimbreData timbre){
+  if (timbre.drumSample == null || timbre.drumSample.length == 0) return null;
+  javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(
+    timbre.drumSampleRate, 16, 1, true, true
+  );
+  return minim.createSample(timbre.drumSample, format, 1024);
+}
+
+// 齋藤版 (kaeru_score_debug) と同じオクターブ移調（楽譜は全声部 C4 基準）
+int brassOctaveShift(int instrumentId){
+  switch (instrumentId){
+    case 0: return  12;   // トランペット → C5
+    case 1: return   0;   // ホルン → C4
+    case 2: return -12;   // トロンボーン → C3
+    case 3: return -12;   // チューバ → C3
+    default: return  0;
   }
 }
-boolean isDrumInstrument(int instrumentId){ return instrumentId >= 4; }
+
+// 齋藤版と同じパート別振幅
+float brassPartAmplitude(int instrumentId){
+  switch (instrumentId){
+    case 0: return 0.20f;  // トランペット
+    case 1: return 0.17f;  // ホルン
+    case 2: return 0.18f;  // トロンボーン
+    case 3: return 0.25f;  // チューバ
+    default: return 0.18f;
+  }
+}
 
 // ── 発音管理 ──────────────────────────────────────────────
 void triggerNote(int partId, int instrumentId, int midi, int velocity, int durationMs){
-  int effectiveId = isDrumInstrument(instrumentId) ? drumInstrIndex(midi) : instrumentId;
-  InstrModel m = modelForId(effectiveId);
+  if (isDrumInstrument(instrumentId)){
+    triggerDrumNote(midi, velocity, durationMs);
+    return;
+  }
+  InstrModel m = modelForId(instrumentId);
   if (m == null) return;
   int guard = 0;
   while (countNonReleasing() >= MAX_POLYPHONY && guard++ < MAX_POLYPHONY){
     for (ResynthVoice v : activeVoices){ if (!v.releasing){ v.noteOff(); break; } }
   }
-  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) * masterVolume;
-  ResynthVoice v = new ResynthVoice(m, midi, g, useSimpleADSR);
+  int effectiveMidi = midi + brassOctaveShift(instrumentId);
+  float g = constrain(velocity / 127.0f, 0.0f, 1.0f) * brassPartAmplitude(instrumentId);
+  ResynthVoice v = new ResynthVoice(m, effectiveMidi, g, useSimpleADSR);
   v.partId        = partId;
   v.instrumentIdx = constrain(instrumentId, 0, max(0, models.size()-1));
   v.scheduledOffMs = millis() + max(40, durationMs);
   v.patch(out);
   activeVoices.add(v);
+}
+
+void triggerDrumNote(int noteNumber, int velocity, int durationMs){
+  int idx = drumTimbreIndex(noteNumber);
+  float amplitude = DRUM_AMPLITUDE * constrain(velocity / 127.0f, 0.0f, 1.0f);
+  AudioSample sample = recordedDrumSamples[idx];
+  if (sample != null){
+    sample.setGain(linearToDecibels(constrain(amplitude * RECORDED_DRUM_GAIN, 0.001f, 1.0f)));
+    sample.trigger();
+    return;
+  }
+  DrumNote dn = new DrumNote(noteNumber, amplitude);
+  dn.noteOn(0);
+  activeDrumSynths.add(new ActiveDrumSynth(dn, millis() + max(40, durationMs)));
 }
 int countNonReleasing(){
   int n = 0; for (ResynthVoice v : activeVoices) if (!v.releasing) n++; return n;
@@ -432,6 +503,8 @@ void releaseMatching(int partId, int midi){
 void stopAll(){
   for (ResynthVoice v : activeVoices) v.unpatch(out);
   activeVoices.clear();
+  for (ActiveDrumSynth ds : activeDrumSynths){ if (!ds.released) ds.note.noteOff(); }
+  activeDrumSynths.clear();
   for (MetroClick mc : metroClicks) mc.unpatch(out);
   metroClicks.clear();
 }
@@ -528,6 +601,11 @@ void draw(){
     ResynthVoice v = it.next();
     if (v.done){ v.unpatch(out); it.remove(); }
   }
+  for (Iterator<ActiveDrumSynth> it = activeDrumSynths.iterator(); it.hasNext();){
+    ActiveDrumSynth ds = it.next();
+    if (!ds.released && now >= ds.offAtMs){ ds.note.noteOff(); ds.released = true; ds.releaseMs = now; }
+    if (ds.released && now - ds.releaseMs > 500) it.remove();
+  }
 
   updateMetronome();
 
@@ -599,7 +677,7 @@ void drawPageTitle(String title, String subtitle){
 void drawPortSelectScreen(){
   drawBackground();
   drawPageTitle("タクトーン — production",
-      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [t]テスト音  [p]音色切替");
+      "楽器定義 " + models.size() + " 個  /  [click]ポート開閉  [r]再列挙  [f]フィルタ  [t]テスト音");
   drawPortListAt(96);
 }
 
@@ -674,7 +752,7 @@ void drawMenuScreen(){
   text("指揮棒を 左右に振る = 選択を移動  /  縦に振る = 決定", width/2, modeY + modeH + 40);
   textAlign(LEFT, BASELINE);
 
-  drawHelpPanel("[r]ポート再選択  [t]テスト音  [p]音色切替  [+/-]音量");
+  drawHelpPanel("[r]ポート再選択  [t]テスト音  [+/-]音量");
 }
 
 // ── 自由演奏画面 ──────────────────────────────────────────
@@ -712,7 +790,7 @@ void drawFreePlayScreen(){
   text("BPM", width/2, 410);
   textAlign(LEFT, BASELINE);
 
-  drawHelpPanel("[r]リセット  [t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+  drawHelpPanel("[r]リセット  [t]テスト音  [+/-]音量  [Space]停止");
 }
 
 // ── ゲーム演奏画面 ────────────────────────────────────────
@@ -825,7 +903,7 @@ void drawAnalyzerScreen(){
     col++; if (col >= 2){ col = 0; ry += 18; }
   }
 
-  drawHelpPanel("[t]テスト音  [p]音色切替  [+/-]音量  [Space]停止");
+  drawHelpPanel("[t]テスト音  [+/-]音量  [Space]停止");
 }
 
 // 画面下部の共通パネル: 左にキー操作ガイド、右に接続ステータス。
@@ -982,11 +1060,6 @@ void keyPressed(){
     return;
   }
   if (c=='i'){ rescanInstruments(); return; }
-  if (c=='p'){
-    forceSingleInstrument = !forceSingleInstrument;
-    println("single-instrument: " + (forceSingleInstrument ? "ON (" + FORCED_INSTRUMENT_FILE + ")" : "OFF"));
-    return;
-  }
   if (c=='t'){ playTestChord(); return; }
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; println("包絡: " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ")); return; }
   if (c=='+' || c=='='){ masterVolume = constrain(masterVolume + 0.05f, 0.05f, 1.5f); return; }
@@ -1243,7 +1316,7 @@ class ResynthVoice extends UGen {
     if (done){ for (int i=0;i<channels.length;i++) channels[i]=0; return; }
     float a = ampAt(tSec);
     float pitchMul = 1.0f;
-    if (m.vibDepthCents > 0.01f && m.vibRateHz > 0.001f){
+    if (!simpleADSR && m.vibDepthCents > 0.01f && m.vibRateHz > 0.001f){
       float vg = m.vibOnsetSec > 0.001f ? min(1, tSec/m.vibOnsetSec) : 1;
       pitchMul = pow(2, (m.vibDepthCents*0.5f*vg*sin(vibPhase))/1200.0f);
       vibPhase += TWO_PI * m.vibRateHz / sr; if (vibPhase >= TWO_PI) vibPhase -= TWO_PI;
@@ -1256,16 +1329,16 @@ class ResynthVoice extends UGen {
       if (f >= sr*0.5f) continue;
       phase[k] += TWO_PI * f / sr;
       if (phase[k] >= TWO_PI) phase[k] -= TWO_PI;
-      s += amp * harmEnvAt(k, tSec) * sin(phase[k]);
+      s += amp * (simpleADSR ? 1.0f : harmEnvAt(k, tSec)) * sin(phase[k]);
     }
     s *= m.harmNorm;
-    if (m.noiseLevel > 0 && m.noiseTable.length > 1){
+    if (!simpleADSR && m.noiseLevel > 0 && m.noiseTable.length > 1){
       float relMul = releasing ? max(0, 1-(tSec-releaseStartT)/relSec()) : 1;
       float ne = noiseEnvAt(tSec) * m.noiseLevel * relMul;
       s += m.noiseTable[(int)noisePos] * ne;
       noisePos += 1; if (noisePos >= m.noiseTable.length) noisePos -= m.noiseTable.length;
     }
-    if (m.tremDepth > 0.001f && m.tremRateHz > 0.001f){
+    if (!simpleADSR && m.tremDepth > 0.001f && m.tremRateHz > 0.001f){
       s *= 1.0f - m.tremDepth*0.5f + m.tremDepth*0.5f*sin(tremPhase);
       tremPhase += TWO_PI * m.tremRateHz / sr; if (tremPhase >= TWO_PI) tremPhase -= TWO_PI;
     }
@@ -1274,5 +1347,133 @@ class ResynthVoice extends UGen {
     tSec += 1.0f/sr;
     if (releasing && (tSec - releaseStartT) >= relSec()) done = true;
     else if (!done && a <= 1e-4f && tSec > 0.15f) done = true;
+  }
+}
+
+
+/* ==========================================================================
+   DrumTimbreData — 齋藤版 TimbreData をそのまま移植。
+   ドラム JSON から倍音・ADSR・原音サンプルを読み込む。
+   ========================================================================== */
+class DrumTimbreData {
+  String name;
+  float fundamentalHz;
+  float[] harmonicRatios;
+  float[] harmonicGains;
+  float noiseLevel;
+  float attackSec;
+  float decaySec;
+  float sustainLevel;
+  float releaseSec;
+  float[] drumSample;
+  float drumSampleRate;
+
+  DrumTimbreData(String filename){
+    JSONObject json = loadJSONObject(sketchPath("data/" + filename));
+    if (json == null) throw new RuntimeException("ドラム音色 JSON を読み込めません: " + filename);
+
+    name = json.getString("name");
+    fundamentalHz = json.getFloat("fundamental_hz", 440.0f);
+    JSONObject sourceEnvelope = json.getJSONObject("envelope");
+    attackSec = sourceEnvelope.getFloat("attack_sec");
+    decaySec = sourceEnvelope.getFloat("decay_sec");
+    sustainLevel = sourceEnvelope.getFloat("sustain_level");
+    releaseSec = sourceEnvelope.getFloat("release_sec");
+    noiseLevel = json.hasKey("noise") ? json.getJSONObject("noise").getFloat("level", 0) : 0;
+
+    JSONArray sourceHarmonics = json.getJSONArray("harmonics");
+    int harmonicCount = min(MAX_DRUM_HARMONICS, sourceHarmonics.size());
+    harmonicRatios = new float[harmonicCount];
+    harmonicGains = new float[harmonicCount];
+    float gainSum = 0;
+    for (int i = 0; i < harmonicCount; i++){
+      JSONObject harmonic = sourceHarmonics.getJSONObject(i);
+      harmonicRatios[i] = harmonic.getFloat("ratio");
+      harmonicGains[i] = harmonic.getFloat("amp");
+      gainSum += harmonicGains[i];
+    }
+    if (gainSum <= 0) throw new RuntimeException("倍音の振幅合計が 0 以下: " + filename);
+    for (int i = 0; i < harmonicCount; i++) harmonicGains[i] /= gainSum;
+
+    if (json.hasKey("drum_sample")){
+      JSONObject sourceDrumSample = json.getJSONObject("drum_sample");
+      JSONArray sourceValues = sourceDrumSample.getJSONArray("values");
+      if (sourceValues != null && sourceValues.size() > 0){
+        drumSample = new float[sourceValues.size()];
+        for (int i = 0; i < drumSample.length; i++) drumSample[i] = sourceValues.getFloat(i);
+        drumSampleRate = sourceDrumSample.getFloat("sample_rate", 44100.0f);
+      }
+    }
+  }
+}
+
+
+/* ==========================================================================
+   DrumNote — 齋藤版と同一の合成ドラム (drum_sample がない場合のフォールバック)。
+   Oscil 倍音 + Noise + ADSR で打楽器を合成する。
+   ========================================================================== */
+class DrumNote implements Instrument {
+  Summer mix;
+  Noise noise;
+  ADSR envelope;
+
+  DrumNote(int noteNumber, float amplitude){
+    mix = new Summer();
+    DrumTimbreData timbre = drumTimbres[drumTimbreIndex(noteNumber)];
+    for (int i = 0; i < timbre.harmonicRatios.length; i++){
+      Oscil harmonic = new Oscil(timbre.fundamentalHz * timbre.harmonicRatios[i],
+                                 amplitude * timbre.harmonicGains[i], Waves.SINE);
+      harmonic.patch(mix);
+    }
+    float noiseAmplitude = amplitude * timbre.noiseLevel * drumNoiseScale(noteNumber);
+    if (noiseAmplitude > 0.001f){
+      noise = new Noise(noiseAmplitude, Noise.Tint.WHITE);
+      noise.patch(mix);
+    }
+    envelope = new ADSR(1.0f, timbre.attackSec, timbre.decaySec,
+                        timbre.sustainLevel, timbre.releaseSec);
+    mix.patch(envelope);
+  }
+
+  void noteOn(float duration){ envelope.noteOn(); envelope.patch(out); }
+  void noteOff(){ envelope.unpatchAfterRelease(out); envelope.noteOff(); }
+}
+
+
+/* ==========================================================================
+   RecordedDrumNote — 齋藤版と同一。JSON の drum_sample 原音を AudioSample で再生。
+   noteOff は空 (原音の自然な減衰を最後まで鳴らす)。
+   ========================================================================== */
+class RecordedDrumNote implements Instrument {
+  AudioSample sample;
+  float amplitude;
+
+  RecordedDrumNote(AudioSample sample, float amplitude){
+    this.sample = sample;
+    this.amplitude = amplitude;
+  }
+
+  void noteOn(float duration){
+    sample.setGain(linearToDecibels(constrain(amplitude * RECORDED_DRUM_GAIN, 0.001f, 1.0f)));
+    sample.trigger();
+  }
+  void noteOff(){}
+}
+
+
+/* ==========================================================================
+   ActiveDrumSynth — DrumNote (合成ドラム) のライフサイクル管理用。
+   ========================================================================== */
+class ActiveDrumSynth {
+  DrumNote note;
+  int offAtMs;
+  boolean released;
+  int releaseMs;
+
+  ActiveDrumSynth(DrumNote n, int offMs){
+    note = n;
+    offAtMs = offMs;
+    released = false;
+    releaseMs = 0;
   }
 }
