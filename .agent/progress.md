@@ -15,6 +15,10 @@
   node_06 コメントパス修正（`3bab795`）、node_03〜05 score_data.cpp コメント修正（`5a6b84a`）。
   crash の drum_sample 原音再生は未対応（倍音合成で代替）。
 
+- 2026-06-24: **test_v3 復元 ＋ production フォルダ分離（2コミット）**。
+  test_v3 を main 状態に復元（`4619f38`）、test_v3 ベースの production フォルダを新設し
+  本番変更を集約（`a608778`）。コメント内パスを production に一括置換。全 7 ノード pio run SUCCESS。
+
 ## 2026-06 — test_v3 ゲームモードフェーズ
 
 - 2026-06-17: **test_v3 Processing 音色データを最新金管 JSON に差し替え**。

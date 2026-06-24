@@ -5,10 +5,12 @@
 
 ## 現在の対象
 
-- **本番プログラム構築** (`feature/production-program` ブランチ)。レビュー＆リファクタ完了。
-  - 前の子の4コミット（ベロシティ・ドラム音色・node_06 新設・マスターリセット修正）は全て正しく反映
-  - Processing ドラム対応を追加実装（noteNumber → 音色インデックス変換）
-  - node_03〜06 のコメントパス修正
+- **本番プログラム分離** (`feature/production-program` ブランチ)
+  - test_v3 を main の状態に復元済み
+  - test_v3 ベースの `firmware/production/` と `pc_app/production/` を新設
+  - 本番用変更（楽譜ベロシティ・ドラム音色・node_06・リセット修正・Processing ドラム対応）は production のみに反映
+  - コメント内パスを test_v3 → production に一括置換
+  - 全 7 ノード pio run SUCCESS
 
 ## 次の一手
 
@@ -19,4 +21,3 @@
 ## 現フェーズで Read すべき設計書
 
 - プロトコル仕様: `.agent/api.md`
-- さいとうくんの参照実装: `work/saito/week9/kaeru_score_debug/kaeru_score_debug.pde`（saitou-work ブランチ）
