@@ -5,7 +5,7 @@
 //
 // 楽器ノード node_03 (輪唱の 1 声部) のエントリポイント (Arduino UNO R4 WiFi)
 // partId / instrumentId / headRestBeats は ProjectConfig.h で決める。
-// 3 フェーズループを loopIntervalMs (5 ms) 間隔で回す
+// 3 フェーズループを loopIntervalMs (2 ms) 間隔で回す
 #include <Arduino.h>
 
 #include "ProjectConfig.h"
@@ -149,7 +149,7 @@ void setup() {
 void loop() {
     const uint32_t now = millis();
     if (now - gLastLoopMs < ORC_RECEIVER_CONFIG.loopIntervalMs) {
-        return;  // ループ周期 5 ms を維持
+        return;  // loopIntervalMs 周期を維持
     }
     gLastLoopMs = now;
 

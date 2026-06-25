@@ -164,6 +164,7 @@ bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
             dir = sNavHorizVec[dom] * NAV_LR_SIGN;
             if (dir < 0.0f) { if (data.game.navCursor > 0)             data.game.navCursor--; }
             else            { if (data.game.navCursor + 1 < itemCount) data.game.navCursor++; }
+            data.sender.forceCtrlSend = true;
         }
         DBG_PRINTF("[N1 NAV vert=%5.2f horiz=%5.2f grav=(%5.2f,%5.2f,%5.2f) hvec=(%5.1f,%5.1f,%5.1f) dom=%d dir=%+5.1f cur=%u->%u -> %s]\n",
                    sNavVertAccum, sNavHorizAccum,
@@ -200,6 +201,8 @@ void noteStateTransition(SystemData& data, uint32_t now) {
     gateToIdle();
     sNavGate = NavGate::Idle;
     data.beat.pathLenM = 0.0f;
+    // 状態遷移直後に CTRL を即送信し、PC 側の画面切替を高速化する
+    data.sender.forceCtrlSend = true;
 }
 
 bool inTransitionDeadtime(uint32_t now) {
@@ -231,7 +234,7 @@ void updateLed(SystemData& data) {
             // ゲーム中でガイドが残っている区間は目標テンポで点滅 (LED メトロノームガイド)。
             // ガイドが切れたら点灯のまま (自由演奏も常時点灯)。
             if (data.game.mode == 1 && data.game.targetBpm > 0 &&
-                gameGuideIntensity(data.game.gameBeatCount) > 0.5f) {
+                gameGuideIntensity(data.game.gameBeatCount) > 0.0f) {
                 data.led.solidOn = false;
                 data.led.blinkIntervalMs = (uint16_t)(30000u / data.game.targetBpm);
             } else {
@@ -382,9 +385,24 @@ void applyPattern(SystemData& data) {
             break;
         }
 
-        case ConductorState::Conducting:
+        case ConductorState::Conducting: {
             // Fallback 遷移は無効化: 実機テストで IMU 瞬断により演奏が遮られるため。
+            // 30 秒間拍が検出されなかったらメニューに自動復帰する
+            const uint32_t lastActivity = (sLastBeatMs > 0) ? sLastBeatMs : sStateEnteredMs;
+            if ((now - lastActivity) > 30000) {
+                data.conductor.state = ConductorState::Menu;
+                data.game.mode = 0;
+                data.game.navCursor = 0;
+                data.game.targetBpm = 0;
+                data.game.score = 0xFF;
+                data.game.gameBeatCount = 0;
+                data.game.scoreErrAccum = 0.0f;
+                data.game.scoreWeightAccum = 0.0f;
+                gateToIdle();
+                resetTempoTracking(data);
+            }
             break;
+        }
 
         case ConductorState::Fallback:
             // Fallback への遷移経路を全て無効化したので到達しないが、

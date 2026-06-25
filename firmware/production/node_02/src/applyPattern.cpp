@@ -31,7 +31,8 @@ namespace {
 // BPM は CTRL から受け取った参考値。NoteOff の予定時刻計算に使う補助。
 uint16_t durationQ8ToMs(uint16_t durationQ8, float bpm) {
     const float beats = (float)durationQ8 / 256.0f;
-    return (uint16_t)(beats * 60000.0f / (bpm < 1.0f ? logic_params::DEFAULT_BPM : bpm));
+    const float ms = beats * 60000.0f / (bpm < 10.0f ? logic_params::DEFAULT_BPM : bpm);
+    return (uint16_t)(ms > 60000.0f ? 60000.0f : ms);
 }
 
 // 楽譜の 1 イベントを発火 (NoteOn 予約のみ)。
@@ -68,6 +69,8 @@ void fireScoreEvent(SystemData& data, const ScoreEvent& ev, uint32_t now) {
 
 // 予約された細分音符の時刻が来ていれば NoteOn を出す。
 // applyPattern の先頭で呼び、楽譜進行 (4 分 BEAT 受信) と同一ループに重ならないようにする。
+// noteOutSub (専用スロット) に書く。noteOut (メイン) とは独立なので、
+// 同一ループ反復で fireScoreEvent が noteOut を書いても衝突しない。
 void firePendingSub(SystemData& data, uint32_t now) {
     if (!data.score.pendingSub) return;
     if ((int32_t)(now - data.score.pendingSubAtMs) < 0) return;
@@ -75,10 +78,10 @@ void firePendingSub(SystemData& data, uint32_t now) {
     uint16_t v = ((uint16_t)data.score.pendingSubVelocity *
                   (uint16_t)data.ctrl.velocity) / 127;
     if (v > 127) v = 127;
-    data.noteOut.noteNumber = data.score.pendingSubNote;
-    data.noteOut.velocity   = (uint8_t)v;
-    data.noteOut.durationMs = data.score.pendingSubDurationMs;
-    data.noteOut.pendingOn  = true;
+    data.noteOutSub.noteNumber = data.score.pendingSubNote;
+    data.noteOutSub.velocity   = (uint8_t)v;
+    data.noteOutSub.durationMs = data.score.pendingSubDurationMs;
+    data.noteOutSub.pendingOn  = true;
     DBG_PRINTF("[SUB] note=%u vel=%u dur=%u delay=%lu now=%lu\n",
                (unsigned)data.score.pendingSubNote,
                (unsigned)v,
@@ -105,6 +108,8 @@ void updatePerformerLed(SystemData& data) {
     }
 }
 
+uint32_t sLastBeatRecvMs = 0;
+
 }  // namespace
 
 void applyPattern(SystemData& data) {
@@ -129,9 +134,20 @@ void applyPattern(SystemData& data) {
             if (data.receiver.hasFirstBeat) {
                 data.performer.state = PerformerState::Playing;
             }
+            // リセット復帰: BEAT 未受信でも CTRL が Conducting (state==2) なら
+            // Playing に合流する。次の BEAT が来るまで鳴らないが、到着時に即発音できる。
+            else if (data.ctrl.state == 2 && data.ctrl.lastReceivedMs > 0) {
+                data.performer.state = PerformerState::Playing;
+                sLastBeatRecvMs = now;
+            }
             break;
         case PerformerState::Playing:
-            // BEAT が長く来なくても Playing に留まる。次の BEAT で自然に再開する。
+            // 指揮者からの BEAT が 10 秒以上途絶えたら待機に戻して LED を点滅に切り替える
+            if (sLastBeatRecvMs > 0 && (now - sLastBeatRecvMs) > 10000) {
+                data.performer.state = PerformerState::WaitStart;
+                data.receiver.hasFirstBeat = false;
+                sLastBeatRecvMs = 0;
+            }
             break;
     }
 
@@ -153,6 +169,7 @@ void applyPattern(SystemData& data) {
             fired       = true;
             firedBeatNo = data.receiver.pending.beatNo;
             data.receiver.pending.valid = false;
+            sLastBeatRecvMs = now;
         }
         // waitMs > 0: 次ループで再評価 (pending は valid のまま残す)
     }

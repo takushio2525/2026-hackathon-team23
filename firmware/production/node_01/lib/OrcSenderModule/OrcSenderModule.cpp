@@ -32,8 +32,9 @@ void OrcSenderModule::updateOutput(SystemData& data) {
         data.beat.event = false;
     }
 
-    // CTRL 送信予約 (周期駆動)
-    if (ctrlTimer_.getNowTime() >= cfg_.ctrlIntervalMs) {
+    // CTRL 送信予約 (周期駆動 + 状態変化時の即時送信)
+    if (data.sender.forceCtrlSend || ctrlTimer_.getNowTime() >= cfg_.ctrlIntervalMs) {
+        data.sender.forceCtrlSend = false;
         ctrlTimer_.setTime();
         orc::CtrlPacket pkt{};
         pkt.header.magic       = orc::MAGIC;

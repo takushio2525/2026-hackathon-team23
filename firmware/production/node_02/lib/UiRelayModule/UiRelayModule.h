@@ -16,7 +16,7 @@
 
 struct UiRelayConfig {
     uint8_t  partId;          // 中継元ノード ID (PC の役割判定用。node_02=0x02)
-    uint16_t minIntervalMs;   // 変化送出の最小間隔 [ms] (200 = 5Hz 上限)
+    uint16_t minIntervalMs;   // 変化送出の最小間隔 [ms] (33 = 30Hz 上限。BPM 表示の追従を滑らかにする)
     uint16_t heartbeatMs;     // 無変化でも送る保険間隔 [ms] (PC が途中接続しても状態を拾える)
 };
 

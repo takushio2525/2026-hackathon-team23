@@ -3,7 +3,7 @@
 //   pio run -d firmware/production/node_03 -t upload
 //   pio device monitor -d firmware/production/node_03
 //
-// 楽器ノード node_03 (輪唱の 1 声部) の全モジュール共有データ
+// 楽器ノード node_02 (輪唱の 1 声部) の全モジュール共有データ
 #pragma once
 #include <Arduino.h>
 
@@ -61,6 +61,7 @@ struct SystemData {
     StatusLedData       led;
     ReceiverLogicData   receiver;
     NoteOutData         noteOut;
+    NoteOutData         noteOutSub;   // 細分音符 (8 分裏等) 専用の第 2 スロット
     NoteSenderData      noteSender;
     SyncLogicData       sync;
     CtrlData            ctrl;

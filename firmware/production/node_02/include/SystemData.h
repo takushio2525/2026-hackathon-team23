@@ -61,6 +61,7 @@ struct SystemData {
     StatusLedData       led;
     ReceiverLogicData   receiver;
     NoteOutData         noteOut;
+    NoteOutData         noteOutSub;   // 細分音符 (8 分裏等) 専用の第 2 スロット
     NoteSenderData      noteSender;
     SyncLogicData       sync;
     CtrlData            ctrl;
