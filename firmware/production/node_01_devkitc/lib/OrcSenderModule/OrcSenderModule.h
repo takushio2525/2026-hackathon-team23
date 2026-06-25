@@ -21,6 +21,7 @@ struct OrcSenderData {
     uint32_t ctrlSeq = 0;
     uint32_t beatSeq = 0;
     uint32_t lastCtrlSentMs = 0;
+    bool     forceCtrlSend = false;   // 状態遷移・カーソル変更時にタイマーを待たず即送信
 };
 
 class OrcSenderModule : public IModule {

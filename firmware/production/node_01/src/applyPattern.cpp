@@ -162,6 +162,7 @@ bool updateNav(SystemData& data, uint32_t now, uint8_t itemCount) {
             const float dir = sNavHorizVec[dom] * NAV_LR_SIGN;
             if (dir < 0.0f) { if (data.game.navCursor > 0)             data.game.navCursor--; }
             else            { if (data.game.navCursor + 1 < itemCount) data.game.navCursor++; }
+            data.sender.forceCtrlSend = true;
         }
         DBG_PRINTF("[N1 NAV vert=%5.2f horiz=%5.2f -> %s]\n",
                    sNavVertAccum, sNavHorizAccum,
@@ -195,6 +196,8 @@ void noteStateTransition(SystemData& data, uint32_t now) {
     gateToIdle();
     sNavGate = NavGate::Idle;
     data.beat.pathLenM = 0.0f;
+    // 状態遷移直後に CTRL を即送信し、PC 側の画面切替を高速化する
+    data.sender.forceCtrlSend = true;
 }
 
 bool inTransitionDeadtime(uint32_t now) {
