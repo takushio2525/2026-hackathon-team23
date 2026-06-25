@@ -1,7 +1,7 @@
 # firmware/production — ゲームモード（かえるのうた輪唱 + テンポ採点）
 
-`firmware/test_v2`（きらきら星→かえるのうた輪唱）の続編。**指揮者 1 + 楽器 4** の
-5 ノード構成・マスタクロック同期・拍番号駆動の楽譜進行を踏襲し、
+`firmware/test_v2`（きらきら星→かえるのうた輪唱）の続編。**指揮者 1 + 楽器 5** の
+6 ノード構成・マスタクロック同期・拍番号駆動の楽譜進行を踏襲し、
 **ゲームモード**を追加した版：
 
 - **2 モード構成**: ①自由演奏（実振り BPM で輪唱）／②ゲーム（目標テンポ 100 BPM を
@@ -17,7 +17,8 @@
   （`UiRelayModule`）。UDP には流れないので同期経路（CTRL/BEAT/NOTE）に影響しない
 - **楽譜は「かえるのうた」32 拍**（`node_02〜05/src/score_data.cpp`）。8 分音符は
   `subNote`（拍裏の予約発火）で表現
-- **4 台輪唱**: 声部が 8 拍（1 フレーズ）ずつ遅れて入る。周回は輪唱サイクル
+- **4 台輪唱 + ドラム**: 金管4声が 8 拍（1 フレーズ）ずつ遅れて入り、ドラムが
+  4/4拍子で全体を支える。周回は輪唱サイクル
   `CANON_CYCLE_BEATS=56` 拍（曲長 32 + 最終声部の遅延 24）を全声部で共有し、
   最終声部（node_05）が 1 周を終えるまで先頭声部は次の周回を始めない
 
@@ -30,9 +31,11 @@
 | [`node_03/`](node_03/) | 輪唱 声部 2（partId=0x03, headRestBeats=8, instrumentId=1=ホルン） |
 | [`node_04/`](node_04/) | 輪唱 声部 3（partId=0x04, headRestBeats=16, instrumentId=2=トロンボーン） |
 | [`node_05/`](node_05/) | 輪唱 声部 4（partId=0x05, headRestBeats=24, instrumentId=3=チューバ） |
+| [`node_06/`](node_06/) | ドラム（partId=0x06, headRestBeats=0, instrumentId=4）。1・3拍目キック、2・4拍目スネアの4/4拍子 |
 
-声部の楽譜（`score_data.cpp`）は 4 台とも同一（= 輪唱）。差分は ProjectConfig.h と
-node_02 のみ持つ `UiRelayModule` だけ。
+金管4声の楽譜（`node_02`〜`node_05` の `score_data.cpp`）は同一（= 輪唱）。
+ドラム（`node_06`）は別譜で、1・3拍目キック、2・4拍目スネアの4/4拍子を演奏する。
+金管側の差分は ProjectConfig.h と node_02 のみ持つ `UiRelayModule` だけ。
 
 ## クイックスタート
 
@@ -45,6 +48,7 @@ pio run -d firmware/production/node_02 -t upload   # 声部 1（メイン操作 
 pio run -d firmware/production/node_03 -t upload   # 声部 2
 pio run -d firmware/production/node_04 -t upload   # 声部 3
 pio run -d firmware/production/node_05 -t upload   # 声部 4（最終声部）
+pio run -d firmware/production/node_06 -t upload   # ドラム
 
 # 3. Mac で Processing を起動し pc_app/production/orchestra_resynth/orchestra_resynth.pde を Run
 #    画面のポート一覧で繋いだ Arduino のポートをクリックして開く
