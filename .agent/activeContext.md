@@ -5,14 +5,15 @@
 
 ## 現在の対象
 
-- **`fix/processing-sound-drop` ブランチ**で production コード改善推奨8件 + 提案7件を完了。
-  - 6a21f5d: 重大バグ4件修正（前コミット群）
-  - 3ff75d6〜e6c22e8: 改善推奨8件 + 提案7件（本セッション、7コミット）
+- MOE/MOP 全 9 項目の検証プログラムを `tools/verification/` に新規作成
+- serial_logger.py（ログ収集）+ analyze.py（解析・PASS/FAIL 判定）の 2 本構成
+- MOP8 用検証ファーム（main_conductor_perf.cpp / main_instrument_perf.cpp）
 
 ## 次の一手
 
-- `fix/processing-sound-drop` を main へマージ（PR or 直マージ）
-- 実機で全修正の動作確認
+- 実機で全ノード SERIAL_DEBUG=1 にして検証テストを実行
+- MOP2（音階誤差）は Processing 音声録音の手動テスト
+- 発表会（2026-07-01）に向けた最終調整
 
 ## 現フェーズで Read すべき設計書
 
