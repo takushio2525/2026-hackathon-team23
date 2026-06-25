@@ -134,6 +134,12 @@ void applyPattern(SystemData& data) {
             if (data.receiver.hasFirstBeat) {
                 data.performer.state = PerformerState::Playing;
             }
+            // リセット復帰: BEAT 未受信でも CTRL が Conducting (state==2) なら
+            // Playing に合流する。次の BEAT が来るまで鳴らないが、到着時に即発音できる。
+            else if (data.ctrl.state == 2 && data.ctrl.lastReceivedMs > 0) {
+                data.performer.state = PerformerState::Playing;
+                sLastBeatRecvMs = now;
+            }
             break;
         case PerformerState::Playing:
             // 指揮者からの BEAT が 10 秒以上途絶えたら待機に戻して LED を点滅に切り替える
