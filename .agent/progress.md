@@ -22,3 +22,4 @@
 - 2026-06-26: `work/saito/week10/kaeru_score_week10_adjusted/` に修正版 Processing スケッチを作成。ドラムを4/4、チューバをC2相当、全体音量を増加し、音色JSONを同梱。Processing ビルド成功。
 - 2026-06-27: week10修正版で拍位置を変えずに金管の `attackSec` だけ短縮。`BRASS_ATTACK_SCALE=0.45` を追加し、Processing ビルド成功。
 - 2026-06-27: week10修正版のチューバ音量を `amplitude 0.24` から `0.30` に増加。他パートと拍位置は変更せず、Processing ビルド成功。
+- 2026-06-27: week10修正版のチューバ音量をさらに `amplitude 0.38` へ増加。他パートと拍位置は変更せず、Processing ビルド成功。

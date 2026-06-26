@@ -86,7 +86,7 @@ final PartDefinition[] MELODY_PARTS = {
   new PartDefinition("主旋律1 / トランペット", "trumpets.tweaked.instrument.json",  0,  12, 0.24f), // C5〜A5
   new PartDefinition("主旋律2 / ホルン",       "horns.tweaked.instrument.json",      8,   0, 0.21f), // C4〜A4
   new PartDefinition("主旋律3 / トロンボーン", "trombones.tweaked.instrument.json", 16, -12, 0.22f), // C3〜A3
-  new PartDefinition("主旋律4 / チューバ",     "tuba.tweaked.instrument.json",      24, -24, 0.30f)  // C2〜A2（共通譜から2オクターブ下）
+  new PartDefinition("主旋律4 / チューバ",     "tuba.tweaked.instrument.json",      24, -24, 0.38f)  // C2〜A2（共通譜から2オクターブ下）
 };
 final float DRUM_AMPLITUDE = 0.12f;
 
