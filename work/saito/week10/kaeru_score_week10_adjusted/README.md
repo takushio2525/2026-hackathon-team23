@@ -12,6 +12,7 @@ week9 の `kaeru_score_debug` をもとにした、week10 用の修正版 Proces
 - 全パートの音量を week9 より大きめに調整
   - `MASTER_GAIN = 1.35`
   - 金管 4 声の各 `amplitude` を増加
+  - チューバは低音でも埋もれにくいように `0.24` から `0.30` に増加
   - `DRUM_AMPLITUDE` と `RECORDED_DRUM_GAIN` も増加
 - 金管とドラムの聴感上のズレ対策
   - 拍位置は変更しない
