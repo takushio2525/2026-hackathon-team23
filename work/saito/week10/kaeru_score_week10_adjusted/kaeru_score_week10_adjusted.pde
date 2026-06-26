@@ -11,6 +11,8 @@ final int CLOSED_HI_HAT = 42;
 final int CRASH_CYMBAL = 49;
 // week10版は発表前確認用に、全体音量を week9 より大きめにする。
 final float MASTER_GAIN = 1.35f;
+// 拍位置は変えず、金管の音の立ち上がりだけを速くしてドラムとの聴感上のズレを減らす。
+final float BRASS_ATTACK_SCALE = 0.45f;
 final float RECORDED_DRUM_GAIN = 2.6f;
 // week10/kaeru_score_week10_adjusted/data/ に同梱した音色JSONを読む。外部参照は不要。
 final String SOURCE_DATA_DIRECTORY = "data/";
@@ -209,7 +211,8 @@ class BrassNote implements Instrument {
                                  amplitude * timbre.harmonicGains[i], Waves.SINE);
       harmonic.patch(mix);
     }
-    envelope = new ADSR(1.0f, timbre.attackSec, timbre.decaySec,
+    float attack = max(0.003f, timbre.attackSec * BRASS_ATTACK_SCALE);
+    envelope = new ADSR(1.0f, attack, timbre.decaySec,
                         timbre.sustainLevel, timbre.releaseSec);
     mix.patch(envelope);
   }
