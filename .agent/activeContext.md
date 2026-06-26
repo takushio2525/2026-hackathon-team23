@@ -1,5 +1,8 @@
 # Active Context
 
+- 2026-06-26: ユーザー指示により、以後の作業は `saitou-work` ブランチで行う。
+- 2026-06-26: `firmware/` と `pc_app/` 配下のプログラムは変更しない。齋藤個人作業は `work/saito/` 配下を中心に扱う。
+- 2026-06-26: `saitou-work` へ切り替え済み。ブランチは `origin/saitou-work` と同期済み。未追跡として `firmware/production/node_04/.vscode/` のVS Code設定ファイルが見えているが、コミット対象にしない。
 - 2026-06-21: `work/saito/week9/kaeru_score_debug/` に、week7 をもとにした4声輪唱版の Processing スケッチを作成済み。
 - 共通の `MELODY_SCORE` をトランペット、ホルン、トロンボーン、チューバで共有し、各パートはオクターブ補正と開始拍だけを変える。
 - ドラムは56拍まで延長し、音量を下げて裏拍ハイハットと終止前フィルを追加した。音色JSONは week9 内の `data/` に同梱し、起動時の自動再生を削除済み。
