@@ -18,7 +18,7 @@
 - **楽譜は「かえるのうた」32 拍**（`node_02〜05/src/score_data.cpp`）。8 分音符は
   `subNote`（拍裏の予約発火）で表現
 - **4 台輪唱 + ドラム**: 金管4声が 8 拍（1 フレーズ）ずつ遅れて入り、ドラムが
-  4/4拍子で全体を支える。周回は輪唱サイクル
+  拍頭中心のパターンで全体を支える。周回は輪唱サイクル
   `CANON_CYCLE_BEATS=56` 拍（曲長 32 + 最終声部の遅延 24）を全声部で共有し、
   最終声部（node_05）が 1 周を終えるまで先頭声部は次の周回を始めない
 
@@ -31,10 +31,10 @@
 | [`node_03/`](node_03/) | 輪唱 声部 2（partId=0x03, headRestBeats=8, instrumentId=1=ホルン） |
 | [`node_04/`](node_04/) | 輪唱 声部 3（partId=0x04, headRestBeats=16, instrumentId=2=トロンボーン） |
 | [`node_05/`](node_05/) | 輪唱 声部 4（partId=0x05, headRestBeats=24, instrumentId=3=チューバ） |
-| [`node_06/`](node_06/) | ドラム（partId=0x06, headRestBeats=0, instrumentId=4）。1・3拍目キック、2・4拍目スネアの4/4拍子 |
+| [`node_06/`](node_06/) | ドラム（partId=0x06, headRestBeats=0, instrumentId=4）。キック中心に、声部の入りや区切りでクラッシュを鳴らす |
 
 金管4声の楽譜（`node_02`〜`node_05` の `score_data.cpp`）は同一（= 輪唱）。
-ドラム（`node_06`）は別譜で、1・3拍目キック、2・4拍目スネアの4/4拍子を演奏する。
+ドラム（`node_06`）は別譜で、拍頭のキックを中心にしつつ、声部の入りや区切りでクラッシュを鳴らす。
 金管側の差分は ProjectConfig.h と node_02 のみ持つ `UiRelayModule` だけ。
 
 ## クイックスタート

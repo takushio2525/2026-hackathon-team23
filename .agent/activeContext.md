@@ -5,17 +5,16 @@
 
 ## 現在の対象
 
-- MOE/MOP 全 9 項目の検証プログラムを `tools/verification/` に新規作成
-- serial_logger.py（ログ収集）+ analyze.py（解析・PASS/FAIL 判定）の 2 本構成
-- MOP8 用検証ファーム（main_conductor_perf.cpp / main_instrument_perf.cpp）
+- `main` に残っていた `1093f04 [改善] 本番版のドラム拍子と全楽器音量を調整` 由来の説明を整理
+- 実行コード本体は触らず、README とドラム譜ヘッダコメントのみ修正
+- 対象: `firmware/production/README.md`、`firmware/production/node_06/include/score_data.h`、`pc_app/production/README.md`
 
 ## 次の一手
 
-- 実機で全ノード SERIAL_DEBUG=1 にして検証テストを実行
-- MOP2（音階誤差）は Processing 音声録音の手動テスト
-- 発表会（2026-07-01）に向けた最終調整
+- `main` にコミット・push する
+- `saitou-work` での個人作業は引き続き `work/saito/` 配下中心に行い、通常作業では `firmware/`・`pc_app/` のプログラムを触らない
 
 ## 現フェーズで Read すべき設計書
 
-- プロトコル仕様: `.agent/api.md`
-- ゲームモード設計: `.agent/test_v3-game-design.md`
+- コミット規約: `.agent/conventions.md`
+- 必要に応じて production 構成: `firmware/production/README.md`、`pc_app/production/README.md`
