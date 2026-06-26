@@ -3,6 +3,7 @@
 - 2026-06-26: ユーザー指示により、以後の作業は `saitou-work` ブランチで行う。
 - 2026-06-26: `firmware/` と `pc_app/` 配下のプログラムは変更しない。齋藤個人作業は `work/saito/` 配下を中心に扱う。
 - 2026-06-26: `saitou-work` へ切り替え済み。ブランチは `origin/saitou-work` と同期済み。未追跡として `firmware/production/node_04/.vscode/` のVS Code設定ファイルが見えているが、コミット対象にしない。
+- 2026-06-26: main に入れた `1093f04 [改善] 本番版のドラム拍子と全楽器音量を調整` の取り消し前調査を実施。対象は `firmware/production/README.md`、`firmware/production/node_06/include/score_data.h`、`firmware/production/node_06/src/score_data.cpp`、`pc_app/production/README.md`、`pc_app/production/orchestra_resynth/orchestra_resynth.pde`。後続の #32/#33 で Processing 処理は `pc_app/common/AudioManager.pde` に移動し、音量・チューバ移調のコードは現在ほぼ元値へ戻っているが、README の説明には C2/1.40/4/4 記述が残っている。
 - 2026-06-21: `work/saito/week9/kaeru_score_debug/` に、week7 をもとにした4声輪唱版の Processing スケッチを作成済み。
 - 共通の `MELODY_SCORE` をトランペット、ホルン、トロンボーン、チューバで共有し、各パートはオクターブ補正と開始拍だけを変える。
 - ドラムは56拍まで延長し、音量を下げて裏拍ハイハットと終止前フィルを追加した。音色JSONは week9 内の `data/` に同梱し、起動時の自動再生を削除済み。
