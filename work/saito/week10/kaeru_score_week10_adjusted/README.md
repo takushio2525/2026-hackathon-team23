@@ -13,7 +13,7 @@ week9 の `kaeru_score_debug` をもとにした、week10 用の修正版 Proces
   - `MASTER_GAIN = 1.35`
   - 金管 4 声の各 `amplitude` を増加
   - チューバは低音でも埋もれにくく、音割れしにくい範囲として `0.36` に調整
-  - `DRUM_AMPLITUDE` と `RECORDED_DRUM_GAIN` も増加
+  - ドラムは全体とのバランスを見て `DRUM_AMPLITUDE = 0.11` に微調整
 - 金管とドラムの聴感上のズレ対策
   - 拍位置は変更しない
   - 金管の `attackSec` だけ `BRASS_ATTACK_SCALE = 0.45` で短くし、立ち上がりを速くする

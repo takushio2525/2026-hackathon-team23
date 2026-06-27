@@ -88,7 +88,7 @@ final PartDefinition[] MELODY_PARTS = {
   new PartDefinition("主旋律3 / トロンボーン", "trombones.tweaked.instrument.json", 16, -12, 0.22f), // C3〜A3
   new PartDefinition("主旋律4 / チューバ",     "tuba.tweaked.instrument.json",      24, -24, 0.36f)  // C2〜A2（共通譜から2オクターブ下）
 };
-final float DRUM_AMPLITUDE = 0.12f;
+final float DRUM_AMPLITUDE = 0.11f;
 
 class TimbreData {
   String name;
