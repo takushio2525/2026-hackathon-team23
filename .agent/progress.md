@@ -5,6 +5,10 @@
 
 ## 2026-06 — 本番プログラム構築フェーズ
 
+- 2026-06-25: **MOE/MOP 全9項目の検証プログラムを新規作成**（`f3fddc6`）。
+  `tools/verification/` に serial_logger.py（複数ポート同時ログ収集）、analyze.py（9項目 PASS/FAIL 判定）、
+  MOP8 用検証ファーム（CPU 負荷計測 main.cpp）、README（テスト手順）を追加。MOP2 は手動テスト手順のみ。
+
 - 2026-06-24: **production 改善推奨8件＋提案7件を修正**（`3ff75d6`〜`e6c22e8`、7コミット）。
   Processing DrumNote パッチ解除修正、ドラム楽譜 crash 延長＋ハイハット TODO、指揮者 beatLookahead 45ms化・LED 閾値修正・
   Conducting 30秒タイムアウト、楽器 durationQ8ToMs オーバーフロー防止・BEAT 10秒タイムアウト、UiRelay コメント修正、
