@@ -18,8 +18,8 @@ sidebar:
 **約 15 分**。前提: 三角関数、サンプリング（44.1 kHz とは何か）、Processing/Java の基本構文。
 :::
 
-実装本体: `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde`
-音色定義: `pc_app/test_v2/orchestra_resynth/data/*.json`（実体は `sound_lab/` で生成）
+実装本体: `pc_app/production/orchestra_resynth/orchestra_resynth.pde`
+音色定義: `pc_app/production/orchestra_resynth/data/*.json`（実体は `sound_lab/` で生成）
 
 ## 加算合成（Additive Synthesis）とは
 
@@ -356,7 +356,8 @@ void triggerNote(...){
 }
 ```
 
-24 ボイス。3 声輪唱 × 各音の release 余韻でも余裕。
+24 ボイス。金管 4 声の輪唱に各音の release 余韻が重なっても余裕を持たせている。
+ドラムは別の `MAX_DRUM_POLYPHONY = 12` で管理するため、この上限には含まれない。
 
 ### release 完了の検知
 
@@ -465,11 +466,11 @@ AudioOutput out;
 
 void setup(){
     minim = new Minim(this);
-    out = minim.getLineOut(Minim.STEREO, 1024, 44100);
+    out = minim.getLineOut(Minim.STEREO, 512, 44100);
 }
 ```
 
-- バッファサイズ 1024 サンプル = 約 23 ms（44.1 kHz）
+- バッファサイズ 512 サンプル = 約 11.6 ms（44.1 kHz）
 - ステレオ出力（本プロジェクトはモノ → 両チャンネル同じ）
 
 `ResynthVoice` は `UGen`（Unit Generator）を継承していて、Minim の音声グラフに
@@ -525,7 +526,7 @@ triggerNote(partId, instrumentId, midi, velocity, durationMs)
    ▼
 activeVoices (ArrayList<ResynthVoice>)
    │
-   │ Minim が 44.1 kHz × 1024 サンプル単位で uGenerate を呼ぶ
+   │ Minim が 44.1 kHz × 512 サンプル単位で uGenerate を呼ぶ
    │
    ▼ 各 Voice の uGenerate(channels)
        - 倍音ループ s += amp * env * sin(phase)

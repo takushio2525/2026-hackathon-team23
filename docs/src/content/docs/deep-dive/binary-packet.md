@@ -1,353 +1,361 @@
 ---
 title: バイナリパケット
-description: 20 B 固定の CTRL/BEAT/NOTE がメモリ上でどう並ぶか — pragma pack、エンディアン、memcpy 復元、static_assert
+description: production の20 B固定 CTRL・BEAT・NOTE・UIを、構造体配置、エンディアン、Serialフレーミングまで分解する
 sidebar:
   order: 4
 ---
 
 :::note[この章で分かること]
-- 「20 バイト固定」を C++ の構造体で表現する方法
-- `#pragma pack` の意味と、サボると何が壊れるか
-- リトルエンディアン環境で `memcpy` が動く前提
-- Processing 側で同じバイナリを読むときのオフセット計算
-- 拡張時のチェックリスト（互換性を壊さない作法）
+- 4種類のパケットが同じ20 Bに収まる仕組み
+- `#pragma pack`、リトルエンディアン、`static_assert` が必要な理由
+- UDPとUSB Serialでフレーミング方法が違う理由
+- C++とProcessingで同じオフセットを読む方法
 :::
 
-:::tip[読了目安]
-**約 10 分**。前提: C/C++ の構造体・ポインタ・型サイズ（`uint8_t` / `uint16_t` / `uint32_t`）。
-:::
+実装本体:
 
-実装本体: `firmware/test_v2/common/lib/OrcProtocol/OrcProtocol.h`
+- マイコン: `firmware/production/common/lib/OrcProtocol/OrcProtocol.h`
+- PC: `pc_app/common/OrcProtocol.pde`
+- Serialフレーミング: `pc_app/common/SerialCore.pde`
 
-## 20 B 固定にした狙い
+## 全体構造
 
-CTRL / BEAT / NOTE のすべてを 20 B に統一している。これにより：
+production のプロトコルは、すべて次の20 B固定です。
 
-- 受信側は **「20 B 来たら 1 パケット」** とだけ思えば良い（フレーミングが単純）
-- マイコンのバッファサイズを 20 B で固定できる（メモリ予測が容易）
-- パケット長で型を推定する必要がない（`type` フィールドで判別）
+```text
+0                         11 12                       19
++---------------------------+---------------------------+
+| PacketHeader 12 B         | type別 payload 8 B       |
++---------------------------+---------------------------+
+```
 
-ヘッダ 12 B + ペイロード 8 B の構成は、メモリレイアウトを揃えるための制約から来ている。
+パケット型は4種類あります。
 
-## 共通ヘッダ（12 B）の構造
+| type | 名前 | 主な経路 | 用途 |
+|---:|---|---|---|
+| 1 | CTRL | node_01 → UDP → node_02〜06 | BPM、状態、ゲーム設定 |
+| 2 | BEAT | node_01 → UDP → node_02〜06 | 拍番号と発音予定時刻 |
+| 3 | NOTE | node_02〜06 → USB Serial → PC | 音高、音量、長さ、音色 |
+| 4 | UI | node_02 → USB Serial → PC | 画面状態の中継 |
+
+UIはUDPには流しません。node_02が受けたCTRLを低頻度でPCへ中継するための専用型です。
+
+固定長にすると、受信側は型ごとにバッファを確保する必要がありません。UDPでは
+「20 Bでなければ破棄」、Serialでは「magicを見つけてから20 B読む」と単純化できます。
+
+## 共通ヘッダ12 B
 
 ```cpp
 #pragma pack(push, 1)
 struct PacketHeader {
-    uint16_t magic;        //  2 B (オフセット 0)
-    uint8_t  version;      //  1 B (オフセット 2)
-    uint8_t  type;         //  1 B (オフセット 3)
-    uint32_t seq;          //  4 B (オフセット 4)
-    uint32_t timestampMs;  //  4 B (オフセット 8)
+    uint16_t magic;        // offset 0, 2 B
+    uint8_t  version;      // offset 2, 1 B
+    uint8_t  type;         // offset 3, 1 B
+    uint32_t seq;          // offset 4, 4 B
+    uint32_t timestampMs;  // offset 8, 4 B
 };
 #pragma pack(pop)
 ```
 
-合計 12 B。各フィールドの意味：
+| offset | フィールド | 意味 |
+|---:|---|---|
+| 0〜1 | `magic` | `0x4F52`。送信バイト列は `52 4F` |
+| 2 | `version` | 現行は `0x01` |
+| 3 | `type` | 1=CTRL、2=BEAT、3=NOTE、4=UI |
+| 4〜7 | `seq` | 単調増加するシーケンス番号 |
+| 8〜11 | `timestampMs` | 送信側の `millis()` |
 
-| フィールド | 意味 |
-|---|---|
-| `magic = 0x4F52` | バイト列で `0x52 0x4F` =「RO」をリトルエンディアンで読むと「OR」 |
-| `version` | プロトコルバージョン。`0x01` 以外は捨てる |
-| `type` | `1=CTRL` / `2=BEAT` / `3=NOTE` |
-| `seq` | 型ごとに独立な単調増加カウンタ。受信側でロス / 重複検知に使う |
-| `timestampMs` | 送信側 `millis()`。楽器側はこれで時刻オフセットを推定 |
+`magic` はASCIIの「OR」を16 bit値として表したものです。little endianでは下位バイトから
+送るので、Serial上では `0x52, 0x4F`、つまり「RO」の順に見えます。
 
-## `#pragma pack(push, 1)` の意味
+### seqの役割
 
-C/C++ のデフォルトでは、コンパイラが速度のために **構造体メンバの間にパディングバイト** を
-挿入することがある。たとえば：
+`seq` はペイロードの意味を持たず、欠落や重複の観測に使います。BEATの4連送は
+同じパケットを繰り返すため同じ `seq` と `beatNo` を持ちます。受信側は
+`beatNo` が同じ再送を二重発音させません。
+
+### timestampMsの役割
+
+CTRLとBEATではマスター時計を伝え、楽器側の時計オフセット推定に使います。
+NOTEとUIではPCログ上の送信時刻として残ります。32 bit `millis()` は約49.7日で
+ラップするため、差分は符号付き32 bitとして扱います。
+
+## 1バイト境界で詰める理由
+
+C++コンパイラは通常、CPUが読みやすい境界へメンバを揃えるためパディングを挿入します。
 
 ```cpp
-struct Foo {
-    uint8_t  a;   // 1 B
-    uint32_t b;   // 4 B
+struct Example {
+    uint8_t  a;
+    uint32_t b;
 };
-// sizeof(Foo) = 8 になりがち (a の後ろに 3 B のパディング)
 ```
 
-これだと「ヘッダ 12 B」のはずが、コンパイラ次第で 16 B や 20 B に膨らんでしまう。
-それを防ぐのが `#pragma pack(push, 1)`：
+この構造体は見かけ上5 Bでも、`b` の手前に3 B入り、8 Bになることがあります。
+通信形式ではコンパイラやボードごとにサイズが変わると壊れるため、
+`#pragma pack(push, 1)` でパディングを禁止します。
 
-- `push`: 現在のパッキング設定をスタックに保存
-- `1`: 「1 バイト境界で詰める」= パディングを入れない
-- 対応する `#pragma pack(pop)` で元の設定に戻る
+さらにコンパイル時検査を置いています。
 
-これにより、`sizeof(PacketHeader) == 12` が保証される（後述の `static_assert`）。
+```cpp
+static_assert(sizeof(PacketHeader) == 12, "header must be 12 B");
+static_assert(sizeof(CtrlPacket) == 20, "ctrl packet must be 20 B");
+static_assert(sizeof(BeatPacket) == 20, "beat packet must be 20 B");
+static_assert(sizeof(NotePacket) == 20, "note packet must be 20 B");
+static_assert(sizeof(UiPacket) == 20, "ui packet must be 20 B");
+```
 
-### パディングを入れたままだと何が起きるか
+フィールド追加で8 Bを超えると、実行前にビルドが止まります。
 
-ヘッダが 16 B になると、送信側と受信側でフィールドのオフセットがずれて、
-**全部のデータが意味不明になる**。Magic だけ偶然合うこともあるが、`seq` や
-`timestampMs` がでたらめになる。
-
-特にマイコン側と PC 側でアラインメント仕様が違うと、こっそり壊れる。
-`#pragma pack` を入れる、もしくは Processing 側のように手動オフセット指定にする、
-のどちらかで揃える必要がある。
-
-## ペイロード（8 B）の構造
-
-### CtrlPayload
+## CTRLペイロード
 
 ```cpp
 struct CtrlPayload {
-    uint16_t bpmQ8;        // 2 B (オフセット 12 from start)
-    uint8_t  velocity;     // 1 B (14)
-    uint8_t  state;        // 1 B (15)
-    uint8_t  reserved[4];  // 4 B (16)
+    uint16_t bpmQ8;      // offset 12
+    uint8_t  velocity;   // 14
+    uint8_t  state;      // 15
+    uint8_t  mode;       // 16
+    uint8_t  navCursor;  // 17
+    uint8_t  targetBpm;  // 18
+    uint8_t  score;      // 19
 };
 ```
 
-`bpmQ8` は BPM を 8 倍した固定小数（Q8）。
-- 例: 100.0 BPM → `800`、120.5 BPM → `964`
-- 送信: `bpmQ8 = (uint16_t)(bpm * 8.0f + 0.5f)`
-- 受信: `bpm = bpmQ8 / 8.0f`
-- 解像度 0.125 BPM、範囲 40〜240 BPM は `320`〜`1920` に収まる（`uint16_t` の `0`〜`65535` 内）
+| offset | フィールド | 値 |
+|---:|---|---|
+| 12〜13 | `bpmQ8` | BPM × 8 |
+| 14 | `velocity` | 0〜127 |
+| 15 | `state` | 0=Idle、1=Calibrating、2=Conducting、3=Fallback、4=Menu、5=Result |
+| 16 | `mode` | 0=自由演奏、1=ゲーム |
+| 17 | `navCursor` | メニューカーソル |
+| 18 | `targetBpm` | ゲーム目標40〜240、0=未設定 |
+| 19 | `score` | 0〜100、`0xFF`=未確定 |
 
-### BeatPayload
+### Q8固定小数
+
+BPMは小数1桁程度を保ちたい一方、`float` をネットワーク形式に含めたくありません。
+そこで8倍して `uint16_t` にします。
+
+```text
+encode: bpmQ8 = round(BPM × 8)
+decode: BPM   = bpmQ8 ÷ 8
+```
+
+たとえば120.5 BPMは964、解像度は0.125 BPMです。名前はQ8ですが、一般的な
+Q8.8形式ではなく「倍率8」というプロジェクト内の呼び方です。
+
+## BEATペイロード
 
 ```cpp
 struct BeatPayload {
-    uint16_t beatNo;          // 2 B (12)
-    uint8_t  reserved[2];     // 2 B (14)
-    uint32_t playAtMasterMs;  // 4 B (16)
+    uint16_t beatNo;          // offset 12
+    uint8_t  reserved[2];     // 14
+    uint32_t playAtMasterMs;  // 16
 };
 ```
 
-`beatNo` は 0 オリジンで単調増加、`playAtMasterMs` は指揮者時計でのこの拍の発音目標時刻。
-詳しくは [時刻同期メカニズム](/deep-dive/time-sync/) 参照。
+`beatNo` は曲進行の基準です。各楽器は自分のローカルカウンタではなく、
+`(beatNo + headOffset) % 32` から読む譜面位置を決めます。
 
-### NotePayload
+`playAtMasterMs` は受信時刻ではなく発音予定時刻です。現行設定は送信時刻の45 ms先です。
+BEATは2 ms間隔で4連送されても、すべて同じ予定時刻を持ちます。
+
+## NOTEペイロード
 
 ```cpp
 struct NotePayload {
-    uint8_t  partId;        // 1 B (12)
-    uint8_t  noteNumber;    // 1 B (13)
-    uint8_t  velocity;      // 1 B (14)
-    uint8_t  gate;          // 1 B (15)
-    uint16_t durationMs;    // 2 B (16)
-    uint8_t  instrumentId;  // 1 B (18)
-    uint8_t  reserved;      // 1 B (19)
+    uint8_t  partId;       // offset 12
+    uint8_t  noteNumber;   // 13
+    uint8_t  velocity;     // 14
+    uint8_t  gate;         // 15
+    uint16_t durationMs;   // 16
+    uint8_t  instrumentId; // 18
+    uint8_t  reserved;     // 19
 };
 ```
 
-`instrumentId` は test_v2 で追加された。旧 `reserved[0]` を充てている。
-PC 側 Processing が `data/<n>_*.json` の n 番目の楽器定義を選ぶキーになる。
+| フィールド | 意味 |
+|---|---|
+| `partId` | 送信ノード。productionでは `0x02〜0x06` |
+| `noteNumber` | MIDI音番号。60=C4 |
+| `velocity` | 0〜127 |
+| `gate` | 1=NoteOn、0=NoteOff |
+| `durationMs` | 予定発音長 |
+| `instrumentId` | 0=trumpet、1=horn、2=trombone、3=tuba、4=drum |
+| `reserved` | 0で埋める |
 
-> ⚠️ test_v1 のドキュメントでは「先頭が `midiNote`」と書かれていた箇所があるが、test_v2
-> 実装は **ヘッダ直後を `partId` から始める順序**。受信側はオフセット 12 から
-> `partId, noteNumber, velocity, gate, durationMs, instrumentId, reserved` の順で読む。
+PCは金管のNOTEに楽器別オクターブ移調を適用します。ドラムでは
+`noteNumber` 36/38/42/49をkick/snare/closed hi-hat/crashとして解釈します。
 
-## `static_assert` でサイズを固定する
-
-仕様変更でうっかりサイズが変わってないか、**コンパイル時** にチェックする：
-
-```cpp
-static_assert(sizeof(PacketHeader) == HEADER_SIZE, "header must be 12 B");
-static_assert(sizeof(CtrlPacket) == PACKET_SIZE,  "ctrl packet must be 20 B");
-static_assert(sizeof(BeatPacket) == PACKET_SIZE,  "beat packet must be 20 B");
-static_assert(sizeof(NotePacket) == PACKET_SIZE,  "note packet must be 20 B");
-```
-
-`#pragma pack` を入れ忘れたり、フィールドを誤って追加したりすると、
-ここでビルドが落ちる。仕様の **嘘** を実装に持ち込ませない安全装置。
-
-## リトルエンディアンの前提
-
-ESP32 / Arduino UNO R4 / x86 PC は **リトルエンディアン**（多バイト整数の下位バイトが
-先に並ぶ）。`uint16_t bpmQ8 = 800` をメモリに置くと：
-
-```
-オフセット: 12   13
-バイト値:   0x20 0x03   (0x0320 = 800)
-```
-
-楽器側は同じくリトルエンディアン環境なので、`memcpy` で生バイトを構造体に書き戻すと
-正しい値になる：
+## UIペイロード
 
 ```cpp
-orc::CtrlPacket pkt;
-memcpy(&pkt, buf, sizeof(pkt));
-// pkt.payload.bpmQ8 は 800 になっている
+struct UiPayload {
+    uint8_t  state;      // offset 12
+    uint8_t  mode;       // 13
+    uint8_t  navCursor;  // 14
+    uint8_t  targetBpm;  // 15
+    uint8_t  score;      // 16
+    uint8_t  partId;     // 17
+    uint16_t bpmQ8;      // 18
+};
 ```
 
-### ビッグエンディアン環境では
+UIはCTRLと内容が似ていますが、経路と受信者が違います。node_02の
+`UiRelayModule` がCTRLの値を取り出し、変化時は最短33 ms（最大約30 Hz）、
+無変化時は1秒heartbeatでUSB Serialへ送ります。
+PCは `partId = 0x02` とUI受信からメイン操作画面の役割を判定します。
 
-ARM Cortex-M も含めて現代の組み込みは大半がリトルエンディアン。理論的には
-ビッグエンディアン環境（一部のミップス、ネットワーク機器）で動かすと壊れるが、
-本プロジェクトの対象ハードウェアでは想定不要。
+画面番号そのものは送りません。PCは `(state, mode)` から
+Menu、Free Play、Game Play、Resultなどを導出します。これによりマイコンとPCの
+画面列挙を二重管理しません。
 
-### `magic = 0x4F52` の表示
+## little endian
 
-リトルエンディアンで書き込まれるので、メモリ上のバイト列は：
+productionで使うESP32-S3、UNO R4 WiFi、PC側Javaの手動パースは、
+複数バイト値を下位バイトから並べる前提です。
 
-```
-オフセット 0:  0x52  0x4F   (= 'R' 'O')
-```
+16 bit値 `0x03C4` は次の順です。
 
-WireShark で見ると "RO" の順に並んでいるように見えるが、`uint16_t` として読み戻すと
-`0x4F52` = "OR" になる。
-
-## シリアライズ / デシリアライズ
-
-### シリアライズ（送信時）
-
-「シリアライズ」と呼んでいるが、本プロジェクトでは **構造体をそのままバイト列として送る**。
-変換コードは不要：
-
-```cpp
-orc::BeatPacket pkt{};
-pkt.header.magic       = orc::MAGIC;
-pkt.header.version     = orc::PROTOCOL_VERSION;
-pkt.header.type        = orc::PKT_BEAT;
-pkt.header.seq         = ++data.sender.beatSeq;
-pkt.header.timestampMs = masterNow;
-pkt.payload.beatNo         = data.beat.beatNo;
-pkt.payload.playAtMasterMs = masterNow + cfg_.beatLookaheadMs;
-
-udp_.write(reinterpret_cast<const uint8_t*>(&pkt), sizeof(pkt));
+```text
+offset n     : C4
+offset n + 1 : 03
 ```
 
-`reinterpret_cast<const uint8_t*>` で構造体の先頭ポインタを `uint8_t*` として扱い、
-`sizeof(pkt)` = 20 バイトをそのまま UDP に流す。
-
-### デシリアライズ（受信時）
-
-受信側も同じく `memcpy`：
-
-```cpp
-uint8_t buf[orc::PACKET_SIZE];
-udp_.read(buf, orc::PACKET_SIZE);
-orc::PacketHeader hdr;
-if (!orc::parseHeader(buf, orc::PACKET_SIZE, hdr)) continue;
-if (hdr.type == orc::PKT_CTRL) {
-    memcpy(&net.lastCtrl, buf, sizeof(net.lastCtrl));
-    net.hasNewCtrl = true;
-}
-```
-
-`parseHeader()` は magic / version の検証だけ：
-
-```cpp
-bool parseHeader(const uint8_t* buf, size_t len, PacketHeader& out) {
-    if (len < HEADER_SIZE) return false;
-    memcpy(&out, buf, HEADER_SIZE);
-    if (out.magic != MAGIC) return false;
-    if (out.version != PROTOCOL_VERSION) return false;
-    return true;
-}
-```
-
-これ以外のフィールド検証はしていない（速度優先）。妥当性チェックは
-各受信モジュール（`OrcReceiverModule` 等）が行う。
-
-## Processing 側のパース
-
-Java 側では構造体を直接 `memcpy` できないので、**バイト列を手動で読み解く**：
+Processing側の復元関数は次のとおりです。
 
 ```java
-int u8(byte v){ return v & 0xFF; }
-int u16le(byte lo, byte hi){ return u8(lo) | (u8(hi) << 8); }
+int u8(byte v){
+  return v & 0xFF;
+}
 
-void handlePacket(byte[] buf){
-    if (u8(buf[2]) != 0x01) return;                   // version
-    int type = u8(buf[3]);
-    if (type != TYPE_NOTE) return;                    // NOTE 以外無視
-    int partId       = u8(buf[12]);
-    int noteNumber   = u8(buf[13]);
-    int velocity     = u8(buf[14]);
-    int gate         = u8(buf[15]);
-    int durationMs   = u16le(buf[16], buf[17]);
-    int instrumentId = u8(buf[18]);
-    // ...
+int u16le(byte lo, byte hi){
+  return u8(lo) | (u8(hi) << 8);
 }
 ```
 
-`u16le()` で 2 バイトをリトルエンディアン解釈。`& 0xFF` は Java の `byte` が
-符号付きなので、上位ビットを 0 にクリアして 0〜255 に正規化するため。
+Javaの`byte`は -128〜127の符号付きなので、`& 0xFF` で0〜255へ戻してから
+シフトします。32 bit値をPCで読む実装を追加するときも同じ順序で4バイトを合成します。
 
-オフセット 12〜19 はマイコン側の `NotePayload` と完全に一致する。
-構造体定義を変えるときは、必ず両方を同じコミットで更新する。
+## C++での送受信
 
-## フレーミング（バイト列をパケットに切り出す）
+送信側は値を詰めた構造体を、そのまま20 Bのバイト列として渡します。
 
-UDP は 1 パケット 1 メッセージ単位で届くので、UDP 経由なら長さチェックだけで OK
-（`packetSize != 20` を捨てる）。だが USB Serial はバイトストリームなので、
-**どこからどこまでが 1 パケットか** を自前で見つける必要がある。
+```cpp
+orc::BeatPacket packet{};
+packet.header.magic = orc::MAGIC;
+packet.header.version = orc::PROTOCOL_VERSION;
+packet.header.type = orc::PKT_BEAT;
+packet.payload.beatNo = data.beat.beatNo;
+packet.payload.playAtMasterMs = masterNow + cfg_.beatLookaheadMs;
 
-Processing 側は `magic` 2 バイト = "RO" を見つけたところで頭出しする：
+udp.write(
+    reinterpret_cast<const uint8_t*>(&packet),
+    sizeof(packet)
+);
+```
+
+受信側は先にヘッダを検査し、型が合う構造体へコピーします。
+
+```cpp
+orc::PacketHeader header;
+if (!orc::parseHeader(buf, len, header)) return;
+
+if (header.type == orc::PKT_CTRL) {
+    memcpy(&data.orcNet.lastCtrl, buf, sizeof(orc::CtrlPacket));
+}
+```
+
+`parseHeader()` が検査するのは長さ、magic、versionです。その後の型や値域は
+呼び出し側で確認します。
+
+## USB Serialのフレーミング
+
+UDPにはデータグラム境界がありますが、Serialは単なるバイト列です。途中から接続したり
+1 B欠けたりすると、20 Bごとに区切るだけでは永続的にずれます。
+
+`SerialCore.pde` は次の状態機械で先頭を探します。
+
+```text
+SearchMagicLo
+  └─ 0x52 → SearchMagicHi
+               ├─ 0x4F → 残り18 Bを収集
+               ├─ 0x52 → SearchMagicHiを継続
+               └─ その他 → SearchMagicLo
+```
+
+20 B揃うと配列をコピーして `ConcurrentLinkedQueue<byte[]>` へ積みます。
+Serialコールバックは音声やUIを直接触らず、`draw()` がキューを消費します。
+
+現行PC実装の `packetType()` は長さとversionを確認します。magicはフレーマが確認済みです。
+別経路から直接 `handlePacket()` を呼ぶ場合はmagic検査も追加する必要があります。
+
+## ProcessingでのNOTEとUIパース
 
 ```java
-void serialEvent(Serial p){
-    while (p.available() > 0){
-        int b = p.read();
-        if (!pc.inFrame){
-            if (pc.rxIdx == 0){
-                if ((byte)b == MAGIC_LO){ rxBuf[0] = (byte)b; rxIdx = 1; }
-            } else {
-                if ((byte)b == MAGIC_HI){ rxBuf[1] = (byte)b; rxIdx = 2; inFrame = true; }
-                else { /* 再同期 */ }
-            }
-        } else {
-            rxBuf[rxIdx++] = (byte)b;
-            if (rxIdx >= PACKET_SIZE){
-                // 1 パケット確定。キューに積む
-                packetQueue.offer(copyOf(rxBuf));
-                rxIdx = 0; inFrame = false;
-            }
-        }
-    }
+class NoteEvent {
+  NoteEvent(byte[] b){
+    partId       = u8(b[12]);
+    noteNumber   = u8(b[13]);
+    velocity     = u8(b[14]);
+    gate         = u8(b[15]);
+    durationMs   = u16le(b[16], b[17]);
+    instrumentId = u8(b[18]);
+  }
+}
+
+class UiEvent {
+  UiEvent(byte[] b){
+    state     = u8(b[12]);
+    mode      = u8(b[13]);
+    navCursor = u8(b[14]);
+    targetBpm = u8(b[15]);
+    score     = u8(b[16]);
+    partId    = u8(b[17]);
+    bpmQ8     = u16le(b[18], b[19]);
+  }
 }
 ```
 
-「`0x52` を見たら次が `0x4F` か確認 → 違ったら再同期、合ったら 20 B 読む」。
-これにより、起動直後や 1 バイトロスからも自動回復する。
+C++構造体の順序を変更したら、PCの各インデックスも同じ変更に含めます。
 
-## 拡張時のチェックリスト
+## 互換性を保つ変更手順
 
-新しいフィールドや新しいパケット型を足すときの作法：
+### reservedを使う変更
 
-### 既存フィールドを変えない場合（後方互換）
+既存ペイロードの意味を保ち、`reserved` を新しいフィールドへ割り当てるなら、
+パケットサイズと既存offsetは維持できます。旧受信者はそのバイトを無視できます。
 
-- `reserved` 領域を使って新フィールドを追加
-- `version` は上げない（既存ノードも捨てずに動かしたい場合）
-- 例: test_v2 で `instrumentId` を `NotePayload::reserved[0]` に充てた
+### 既存offsetを変える変更
 
-### 既存フィールドを変える場合（後方非互換）
+フィールドの並べ替え、サイズ変更、20 B超過は非互換です。
 
-- `PROTOCOL_VERSION` を `0x02` に上げる
-- 受信側は `version != 0x01` を見たら **古いパケットを捨てるか変換** する
-- 旧バージョンと並行運用したいなら、両方の構造体を残しておく
+1. `PROTOCOL_VERSION` を上げる
+2. 新旧の構造体とパーサを併存させるか、一斉更新する
+3. マイコンとPCを同時に更新する
+4. `static_assert` とパケットfixtureを更新する
+5. [プロトコル仕様](/system/protocol/) とこのページを更新する
 
-### 共通の作法
+### 新しいパケット型を足す変更
 
-- `static_assert(sizeof(...) == 20, ...)` を必ず追加
-- `#pragma pack(push, 1)` で囲む
-- `.agent/api.md` と `architecture/protocol.md` を **同じコミットで** 更新
-- Processing 側のオフセット計算も同期更新
+8 Bの新ペイロードと20 Bのパケット構造体を追加し、未使用type番号を割り当てます。
+既存受信者が未知typeを無視できることを確認します。UI追加はこの方法です。
 
-## なぜ `union` で型を切り替えないか
+## デバッグ
 
-別の設計として、`Packet { Header h; union { Ctrl c; Beat b; Note n; }; }` を
-1 つの型で表す案もある。本プロジェクトでは採用していない：
+| 症状 | 確認箇所 |
+|---|---|
+| PCが一切受信しない | Serialが115200 bpsか、デバッグ文字列を同じポートへ混ぜていないか |
+| 途中から値が崩れる | magic再同期、20 B固定、1 B欠落 |
+| typeが不正 | offset 3、version offset 2 |
+| BPMだけ8倍/8分の1 | `bpmQ8` のencode/decode |
+| NOTEの長さが異常 | offset 16〜17のlittle endian |
+| 画面だけ更新されない | node_02のUI type=4、2秒タイムアウト、`partId=0x02` |
+| 拍が二重に鳴る | 4連送を `beatNo` で重複排除しているか |
 
-- `union` は型タグ（`type`）の手動管理が必要で、誤用しやすい
-- 別々の構造体（`CtrlPacket` / `BeatPacket` / `NotePacket`）の方が、受信時の
-  `memcpy` 先が明確
-- メモリオーバーヘッドはどちらも同じ（20 B）
+## 次に読む
 
-明示的な型分離の方が読みやすく、ミスが少ない。
-
-## デバッグの観点
-
-- パケットがおかしい → WireShark で 20 B 並んでいるか確認、`magic = 0x4F52` か
-- パケット型が違うと言われる → `type` バイト（オフセット 3）を確認
-- 値が変 → `bpmQ8` を `bpmFixed × 256` で計算していないか（古い文書の罠）
-- Processing が読めない → USB Serial がデバッグログとパケットを混ぜていないか
-  （`SERIAL_DEBUG=0` を確認）
-
-## 次に読むべきページ
-
-- 受信したパケットの先 → [楽譜進行ロジック](/deep-dive/score-progression/)
-- 楽器→PC の発音側 → [加算合成エンジン](/deep-dive/additive-synthesis/)
-- 通信路の選定理由 → [UDP マルチキャスト](/deep-dive/udp-multicast/)
+- 通信路: [UDPマルチキャスト](/deep-dive/udp-multicast/)
+- 時刻と4連送: [時刻同期メカニズム](/deep-dive/time-sync/)
+- 譜面: [楽譜進行ロジック](/deep-dive/score-progression/)
+- PCの同じ実装: [PC側プロトコル](/pc-audio/orc-protocol/)

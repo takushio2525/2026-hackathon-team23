@@ -21,13 +21,13 @@ sidebar:
 
 | 層 | 目的 | 該当章 |
 |---|---|---|
-| **コンセプト** | 何を作るか、なぜ作るか | `intro/` `concept/` |
-| **アーキテクチャ概要** | システムの構造と各モジュールの責務 | `architecture/` `code/` |
+| **概要** | 何を作るか、なぜ作るか | `intro/` `system/` |
+| **実装概要** | システムの構造と各モジュールの責務 | `implementation/` |
 | **アルゴリズム詳説** | 個々のロジックを「式」「状態遷移」「コード断片」で深掘り | `deep-dive/` ← **この章** |
 
 上の層を読んでから降りてくる前提で書いてある。先に
-[全体図](/architecture/overview/) と
-[Embedded-Module-Architecture](/architecture/ema/) を通しておくと、
+[システム全体](/system/overview/) と
+[ファームウェア概要](/implementation/firmware-overview/) を通しておくと、
 ここで出てくる `SystemData` / `IModule` / `applyPattern()` の呼ばれ方が腑に落ちる。
 
 ## 推奨の読み順
@@ -40,7 +40,7 @@ sidebar:
    前提: 高校数学（ベクトル・積分）と C++ の基本構文。
 
 2. [時刻同期メカニズム](/deep-dive/time-sync/)
-   5 台のマイコンの `millis()` を揃える仕掛け。EMA で
+   6 台のマイコンの `millis()` を指揮者基準へ写す仕掛け。EMA で
    オフセットを推定し、`playAtMasterMs` 先読みでネットワーク遅延を吸収する。
    前提: 拍検出を読み終えていること。
 
@@ -49,7 +49,7 @@ sidebar:
    IGMP の振る舞い。`OrcNetModule` の送受信実装も追う。
    前提: TCP/IP の超基本（IP/ポートを知っていれば OK）。
 
-4. [バイナリパケット](/deep-dive/binary-packet.md)
+4. [バイナリパケット](/deep-dive/binary-packet/)
    20 B 固定の CTRL/BEAT/NOTE がメモリ上でどう並ぶか。
    `#pragma pack`、エンディアン、`memcpy` での復元、`static_assert` の使い方。
    前提: C/C++ の構造体とポインタの基礎。
@@ -59,13 +59,16 @@ sidebar:
    ループ再生（mod 演算）、細分音符の予約発火、PC 途中起動への耐性。
    前提: 拍検出と時刻同期を読み終えていること。
 
-6. [加算合成エンジン](/deep-dive/additive-synthesis/)
+6. [ゲームのナビゲーションと採点](/deep-dive/game-navigation-scoring/)
+   重力基準の縦横判定、ガイド減衰、テンポ誤差の加重平均と0〜100点への写像。
+
+7. [加算合成エンジン](/deep-dive/additive-synthesis/)
    PC 側 Processing の音作り。基音 × 倍音の合成式、非調和性、
    ADSR エンベロープ、ボイスプール、スペクトル整形ノイズ、
    ビブラート / トレモロ。
    前提: 三角関数とサンプリングの基礎（44.1 kHz とは何か）。
 
-7. [モジュール拡張ガイド](/deep-dive/module-extension/)
+8. [モジュール拡張ガイド](/deep-dive/module-extension/)
    新しい `IModule` を足したいときの手順と落とし穴。
    `SystemData` を拡張する／`ProjectConfig.h` の組み立て／
    3 フェーズに混ぜないコツ。
@@ -78,14 +81,15 @@ sidebar:
 | 拍検出の閾値を調整したい | [拍検出アルゴリズム](/deep-dive/beat-detection/) §「閾値の根拠」 |
 | 楽器がズレて鳴る | [時刻同期メカニズム](/deep-dive/time-sync/) §「ジッタの主因」 |
 | 新しいパケット型を足したい | [バイナリパケット](/deep-dive/binary-packet/) §「拡張時のチェックリスト」 |
-| 新しい曲を入れたい | [楽譜進行ロジック](/deep-dive/score-progression/) §「曲を差し替える」 |
+| 新しい曲を入れたい | [楽譜進行ロジック](/deep-dive/score-progression/) §「曲を変更する手順」 |
+| ゲームの採点を調整したい | [ゲームのナビゲーションと採点](/deep-dive/game-navigation-scoring/) |
 | 楽器音を作りたい | [加算合成エンジン](/deep-dive/additive-synthesis/) §「JSON フォーマット」 |
 | 新しいセンサを足したい | [モジュール拡張ガイド](/deep-dive/module-extension/) §「足し方ステップ」 |
 
 ## ここで使う表記の約束
 
 - **コード断片**は実コードの抜粋。コメントの大半は実コードからそのまま引いている
-- 「実装: `firmware/test_v2/.../foo.cpp`」と書かれていたら、そのファイルが SSOT
+- 「実装: `firmware/production/.../foo.cpp`」と書かれていたら、そのファイルが SSOT
 - 数式に出てくる記号は、各ページの冒頭の表で意味を明示する
 - 「閾値は `ProjectConfig.h` の `logic_params` で調整」と書かれていたら、
   モジュール本体をいじってはいけない（EMA の原則）

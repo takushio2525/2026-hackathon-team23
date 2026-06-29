@@ -1,107 +1,134 @@
 ---
-title: PC アプリ・音声処理（塩澤の実装例）
-description: orchestra_resynth.pde と sound_lab/analyzer の実コードを題材に、設計判断と差し替えポイントを解説する章
+title: PCアプリ・音声処理
+description: production のProcessingアプリ、共有モジュール、音声解析を現行コードどおりに案内する
 sidebar:
   label: 読み順ガイド
   order: 0
 ---
 
-:::note[この章で分かること]
-- 楽器ノードから来る NOTE バイナリを受け、PC で音にするまでの **設計判断の出発点**
-- `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` の **構造と内部実装**
-- `sound_lab/analyzer/analyzer.py` の **音声解析パイプライン** とそこで使っている手法
-- **別方針** で実装し直したいときに、どの部品をどう差し替えればいいか
-:::
+PC側は、楽器ノードから受けたNOTEを再合成し、node_02から受けたUI状態に応じて
+画面を切り替えます。音色JSONを作るオフライン解析もこの章で扱います。
 
-:::tip[この章の位置づけ]
-ここに書いてあるのは **塩澤が一例として組んだ実装** の解剖。「これが唯一の正解」ではない。
-**他のメンバーが自分の方針で PC 側を書き直すとき**、どこを参考にしてどこから違う道を選ぶかを
-判断するための足場として読んでほしい。
-:::
+実行本体は `pc_app/production/orchestra_resynth/`、再利用する実装の原本は
+`pc_app/common/` です。productionスケッチ内の同名タブは共有ファイルへのsymlinkです。
 
-## 全体像
+## 現行構成
 
-PC 側で起きていることは、ざっくり 3 段階に分かれる。
-
-```
-┌─ Arduino UNO R4 WiFi (楽器ノード) ─┐
-│  BEAT 受信 → 楽譜参照 → NOTE 送信  │
-└────────────────────────────────────┘
-                │  USB Serial / 115200 bps / 20 B バイナリパケット
-                ▼
-┌─ PC: orchestra_resynth.pde ───────────────────────────────────┐
-│  ① serialEvent: マルチポート同時受信 → packetQueue          │
-│  ② draw 開始: drainPackets → triggerNote()                    │
-│  ③ ResynthVoice: 加算合成 (倍音 + ノイズ + 非調和性 + 揺れ)   │
-│  ④ Minim AudioOutput → スピーカー                            │
-└───────────────────────────────────────────────────────────────┘
-
-┌─ オフライン: sound_lab/analyzer/analyzer.py (Python) ──────────┐
-│  WAV → 無音トリム → 基音検出 (pyin) → ADSR 当てはめ          │
-│   → 倍音抽出 (FFT + STFT) → 非調和性フィット                  │
-│   → 残差ノイズ → ビブラート/トレモロ → JSON 出力              │
-└───────────────────────────────────────────────────────────────┘
-                │  data/0_organ.json などとして配置
-                ▼  (ファイル名昇順ソートで配列化 → instrumentId を index 参照)
-        Processing 側で InstrModel として読み込み
+```text
+node_02〜06
+  │ USB Serial 115200 bps
+  │ NOTE type=3（全楽器）/ UI type=4（node_02）
+  ▼
+SerialCore
+  ├─ ポートごとのmagic同期
+  └─ 20 B完成 → packetQueue
+          ▼
+orchestra_resynth.pde
+  ├─ OrcProtocolでNOTE/UIを復号
+  ├─ stateとmodeから画面を決定
+  └─ NOTEをAudioManagerへ渡す
+          ├─ instrumentId 0〜3 → InstrModel + SynthVoice
+          └─ instrumentId 4   → DrumEngine
+                                  ▼
+                           Minim / 44.1 kHz / 512 samples
 ```
 
-実装は大きく 2 つに分かれる:
+## ファイルと責務
 
-| 区分 | 場所 | 言語 | 役割 |
-|---|---|---|---|
-| **リアルタイム再合成** | `pc_app/test_v2/orchestra_resynth/` | Processing 4 (Java) | NOTE を受けてその場で加算合成 |
-| **オフライン音声解析** | `sound_lab/analyzer/` | Python (librosa + numpy) | 実楽器の単音録音から音色 JSON を作る |
-
-両者は **JSON 1 ファイルで疎結合**（`sound_lab/library_format.md` がフォーマット仕様）。
-解析側を別言語で書き直しても、JSON 仕様さえ守れば再合成側はそのまま動く。
-
-## 読み順（推奨）
-
-### Step 1 — まず設計判断とデータの流れを掴む
-
-| # | ページ | 何が分かるか |
+| ファイル | 責務 | 詳細 |
 |---|---|---|
-| 1 | [設計の出発点と全体方針](/pc-audio/design/) | なぜ加算合成 resynth を選んだか・対案・トレードオフ |
-| 2 | [NOTE 受信から発音までの信号フロー](/pc-audio/signal-flow/) | パケット受信→発音→消音までのタイムライン |
+| `orchestra_resynth.pde` | production固有状態、画面遷移、入力、描画 | [メイン構造](/pc-audio/resynth-main/) |
+| `OrcProtocol.pde` | 定数、NOTE/UIパーサ、状態・画面ID | [PC側プロトコル](/pc-audio/orc-protocol/) |
+| `SerialCore.pde` | 複数ポート、magic同期、キュー投入 | [SerialCore](/pc-audio/serial-handling/) |
+| `AudioManager.pde` | JSONロード、音色選択、発音・回収 | [AudioManager](/pc-audio/audio-manager/) |
+| `InstrModel.pde` | 音色JSONを合成用配列へ変換 | [InstrModel](/pc-audio/instr-model/) |
+| `SynthVoice.pde` | 金管1音分の加算合成UGen | [ResynthVoice](/pc-audio/resynth-voice/) |
+| `DrumEngine.pde` | 4ドラム音色、録音・合成フォールバック | [DrumEngine](/pc-audio/drum-engine/) |
+| `SharedUI.pde` | フォント、背景、パネル、波形 | [SharedUI](/pc-audio/shared-ui/) |
+| `OrcLogger.pde` | カテゴリ付きログと画面ログ | [OrcLogger](/pc-audio/orc-logger/) |
 
-### Step 2 — Processing 側の実装を読む
+## productionの固定値
 
-| # | ページ | 何が分かるか |
-|---|---|---|
-| 3 | [orchestra_resynth.pde の全体構造](/pc-audio/resynth-main/) | setup / draw / UI / キー操作の責務分割 |
-| 4 | [加算合成ボイス（ResynthVoice）](/pc-audio/resynth-voice/) | 1 音を作る数式と実装（倍音・揺れ・包絡） |
-| 5 | [音色定義モデル（InstrModel）と JSON](/pc-audio/instr-model/) | JSON を配列に展開する手続きと格納するフィールド |
-| 6 | [マルチポート同時受信](/pc-audio/serial-handling/) | 複数 USB を 1 つの Processing で扱う仕組み |
+| 項目 | 値 |
+|---|---:|
+| ウィンドウ | 1000 × 560 |
+| 描画 | 90 fps |
+| 音声 | stereo、44.1 kHz、512 samples |
+| 金管同時発音 | 24 voice |
+| ドラム合成同時発音 | 12 voice |
+| Serial | 115200 bps |
+| パケット | 20 B |
+| UIタイムアウト | 2000 ms |
+| ゲーム長 | 56拍 |
+| ガイド | 0〜15拍=100%、16〜31拍で減衰、32拍以降=0% |
 
-### Step 3 — Python 側の音声解析を読む
+値を変える前に、マイコン側と共有する定数かPCだけの値かを区別してください。
+`GAME_LENGTH_BEATS`、ガイド境界、状態値、パケットoffsetは両側の整合が必要です。
 
-| # | ページ | 何が分かるか |
-|---|---|---|
-| 7 | [音声解析パイプライン全体](/pc-audio/analyzer-overview/) | analyzer.py の入出力と処理段の俯瞰 |
-| 8 | [倍音抽出・非調和性・残差ノイズ](/pc-audio/analyzer-harmonics/) | FFT と STFT で倍音と残差を分離する数学 |
-| 9 | [基音検出・ADSR・ビブラート](/pc-audio/analyzer-modulation/) | pyin、自己相関フォールバック、エンベロープ当てはめ |
+## 音色の対応
 
-### Step 4 — 自分で書き直すための整理
+JSONはファイル名昇順で読み込まれ、`instrumentId` がそのindexを選びます。
 
-| # | ページ | 何が分かるか |
-|---|---|---|
-| 10 | [別方針で実装するためのガイド](/pc-audio/extending/) | 解析手法・合成方式・パケットを差し替えるための判断軸 |
+| ID | ファイル接頭辞 | 音色 | PCでの処理 |
+|---:|---|---|---|
+| 0 | `0_` | trumpet | 加算合成、+12半音 |
+| 1 | `1_` | horn | 加算合成、移調なし |
+| 2 | `2_` | trombone | 加算合成、-12半音 |
+| 3 | `3_` | tuba | 加算合成、-12半音 |
+| 4 | `4_`以降 | drum | note番号で4音色を選択 |
 
-## このリポジトリにおける「正解」と「一例」の区別
+ドラムJSONはkick、snare、hi-hat、crashの順です。`AudioManager` は
+録音波形があれば `AudioSample`、なければ倍音＋Noise＋ADSRへフォールバックします。
 
-| カテゴリ | 内容 | 性質 |
-|---|---|---|
-| **正解（守るべき）** | UDP / シリアル パケットフォーマット（20 B 固定） | これを変えるとファームと PC の両方を直す必要がある |
-| 正解 | `data/*.json` のスキーマ（`sound_lab/library_format.md`） | 解析と再合成の境界。バージョン文字列 `sound_lab.instrument/1` で管理 |
-| **一例（書き直し可）** | 加算合成 (`ResynthVoice`) | 同じ JSON を読んで別方式（FM・サンプル再生など）で鳴らしてよい |
-| 一例 | 音声解析 (`analyzer.py`) | librosa を使った塩澤の一案。手書き FFT・市販プラグイン・別ライブラリでもよい |
-| 一例 | Processing で実装 | Web Audio・SuperCollider・openFrameworks・JUCE などへの移植も可 |
+## 画面の決まり方
 
-この章は **「一例」と書いた箇所を理解して、自分の好む方向に倒すための材料** を集めてある。
+PCは手動で「メインUI」や「アナライザ」を設定しません。
 
-## このあとに読むもの
+1. type=4 UIを受ける、またはpartId `0x02` のNOTEを受ける → メイン操作UI
+2. それ以外のNOTEを最初に受ける → アナライザ
+3. メインUIでは `state` と `mode` からMenu、Free Play、Game Play、Resultを導出
+4. UIが2秒途絶える → マスター再起動とみなしWaitingへ戻し、全音停止
 
-- 加算合成のアルゴリズム解説（数学寄り）は別章にある: [アルゴリズム詳説 — 加算合成エンジン](/deep-dive/additive-synthesis/)
-- バイナリパケットの解析側の挙動: [アルゴリズム詳説 — バイナリパケット](/deep-dive/binary-packet/)
-- ファームウェア側（楽器ノードがどう NOTE を作るか）: [ファームウェア — NoteSenderModule](/firmware/note-sender/)
+詳しくは [メイン構造](/pc-audio/resynth-main/) と [SharedUI](/pc-audio/shared-ui/) を参照してください。
+
+## 推奨の読み順
+
+### リアルタイム経路
+
+1. [設計判断](/pc-audio/design/)
+2. [NOTE/UIから音と画面まで](/pc-audio/signal-flow/)
+3. [メイン構造](/pc-audio/resynth-main/)
+4. [PC側プロトコル](/pc-audio/orc-protocol/)
+5. [SerialCore](/pc-audio/serial-handling/)
+6. [AudioManager](/pc-audio/audio-manager/)
+7. [InstrModel](/pc-audio/instr-model/)
+8. [ResynthVoice](/pc-audio/resynth-voice/)
+9. [DrumEngine](/pc-audio/drum-engine/)
+
+### UIと運用
+
+10. [SharedUI](/pc-audio/shared-ui/)
+11. [OrcLogger](/pc-audio/orc-logger/)
+
+### 音色生成
+
+12. [解析パイプライン](/pc-audio/analyzer-overview/)
+13. [倍音・非調和性・残差ノイズ](/pc-audio/analyzer-harmonics/)
+14. [基音・ADSR・変調](/pc-audio/analyzer-modulation/)
+
+### 差し替え
+
+15. [別方式へ拡張する](/pc-audio/extending/)
+
+## 仕様と実装例の境界
+
+守る必要があるのは、マイコンと接続する20 Bプロトコル、状態値、`instrumentId`の対応です。
+音色JSONは解析と合成の内部契約です。加算合成、Processing、Minim、画面デザインは
+現行実装であり、接続契約を維持すれば差し替えられます。
+
+## 関連ページ
+
+- システム全体: [構成](/system/overview/)
+- 20 Bの詳細: [バイナリパケット](/deep-dive/binary-packet/)
+- 合成数式: [加算合成](/deep-dive/additive-synthesis/)
+- ファーム側NOTE: [NoteSenderModule](/firmware/note-sender/)

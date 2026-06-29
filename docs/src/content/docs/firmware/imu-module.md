@@ -17,8 +17,8 @@ sidebar:
 
 | ファイル | 行数 | 内容 |
 |---|---|---|
-| `firmware/test_v2/node_01/lib/ImuModule/ImuModule.h` | 49 | Config / Data / クラス宣言 |
-| `firmware/test_v2/node_01/lib/ImuModule/ImuModule.cpp` | 106 | レジスタアクセス + バーストリード実装 |
+| `firmware/production/node_01/lib/ImuModule/ImuModule.h` | 49 | Config / Data / クラス宣言 |
+| `firmware/production/node_01/lib/ImuModule/ImuModule.cpp` | 106 | レジスタアクセス + バーストリード実装 |
 
 指揮者ノード（XIAO ESP32-S3 Sense）専用。楽器ノードでは使わない。
 

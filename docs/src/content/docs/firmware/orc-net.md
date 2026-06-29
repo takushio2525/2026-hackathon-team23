@@ -17,8 +17,8 @@ sidebar:
 
 | ファイル | 行数 | 内容 |
 |---|---|---|
-| `firmware/test_v2/common/lib/OrcNetModule/OrcNetModule.h` | 76 | クラス定義 + Config / Data 構造体 |
-| `firmware/test_v2/common/lib/OrcNetModule/OrcNetModule.cpp` | 138 | 接続 / 受信ループ / 送信ループ実装 |
+| `firmware/production/common/lib/OrcNetModule/OrcNetModule.h` | 85 | クラス定義 + Config / Data 構造体 |
+| `firmware/production/common/lib/OrcNetModule/OrcNetModule.cpp` | 194 | 接続 / 受信ループ / 送信ループ実装 |
 
 このモジュールは **入力フェーズと出力フェーズの両方に登場する** 唯一のモジュール。
 受信は `updateInput()`、送信は `updateOutput()` でフェーズが分かれている。
@@ -39,7 +39,7 @@ BEAT の組み立ても同じ。OrcNetModule は **完成品の `CtrlPacket` を
 ```cpp
 enum class WifiMode : uint8_t {
     SoftAp,  // 自身が AP を起動する側 (node_01)
-    Sta,     // 既存 SoftAP に接続する側 (楽器ノード: test_v2 は node_02-04 / production 想定は node_02-06)
+    Sta,     // 既存 SoftAP に接続する側 (楽器 node_02〜06)
 };
 
 struct OrcNetConfig {
@@ -54,11 +54,8 @@ struct OrcNetConfig {
 };
 ```
 
-> 📝 **`beatGapMs` の暫定運用**: ESP32-S3 SoftAP で「radio が同一状態で連発するとロスする」
-> 癖の切り分け対策として 2026-05-25 に追加。現状は `0`（旧挙動）でコミットされており、
-> 1-5 ms を実機で試して確定値を入れる段取り。詳しくは
-> [orc-sender.md の BEAT 連送節](/firmware/orc-sender/#beat-連送-redundant-transmission)
-> 参照。
+> 📝 **production値**: 指揮者は`beatGapMs=2`。4連送を約8 msへ時間分散し、
+> ESP32-S3 SoftAPで同一無線状態のまままとめて落ちる確率を下げる。
 
 ### 指揮者ノードの設定
 
@@ -71,7 +68,7 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
     /*udpPort=*/             5001,
     /*channel=*/             6,        // 2.4 GHz CH6 を使う
     /*reconnectIntervalMs=*/ 2000,     // SoftAP 側は使わない
-    /*beatGapMs=*/           0,        // 0 = タイトループ連送 (旧挙動)。一時的に切り分け用
+    /*beatGapMs=*/           2,        // 4連送を2 ms間隔で時間分散
 };
 ```
 
@@ -322,7 +319,8 @@ void OrcNetModule::flushSend(OrcNetData& net) {
 
 ### BEAT の冗長送信
 
-`pendingBeatRedundancy` (デフォルト 2) の回数だけ同じパケットを連送する：
+`pendingBeatRedundancy`（productionでは4）の回数だけ同じパケットを連送する。
+各送信の間に`beatGapMs=2` msを入れ、送信後にpendingフラグをclearする：
 
 ```cpp
 for (uint8_t i = 0; i < reps; ++i) {

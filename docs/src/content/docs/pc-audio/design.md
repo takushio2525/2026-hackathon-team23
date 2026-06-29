@@ -1,138 +1,154 @@
 ---
-title: 設計の出発点と全体方針
-description: なぜ PC 側で加算合成 resynth を選んだのか、対案、トレードオフを整理する
+title: PC側の設計判断
+description: productionで加算合成、共有タブ、即時発音、UI中継を採用した理由とトレードオフ
 sidebar:
   order: 1
 ---
 
-PC 側を実装するときに塩澤が立てた **設計仮説と意思決定** を、コードに着手する前の順で書き出した
-ページ。後から見返すと「なんとなくこうなった」に見える構造も、出発点を共有していれば
-**どこを差し替えていいか／どこを動かすと全部崩れるか** が分かる。
+## 入力として確定しているもの
 
-## 与件（出発点として動かせなかったもの）
+PCは次の契約を受け入れる側です。
 
-PC 側を考え始める時点で、すでに次が決まっていた:
-
-| 与件 | 出所 |
+| 与件 | 現行仕様 |
 |---|---|
-| 楽器ノードは Arduino UNO R4 WiFi | ADR-0004（5 台構成） |
-| 楽器 → PC は **USB シリアル**（UDP ではない） | ADR-0002（UDP オリジナルプロトコル）の例外 |
-| シリアルパケットは **20 B 固定バイナリ** | 共通プロトコル `OrcProtocol/`、@.agent/api.md |
-| PC は MacBook 想定（チーム所有機） | ハッカソン制約 |
-| 同時発音は **最低 3 声**（輪唱）、目標 **3〜5 声 × 複数 PC**（test_v2 は 3 声・production は 5 声目標） | test_v2 のゴール |
+| 楽器ノード | UNO R4 WiFi × 5（node_02〜06） |
+| 接続 | 各ノードからUSB Serial、115200 bps |
+| NOTE | 20 B、type=3 |
+| UI | 20 B、type=4。node_02だけが中継 |
+| 編成 | trumpet、horn、trombone、tuba、drum |
+| 曲 | 32拍譜面を頭ずらしして56拍の輪唱 |
+| PCの発音 | 楽器側が45 ms先読みを解消した後なので、受信後すぐ鳴らす |
 
-ここから「PC で何を鳴らすか」「どう作るか」を決めていく。
+PC側で自由に設計できるのは、音色の作り方、音声ライフサイクル、画面、ログです。
 
-## 中心の問い: 楽器の音色をどう作るか
+## なぜ加算合成か
 
-楽器ノードが送ってくるのは「ノート番号・長さ・強さ・楽器番号」だけ。**音色そのもの** は
-PC 側が持つ必要がある。選択肢は次の通り。
+金管音色には、実録音から抽出した倍音振幅、時間包絡、非調和性、残差ノイズ、
+ビブラート、トレモロを保存し、再合成する方式を採用しています。
 
-| 方式 | 中身 | 利点 | 不利な点 |
+| 方式 | 利点 | 欠点 | production |
 |---|---|---|---|
-| **A. サンプル再生** | 実楽器の録音をピッチシフトで鳴らす | リアルさ・実装が単純 | サンプル数が爆発、輪唱 3 声の同時消費メモリが大、ライセンス処理 |
-| **B. 加算合成 (resynth)（採用）** | 倍音列 + エンベロープ + ノイズで合成 | 1 楽器 = JSON 1 個（数 KB）、ピッチ自由、CPU で完結 | 「らしさ」は解析品質に依存、打楽器・破裂音は弱い |
-| C. FM / 物理モデリング | 既存合成方式 | 表現の幅 | 楽器ごとにパラメータ設計が必要、自動解析しづらい |
-| D. MIDI 音源を叩く | DAW / fluidsynth に橋渡し | 音は最も良い | 外部依存・遅延読みづらい・「自作感」が薄い |
+| 加算合成 | 音高を変えやすい、JSONが小さい、解析結果を説明できる | CPU負荷、過渡音の再現が難しい | 金管4音色 |
+| 録音再生 | 過渡音や打楽器に強い | 音高ごとの素材、メモリ | ドラムで優先使用 |
+| FM/物理モデル | 表現力 | 音色設計と実装が大きい | 未採用 |
+| 外部MIDI音源 | 高品質化が容易 | 外部依存、環境差 | 未採用 |
 
-**塩澤が B を選んだ理由**:
+ドラムを金管と同じ方式だけで処理するのは不利です。そのため現行は、JSON内の
+`drum_sample` があれば録音を再生し、無ければ倍音＋白色Noise＋ADSRで合成します。
+「打楽器は未実装」ではなく、用途に応じてハイブリッド化されています。
 
-1. 「自作音源で鳴らした」と言えるのがハッカソンとして強い
-2. 解析の結果が **JSON 1 ファイルで完結** するので、他メンバーが解析側だけ独立して触れる
-3. PC 側コード量が小さく（Processing 1 ファイル）、デモのその場で改造できる
-4. 実機 1 台で動くので Mac × 1 だけでデモが成立する
+## なぜJSONを境界にするか
 
-**B のリスクと、それへの対処**:
+`sound_lab/analyzer/` はWAVから特徴量を抽出し、
+`pc_app/production/orchestra_resynth/data/` のJSONを作ります。リアルタイムアプリは
+WAV解析を行わず、起動時にJSONを読みます。
 
-| リスク | 対処 |
+この分離により次が可能です。
+
+- 重いpyin、STFT、非調和性fitを演奏前に済ませる
+- 解析器を変更してもJSON契約を維持すれば合成側を変えない
+- 同一`InstrModel`を複数voiceから読み取り専用で共有する
+- 音色の差分をテキストとして確認する
+
+ファイル名の昇順が `instrumentId` になるので、先頭番号の変更は通信仕様の変更に相当します。
+
+## なぜProcessing + Minimか
+
+ProcessingはSerial列挙、画面、Javaコレクションを一つのスケッチで扱えます。
+MinimはUGenを自作でき、1サンプル単位の加算合成とAudioSample再生を同じ出力へ接続できます。
+
+現行設定:
+
+```java
+frameRate(90);
+out = minim.getLineOut(Minim.STEREO, 512, 44100);
+```
+
+512 samplesは約11.6 msです。小さくすると音声遅延は減りますが、処理が間に合わないと
+dropoutします。描画90 fpsのフレーム間隔は約11.1 msで、Serialキューを消費する
+最大待ち時間も旧構成より短くしています。
+
+## スレッドを分離する理由
+
+3つの実行主体があります。
+
+| 実行主体 | 責務 | 触る状態 |
+|---|---|---|
+| Serial callback | magic同期、20 B収集、queue投入 | `PortConn`、`packetQueue` |
+| Animation `draw()` | packet解釈、発音指示、voice回収、UI | アプリ全体の可変状態 |
+| Minim audio | 1サンプル生成 | 各voice内部 |
+
+Serial callbackから`activeVoices`を変更すると、drawやaudioとの競合が発生します。
+そのため完成packetだけを`ConcurrentLinkedQueue<byte[]>`へ渡します。drawが
+`handlePacket()`を呼ぶことで、発音開始と画面状態変更を単一スレッドに集約します。
+
+## NOTEを受信後すぐ鳴らす理由
+
+WiFi側のBEATには `playAtMasterMs` がありますが、PCはBEATを直接受けません。
+楽器ノードがマスター時計とのoffsetを使って指定時刻まで待ち、その時点でNOTEを
+USBへ送ります。PCで再び45 ms待つと二重遅延になります。
+
+したがってPCはNOTEを受信した次のdrawで `patch(out)` します。遅延の主な要素は:
+
+```text
+USB転送 + Serial callback + draw待ち最大約11.1 ms + audio buffer最大約11.6 ms
+```
+
+OSとAudioデバイスのbufferも加わるため、端から端の値は実機測定が必要です。
+
+## なぜdurationとgateの両方を扱うか
+
+通常のNOTEは `gate=1` と `durationMs` を持ちます。`AudioManager`は
+`scheduleOffMs = millis() + max(40, durationMs)` を設定し、時間到達でreleaseします。
+これによりNoteOffが失われても音が伸び続けません。
+
+`gate=0` も受け付け、同じ`partId`と移調後MIDI音のvoiceをreleaseします。
+ドラムはワンショットなのでgate=0を無視します。
+
+## 金管とドラムを分ける理由
+
+金管は連続音で、release中にもスペクトルと包絡を維持する必要があります。
+ドラムは短い過渡音で、MIDI note番号が音色選択になります。
+
+| 管理 | 金管 | ドラム |
+|---|---|---|
+| class | `ResynthVoice` | `AudioSample` または `DrumNote` |
+| 上限 | 24 non-releasing voices | 12 synthesized voices |
+| 音色選択 | `instrumentId` 0〜3 | note 36/38/42/49 |
+| 終了 | duration → release → done | sample終了または500 ms以上 → release |
+| オクターブ | 楽器別に移調 | なし |
+
+同じ`triggerNote()`入口で分岐するため、上流のSerial・protocolは共通です。
+
+## 共有タブに分割した理由
+
+productionだけでなく検証スケッチでも同じprotocol、Serial、audio、UIを使います。
+原本を `pc_app/common/` に置き、各スケッチからsymlinkすることで、コピー間の差分を防ぎます。
+
+共有タブはグローバル変数へ依存します。これはProcessingタブが一つのスケッチとして
+コンパイルされる性質を利用したものです。再利用は容易ですが、独立Javaライブラリほど
+依存が明示的ではありません。各ファイル冒頭の「グローバル依存」を契約として扱います。
+
+## UI状態を別パケットにした理由
+
+PC画面は指揮者の状態を知る必要がありますが、node_01はPCとUSB接続しません。
+そこでnode_02が受けたCTRLをUI type=4へ詰め替えて中継します。
+
+- 音楽同期のUDP経路を変えない
+- NOTE type=3のoffsetを変えない
+- 変化時は最短33 ms、無変化時は1秒heartbeatとし、Serialを圧迫しない
+- 画面番号ではなく`state`と`mode`を送り、PCで画面を導出する
+- 2秒途絶えたら安全側へ戻して全音停止する
+
+## 変更可能な境界
+
+| 変更 | 影響範囲 |
 |---|---|
-| 「らしさ」が出ない | `sound_lab/analyzer/` で **実楽器の録音を解析** して JSON を作る（音色は事実の翻訳になる） |
-| 打楽器が苦手 | test_v2 は管弦の輪唱のみに絞る。打楽器が必要になったらサンプル再生を後付けする |
-| CPU 負荷 | 倍音数 40 個 × 同時 3〜5 声（test_v2 は 3 声・production は 5 声目標）で 1 Mac は余裕（実測。Minim のサンプルレート 44.1 kHz） |
+| UIの色や配置 | `SharedUI`とmainの描画関数 |
+| voice stealing | `AudioManager.triggerNote()` |
+| 合成方式 | `SynthVoice`と必要なら`InstrModel` |
+| 音色解析 | `sound_lab/analyzer/`、JSON契約を維持 |
+| Serial以外の入力 | `SerialCore`相当の入口、`handlePacket`契約を維持 |
+| パケットoffsetや状態値 | firmwareとPCを同時変更、文書・fixtureも更新 |
 
-:::tip[他案を選ぶ余地]
-- サンプル再生（A）でやりたい人は、`InstrModel` を「波形バッファ + ピッチシフト係数」に置き換え、
-  `ResynthVoice.uGenerate()` を読み出しに差し替えれば、上流（NOTE 受信〜トリガー）はそのまま使える。
-- 物理モデリング（C）も同じ。**`InstrModel` と `ResynthVoice` 以外は触らない設計** にしてあるのは
-  この差し替えを楽にするため。
-:::
-
-## 中心の問い: NOTE を受けて発音するまでの遅延をどう抑えるか
-
-シリアルは指揮者の `playAtMasterMs` 先読みを介さない（楽器側で時刻合わせ済みのまま発音指示が来る）。
-PC は **届いたら即座に鳴らす** ことを期待される。要件は次の通り。
-
-| 指標 | 目標 |
-|---|---|
-| シリアル受信から発音開始までの遅延 | ≤ 10 ms |
-| 同時発音数（仮） | 同一ノード PC で 24 まで（`MAX_POLYPHONY`） |
-| パケット欠落への耐性 | NOTE は **gate=1 のみ** で完結。NoteOff は durationMs から自動算出 |
-
-これを実現するため、Processing スケッチに以下の構造を入れた。
-
-1. **`serialEvent(Serial p)` は受信スレッドで走る** ので、ここでは音を作らない。
-   `packetQueue: ConcurrentLinkedQueue<byte[]>` に投げるだけ。
-2. **発音判断は `draw()` スレッド** で `drainPackets()` がまとめてやる。
-   音声合成（Minim の `UGen`）は draw とは別の audio スレッドで動くが、UGen 自身は
-   トリガー時刻の `tSec` で時間を進めるので、draw からの `patch` 経路で 1 ループ
-   ぶん（≈ 16 ms）の遅延を許容する。
-3. **NoteOff は時刻トリガー**: パケットには gate=1 しか来ない前提で、`scheduledOffMs`
-   に達したら draw が自動で `noteOff()` を呼ぶ（→ 通信が落ちても音が伸びっぱなしにならない）。
-
-## なぜ Processing なのか
-
-| 候補 | 利点 | 不利な点 | 判断 |
-|---|---|---|---|
-| **Processing 4 + Minim（採用）** | Java の知識で組める、Minim の `UGen` でサンプル単位の合成書ける、シリアル・FFT・GUI が標準 | Java 起動が重い、Processing IDE がやや古い | ◎ 学内の前提知識と一致、起動の重さは許容 |
-| openFrameworks / JUCE | C++ で高速、プロ志向 | チーム 2 年生に C++ GUI は重い | × |
-| Web Audio (TypeScript) | ブラウザで即動く、解析側と Web で統一 | シリアルは Web Serial 必須（Chrome 限定）、Minim 級のレンジを再実装が必要 | △（編集スタジオ側で部分的に採用） |
-| Max/MSP / Pure Data | 直感的、リアルタイム強い | ライセンス・配布・コード管理 | × |
-| SuperCollider | プロのライブコーディングで実績豊富 | 言語学習コストが高い | × |
-
-**Processing にした最大の理由は「IDE を開いて Run を押す」だけで動くこと**。チーム 2 年生
-の学習コストを最小化する目的だった。
-
-## なぜ Python（librosa）で解析するのか
-
-| 候補 | 利点 | 不利な点 | 判断 |
-|---|---|---|---|
-| **Python + librosa + numpy（採用）** | pyin / STFT / Spectral Feature が全部入り、サンプル豊富 | 実行時に Python 環境が要る | ◎ 解析はオフライン処理なので OK |
-| Processing で内製 | Processing IDE 内で完結する | pyin 級の基音検出を 1 から書くのは無理 | × |
-| C++ + JUCE で内製 | リアルタイム化も視野 | 同上、加えて学習コストが高い | × |
-| Web Audio で解析 | ブラウザで完結 | FFT は OK、pyin は無い | △（編集スタジオ補助に使用） |
-
-解析は **リアルタイム性が不要** なので、最も解析ライブラリが揃った Python を選ぶのが普通。
-
-## アーキテクチャ上の重要な切り口
-
-塩澤の実装で **意図的に守った境界線** は次の 3 つ。これを動かすと既存コードが連鎖的に壊れる。
-
-### 境界 1: パケットフォーマット（20 B 固定）
-
-- ファーム側 `firmware/test_v2/common/lib/OrcProtocol/` と
-  PC 側 `orchestra_resynth.pde` の `handlePacket()` が **両端でこの形を知っている**
-- 詳細: @.agent/api.md / [バイナリパケット詳説](/deep-dive/binary-packet/)
-- **動かすときは両端を同時に直す**
-
-### 境界 2: 音色 JSON フォーマット
-
-- 解析側 `analyzer.py` が出力し、再合成側 `InstrModel` が読む
-- 詳細: [JSON フォーマット仕様](/pc-audio/instr-model/)（`sound_lab/library_format.md` のサイト版）
-- バージョン文字列 `"format": "sound_lab.instrument/1"` で世代管理
-- **どちらか片方を変えるならバージョン文字列を上げ、他方が読めるよう互換コードを残す**
-
-### 境界 3: `ResynthVoice` 内部の数学
-
-- 加算合成の数式そのもの。`InstrModel` のフィールドが何を意味するかと、
-  uGenerate() の各行が何を計算するかが対応している
-- ここを変えると **JSON の意味も連動する**
-- [ResynthVoice のページ](/pc-audio/resynth-voice/) で詳しく解剖する
-
-## このページの先
-
-ここまでで「PC 側で何をやろうとしているのか」「なぜそうしたか」が見えたら、次は
-**コードの中で起きていること** を順に読む:
-
-- データの流れ全体を 1 枚で見たい → [NOTE 受信から発音までの信号フロー](/pc-audio/signal-flow/)
-- いきなり実コードを読みたい → [orchestra_resynth.pde 全体構造](/pc-audio/resynth-main/)
-- 解析側から見たい → [音声解析パイプライン全体](/pc-audio/analyzer-overview/)
+次は [信号フロー](/pc-audio/signal-flow/) で実行順を追います。

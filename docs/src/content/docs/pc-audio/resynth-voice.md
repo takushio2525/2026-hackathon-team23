@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-実体: `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` 599〜721 行（`class ResynthVoice extends UGen`）。
+実体: `pc_app/common/SynthVoice.pde`（126行、productionスケッチから共有タブとして参照）。
 
 このページは **「1 音をどう作っているか」** の解剖。スケッチ全体構造は
 [orchestra_resynth.pde の全体構造](/pc-audio/resynth-main/) を先に読むこと。
@@ -52,7 +52,7 @@ class ResynthVoice extends UGen {
   float gain;                     // 0..1.5 (velocity * masterVolume)
   boolean simpleADSR;             // false=実エンベロープ / true=ADSR 4 値
 
-  // test_v2 で追加: 自動 noteOff のため
+  // 自動noteOffと送信元の追跡
   int   partId = -1;              // どの声部か
   int   instrumentIdx = -1;       // どの音色か
   int   scheduledOffMs = Integer.MAX_VALUE;  // millis() でこれを超えたら noteOff
@@ -197,9 +197,9 @@ float sustainBodyLevel(float t){
 }
 ```
 
-- **`simpleADSR = false`** (デフォルト): JSON の `envelope.values[]` を時間軸で
-  サンプリングして使う。実楽器の包絡そのもの
-- **`simpleADSR = true`** (キー `a` でトグル): ADSR 4 値だけで動かす簡易モード
+- **`simpleADSR = true`**（productionのデフォルト）: ADSR 4 値だけで動かす簡易モード
+- **`simpleADSR = false`**（キー `a` で切替）: JSON の `envelope.values[]` を時間軸で
+  サンプリングし、倍音包絡・noise・ビブラート・トレモロも有効にする
 
 ### `warpBody(t)` — 持続音のループ参照
 
