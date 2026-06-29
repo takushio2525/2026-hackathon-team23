@@ -10,6 +10,11 @@ sidebar:
 **決定の場**: チーム内オフライン検討（第 1 回と第 2 回の**間**）。会議ベースではなく、第 1 回ミーティング（2026-04-15）で合意した 5 台構成（[ADR-0004](/decisions/0004-ensemble-structure/)）を前提に、firmware 実装方針としてリポジトリ上で確定したもの。
 **関連**: [ADR-0004](/decisions/0004-ensemble-structure/)（5 台構成）、リポジトリ内 `firmware/README.md`
 
+:::note[現在の実装]
+当初は雛形だった`firmware/production/`にもEMAを適用済みで、現行の本番実装になっている。
+共通層は`firmware/production/common/lib/`、ノードは`node_01〜06`。詳細は[ファームウェア概要](/implementation/firmware-overview/)を参照。
+:::
+
 ## 背景
 
 本チームは指揮者 XIAO ESP32-S3 × 1 台 ＋ 楽器 Arduino UNO R4 WiFi × 5 台（合計 6 台、

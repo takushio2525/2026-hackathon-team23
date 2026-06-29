@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-実体: `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` 485〜585 行（`class InstrModel`）。
+実体: `pc_app/common/InstrModel.pde`（111行、productionスケッチから共有タブとして参照）。
 JSON 仕様の SSOT: `sound_lab/library_format.md`。
 
 `InstrModel` は **JSON を 1 度パースして、Voice が使う配列の形にしておく前処理クラス**。

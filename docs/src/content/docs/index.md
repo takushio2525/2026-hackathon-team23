@@ -1,76 +1,46 @@
 ---
 title: タクトーン
-description: IMU ジェスチャーで奏でる Arduino オーケストラ — チーム 23 の公式解説サイト
+description: IMUジェスチャーで演奏するArduinoオーケストラの現行仕様書
 template: splash
 hero:
-  tagline: 「指揮を振る体験」を主役に、5 台のマイコンと PC でひとつの曲を作る。
+  tagline: 指揮棒を振ると、5台の楽器マイコンとPCが同期して「かえるのうた」を演奏する。
   actions:
-    - text: プロジェクト概要を読む
-      link: /intro/overview/
+    - text: 現行仕様を見る
+      link: /system/overview/
       icon: right-arrow
       variant: primary
-    - text: クイックスタート
+    - text: 動かしてみる
       link: /intro/quickstart/
       icon: rocket
 ---
 
 ## このサイトについて
 
-千葉工業大学 情報変革科学部 情報工学科 ハッカソン課題（チーム 23）の **タクトーン — IMU ジェスチャーで
-奏でる Arduino オーケストラ** の公式解説サイトです。**Git や PlatformIO に初めて触れる読者**
-でも単独で全体像を追えるよう、用語・図・コード解説を一通り揃えました。
+千葉工業大学ハッカソン・チーム23の作品 **タクトーン** の仕様と開発手順をまとめたサイトです。
+記述対象は現在の本番版である `firmware/production/` と `pc_app/production/` です。
 
-- **聴衆 / 審査員の方** は、まず [プロジェクト概要](/intro/overview/) と
-  [なぜ作るのか](/concept/why/) を読むと全体像が掴めます（プレゼン本番 2026-05-20）。
-- **新メンバー / 後輩** は、[クイックスタート](/intro/quickstart/) からセットアップして
-  [開発ガイド](/guide/setup/) を順に追ってください。
-- **既存メンバー** は [アーキテクチャ](/architecture/overview/) と
-  [コードを読む](/code/map/) が日常の参照先になります。
-
-## このプロジェクトでできること
-
-- **指揮者の腕を振るだけ** で 4 台の楽器マイコンが同期して演奏する
-- **テンポを変えると演奏速度が追従** する（指揮の速さに応じてリアルタイム反映）
-- 振り方の方向に依存せず、雑な振りでも拍を取る
-- 楽譜を内蔵しているので **PC を曲の途中で起動しても「今の拍」から鳴る**
-- 楽器番号付き NOTE で **PC 側の音色（金管・木管・弦など）を切り替え**
-
-## システム構成（一目で）
-
-```
-[指揮者 XIAO ESP32-S3 + IMU] ── UDP ──→ [楽器 Arduino UNO R4 WiFi × 3]
-                                              │
-                                              ↓ USB Serial
-                                         [PC: Processing 加算合成]
-                                              │
-                                              ↓
-                                          🔊 スピーカ
+```mermaid
+flowchart LR
+    C[指揮者<br/>XIAO ESP32-S3 + IMU]
+    I[楽器5台<br/>Arduino UNO R4 WiFi]
+    P[Processing]
+    S[スピーカー]
+    C -- CTRL / BEAT<br/>UDP --> I
+    I -- NOTE / UI<br/>USB Serial --> P
+    P --> S
 ```
 
-詳しくは [全体図](/architecture/overview/) を参照。
+## 迷ったらここから
 
-## まず読むなら：要点ダイジェスト
-
-詳細ページがどれも長すぎて入りにくい、という方のために **「これさえ読めば全体が分かる」**
-4 本のダイジェストを用意しました。1 本 10〜15 分、合計 1 時間で **設計・実装・解析の全体像**
-を一通り把握できます。
-
-1. [①プロジェクト全体のあらまし](/essentials/project/) — 何を作っているか、どう動くか
-2. [②ファームウェアのあらまし](/essentials/firmware/) — マイコン側の理屈
-3. [③Processing のあらまし](/essentials/processing/) — PC 側「音を作る」の理屈
-4. [④音声解析のあらまし](/essentials/analyzer/) — 実音から音色 JSON を作る理屈
-
-各ダイジェストの末尾から、興味のある層の詳説ページに進めます。
-
-## サイトの歩き方
-
-| 目的 | おすすめの順路 |
+| 目的 | 読むページ |
 |---|---|
-| 何ができるか知りたい | [プロジェクト概要](/intro/overview/) → [シナリオと体験](/concept/scenario/) |
-| 仕組みを **広く** 理解したい | [要点ダイジェスト ①〜④](/essentials/project/) |
-| 仕組みを **深く** 理解したい | [全体図](/architecture/overview/) → [通信プロトコル](/architecture/protocol/) → [同期戦略](/architecture/sync/) |
-| 自分の手で動かしたい | [クイックスタート](/intro/quickstart/) → [Arduino を書き換える](/guide/firmware/) |
-| コードを読みたい | [リポジトリ・マップ](/code/map/) → [firmware の歩き方](/code/firmware/) |
-| 設計判断の根拠を見たい | [意思決定の記録（ADR）](/decisions/0007-project-purpose-and-scope/) |
+| 何を作ったか知る | [プロジェクト概要](/intro/overview/) |
+| システム全体を理解する | [現行システム](/system/overview/) |
+| 実機を動かす | [クイックスタート](/intro/quickstart/) |
+| コードを変更する | [開発ガイド](/guide/setup/) |
+| 旧版との差を確認する | [バージョン変遷](/history/versions/) |
 
-困ったら左サイドバーから戻ってきてください。
+:::caution[仕様の基準]
+このサイト内で食い違いが見つかった場合は、productionのヘッダー・設定・実装コードを優先してください。
+ADRは「当時なぜ決めたか」を残す履歴なので、現在の実装と異なる場合があります。
+:::

@@ -5,15 +5,15 @@ sidebar:
   order: 6
 ---
 
-実体: `pc_app/test_v2/orchestra_resynth/orchestra_resynth.pde` 80〜250 行（`PortConn` クラス、
-ポート管理、`serialEvent` 受信ループ）。
+実体: `pc_app/common/SerialCore.pde`（107行）。packetの意味付けは
+`pc_app/production/orchestra_resynth/orchestra_resynth.pde` の `handlePacket()` が担当する。
 
 このページは **「なぜマルチポートが要るのか、どう実装してあるか、自分で書き直すなら何に注意するか」**
 を解剖する。
 
 ## 何のために複数ポートを 1 つの Processing で扱うか
 
-本番は **1 Mac × 1 楽器ノード** のつもりだが、開発・デモで次が頻発する:
+productionは **1つのProcessingで複数楽器ノードを開ける** 構成で、次に対応する:
 
 - **リハ会場で楽器 3 台を 1 Mac に USB 直結して動作確認したい**（人手減らす）
 - 楽器ノードを USB ハブで集約してデモ机に並べ、1 Mac で全声部を鳴らす
@@ -48,7 +48,7 @@ ConcurrentLinkedQueue<byte[]> packetQueue;  // 完成パケットを draw 側に
 | `PortConn` per ポート | 各ポートが **独立した受信状態** を持つ | 同期 (magic 待ち) は各 USB ストリームで独立。共有すると別ポートのバイトが混ざる |
 | `openByName` | 開閉状態の管理 | 同じポートを 2 回開かないため |
 | `bySerial` | `serialEvent(Serial p)` から逆引き | Processing の API がポート名でなく `Serial` オブジェクトを渡してくるため |
-| `packetQueue` | Serial → Animation の橋 | ロック不要で 1 producer / 1 consumer に最適 |
+| `packetQueue` | Serial → Animation の橋 | 複数portから安全にofferでき、drawがpollできる |
 
 ## シリアル受信ループ — magic 同期
 
@@ -138,13 +138,13 @@ Processing は内部で勝手にバッファして呼び出し頻度を絞るの
 | **`ConcurrentLinkedQueue`** | ロックフリーで容量無制限、`offer` は必ず成功、`poll` は空なら null |
 | `LinkedBlockingQueue` | `take` がブロックするので Animation スレッドが固まる |
 
-採用したのは `ConcurrentLinkedQueue`。**1 producer (Serial) / 1 consumer (Animation)** に
-最適。
+採用したのは `ConcurrentLinkedQueue`。Serial callback側のproducerとAnimation側の
+consumerが同じ配列を直接触らずに済む。
 
 容量無制限が怖い場合もあるが、20 B × 万単位なら数十 MB で、ハッカソン用途では問題なし。
 draw が毎フレーム必ず poll するので無限に伸びることはない。
 
-## パケット → 発音指示への変換
+## パケット → NOTEまたはUIへの変換
 
 ```java
 void drainPackets(){
@@ -154,22 +154,18 @@ void drainPackets(){
 
 void handlePacket(byte[] buf){
   totalReceived++;
-  if (u8(buf[2]) != 0x01) return;            // version チェック
-  int type = u8(buf[3]);
-  if (type != TYPE_NOTE) return;             // CTRL/BEAT は USB には流れない — 無視
-  int partId       = u8(buf[12]);
-  int noteNumber   = u8(buf[13]);
-  int velocity     = u8(buf[14]);
-  int gate         = u8(buf[15]);
-  int durationMs   = u16le(buf[16], buf[17]);
-  int instrumentId = u8(buf[18]);
-  if (gate == 1){
-    triggerNote(partId, instrumentId, noteNumber, velocity, durationMs);
-    ...
-  } else {
-    releaseMatching(partId, noteNumber);
-    ...
+  int type = packetType(buf);
+  if (type == TYPE_UI){
+    UiEvent ui = new UiEvent(buf);
+    // state/mode/cursor/target/score/BPMを更新して画面判定へ
+    return;
   }
+  if (type != TYPE_NOTE) return;
+  NoteEvent n = new NoteEvent(buf);
+  if (n.gate == 1)
+    triggerNote(n.partId, n.instrumentId, n.noteNumber, n.velocity, n.durationMs);
+  else if (!isDrumInstrument(n.instrumentId))
+    releaseMatching(n.partId, n.noteNumber + brassOctaveShift(n.instrumentId));
 }
 ```
 
@@ -177,7 +173,8 @@ void handlePacket(byte[] buf){
 
 - **`u8` / `u16le` で符号無しに正規化**（Java の byte は符号付き）
 - **version が違うと無視**（互換性の壁を作ってある）
-- **type が NOTE 以外なら無視** — 楽器ノードが間違って CTRL/BEAT を流しても落ちない
+- **type=UI は画面状態へ反映、type=NOTE は発音へ反映**
+- CTRL/BEATや未知typeは無視する
 - `instrumentId` が 0 から始まる 1 バイト整数
 
 `u16le(lo, hi)` の中身:

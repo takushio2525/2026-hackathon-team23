@@ -13,11 +13,11 @@ sidebar:
 :::
 
 :::tip[読了目安]
-**約 15 分**。前提: [同期戦略（±20ms）](/architecture/sync/) の概要、ベクトルと積分、C++ の基本構文。
+**約 15 分**。前提: [同期方式](/system/synchronization/) の概要、ベクトルと積分、C++ の基本構文。
 :::
 
-実装本体: `firmware/test_v2/node_01/src/applyPattern.cpp`
-閾値定数: `firmware/test_v2/node_01/include/ProjectConfig.h` の `logic_params` 名前空間
+実装本体: `firmware/production/node_01/src/applyPattern.cpp`
+閾値定数: `firmware/production/node_01/include/ProjectConfig.h` の `logic_params` 名前空間
 
 ## 問題設定
 
@@ -460,6 +460,8 @@ BPM EMA (α=0.30) ─→ data.tempo.bpm
 ## 次に読むべきページ
 
 - 拍の先の話: [時刻同期メカニズム](/deep-dive/time-sync/)
-- センサ生データを取り込むモジュール: `firmware/test_v2/node_01/lib/ImuModule/`
+- メニュー操作はこの拍検出とは別系統。傾きナビとゲーム採点は
+  [ゲーム操作と採点](/deep-dive/game-navigation-scoring/) を参照
+- センサ生データを取り込むモジュール: `firmware/production/node_01/lib/ImuModule/`
 - 拍検出が CTRL/BEAT になる過程: [バイナリパケット](/deep-dive/binary-packet/)
 - 新しい入力センサを足したい: [モジュール拡張ガイド](/deep-dive/module-extension/)

@@ -16,8 +16,8 @@ sidebar:
 
 | ファイル | 行数 | 内容 |
 |---|---|---|
-| `firmware/test_v2/common/lib/ModuleCore/IModule.h` | 28 | 抽象基底クラス |
-| `firmware/test_v2/common/lib/ModuleCore/ModuleTimer.h` | 25 | 周期判定タイマ |
+| `firmware/production/common/lib/ModuleCore/IModule.h` | 28 | 抽象基底クラス |
+| `firmware/production/common/lib/ModuleCore/ModuleTimer.h` | 25 | 周期判定タイマ |
 
 両方ともヘッダオンリーで `.cpp` を持たない。テンプレート的に「全コードを見せる」ので、
 構造を覚えてしまえばモジュール拡張時に迷わない。
@@ -181,4 +181,4 @@ getNowTime() = 0x00000003 - 0xFFFFFFFE = 0x00000005 = 5  ← 正しい
 
 - 拡張する側 → [モジュール拡張ガイド](/deep-dive/module-extension/)
 - 各モジュールの実例 → [OrcNetModule](/firmware/orc-net/) / [ImuModule](/firmware/imu-module/) など
-- 全体像 → [Embedded-Module-Architecture](/architecture/ema/)
+- 全体像 → [共通モジュール](/implementation/common-modules/)

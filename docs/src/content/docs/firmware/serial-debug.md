@@ -16,7 +16,7 @@ sidebar:
 
 | ファイル | 行数 | 内容 |
 |---|---|---|
-| `firmware/test_v2/common/lib/SerialDebug/SerialDebug.h` | 69 | マクロ + 補助 inline 関数（ヘッダオンリー） |
+| `firmware/production/common/lib/SerialDebug/SerialDebug.h` | 69 | マクロ + 補助 inline 関数（ヘッダオンリー） |
 
 `.cpp` を持たない。テンプレート的に「全部見せる」のでまず全コードを置く。
 
