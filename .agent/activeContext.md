@@ -5,16 +5,16 @@
 
 ## 現在の対象
 
-- `saitou-work` の week10 修正版 Processing スケッチを `main` に同じ場所で取り込み
-- 対象: `work/saito/week10/kaeru_score_week10_adjusted/`
-- 内容: 4/4ドラム、チューバ C2 相当、チューバ音量 0.36、ドラム音量 0.11、金管 attack 短縮
+- `umezawa_work` の `work/umezawa/hck/week9/` に2026年6月29日分の作業ログを作成
+- 内容: docsサイト再編、サイドバー更新、MathJax対応
+- 作業時間: 1時間30分
 
 ## 次の一手
 
-- `main` にコミットする
-- push は GitHub 認証状態次第で実施する
+- TeXと生成PDFの内容をユーザーが確認する
+- 必要に応じてコミット・pushする
 
 ## 現フェーズで Read すべき設計書
 
-- コミット規約: `.agent/conventions.md`
-- 齋藤個人作業: `work/saito/week10/kaeru_score_week10_adjusted/README.md`
+- LaTeX・Git規約: `.agent/conventions.md`
+- 作業ログ: `work/umezawa/hck/week9/worklog_25G1021.tex`

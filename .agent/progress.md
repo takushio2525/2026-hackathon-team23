@@ -452,3 +452,4 @@
 
 - 2026-06-26: main に残っていた `1093f04` 由来の説明を対象ファイルを絞って修正。`pc_app/production/README.md` から C2/1.40 の説明を削除し、`firmware/production/README.md` と node_06 のヘッダコメントを現行ドラム譜に合わせた。実行コード本体は変更していない。
 - 2026-06-27: `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` を `main` の同じ場所に取り込み。最新調整（チューバ0.36、ドラム0.11、金管attack短縮）込みで Processing ビルド成功。
+- 2026-06-30: `umezawa_work` に梅澤week9作業ログを作成。6月29日のdocs更新（1時間30分）を記録し、TeXと3ページのPDFを生成・目視確認した。
