@@ -135,7 +135,7 @@
 \textbf{300 テスト}     &     &     &     &     &     &     &     &     &     &     &     &     \\
 \quad 単体・結合・システム &   &     &     &     &     &     &     &     & \bD & \bD & \bD &     \\
 \quad 評価（精度・遅延） &     &     &     &     &     &     &     &     &     &     & \bD & \bP \\
-400 ストレッチ（強弱ほか） &  &     &     &     &     &     &     & \bD & \bD &     &     &     \\
+400 ストレッチ（強弱ほか） &  &     &     &     &     &     &     & \bQ & \bQ &     &     &     \\
 発表会                  &     &     &     &     &     &     &     &     &     &     &     & \multicolumn{1}{c}{$\bigstar$} \\
 \bottomrule
 \end{tabular}
@@ -268,6 +268,7 @@ production バグ多発 & test\_v3 からの移行時に不整合 & 中 & 高 & 
   \item 添付資料：
     \begin{itemize}
       \item GitHub リポジトリ：\url{https://github.com/takushio2525/2026-hackathon-team23}
+      \item 筐体 3D モデル：図\ref{fig:case-outer}（外観），図\ref{fig:case-inner}（内部）
     \end{itemize}
   \item 主要コミット（塩澤担当分）：
     \begin{itemize}
@@ -278,6 +279,23 @@ production バグ多発 & test\_v3 からの移行時に不整合 & 中 & 高 & 
       \item \texttt{1f33943} --- test\_multi 指揮者パネルを production 版ゲーム UI に変更
     \end{itemize}
 \end{itemize}
+
+\bigskip
+
+% --- 筐体 3D モデル ---
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\linewidth]{fig/case_outer.png}
+  \caption{指揮棒筐体 3D モデル（外観）：角にフィレット，一端に USB コネクタ用の開口部}
+  \label{fig:case-outer}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\linewidth]{fig/case_inner.png}
+  \caption{指揮棒筐体 3D モデル（内部）：四隅にネジ穴，蓋と本体の嵌合構造}
+  \label{fig:case-inner}
+\end{figure}
 
 \sectionrule
 
