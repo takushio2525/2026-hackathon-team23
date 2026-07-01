@@ -59,20 +59,6 @@ void resetAfterMasterReset(SystemData& data) {
 void OrcReceiverModule::updateInput(SystemData& data) {
     // 1. CTRL を受信していれば時計同期 + 状態取り込み
     if (data.orcNet.hasNewCtrl) {
-#if MOP_TEST == 6
-        // MOP6: BPM 変化時に出力
-        {
-            static uint16_t sPrevBpmQ8_m6 = 0;
-            const uint16_t bpmQ8 = data.orcNet.lastCtrl.payload.bpmQ8;
-            if (bpmQ8 != sPrevBpmQ8_m6) {
-                mop_test::mprintf("M6,%u,0,%u,%lu\n",
-                                  (unsigned)cfg_.partId,
-                                  (unsigned)bpmQ8,
-                                  (unsigned long)millis());
-                sPrevBpmQ8_m6 = bpmQ8;
-            }
-        }
-#endif
         if (updateClockOffset(data,
                               data.orcNet.lastCtrl.header.timestampMs,
                               cfg_.clockSyncEmaAlpha,
