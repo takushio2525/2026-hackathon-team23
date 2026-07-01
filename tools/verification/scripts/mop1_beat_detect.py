@@ -173,7 +173,11 @@ def main():
     common.print_header('MOP1: 拍検出の正確性 (正解率 >= 90%)')
 
     if len(beats) < 2:
-        print('  拍データ不足 (< 2)。')
+        msg = f'拍データ不足 ({len(beats)} 拍)。指揮棒を振ったか確認してください。'
+        print(f'  {msg}')
+        summary_path = common.write_summary(1, ts, False, msg)
+        print(f'\n  CSV:     {csv_path}')
+        print(f'  Summary: {summary_path}')
         return
 
     intervals_ms = [beats[i][1] - beats[i - 1][1]
@@ -190,15 +194,38 @@ def main():
 
     if len(intervals_ms) >= 2:
         sd = statistics.stdev(intervals_ms)
-        stats_lines.append(f'拍間隔 SD:    {sd:.1f} ms  (CV {sd / mean_iv * 100:.1f}%)')
+        cv = sd / mean_iv * 100
+        stats_lines.append(f'拍間隔 SD:    {sd:.1f} ms  (CV {cv:.1f}%)')
+
+        # 偽検出の疑い: 期待間隔の半分未満の間隔があれば二重検出の可能性
+        if args.bpm:
+            expected_iv = 60000 / args.bpm
+            short_count = sum(1 for iv in intervals_ms if iv < expected_iv * 0.5)
+            if short_count > 0:
+                stats_lines.append(
+                    f'⚠ 短間隔 {short_count} 件 (< {expected_iv * 0.5:.0f}ms)'
+                    f' → 偽検出の疑い')
 
     passed = None
     if args.bpm:
-        expected = int(args.duration * args.bpm / 60)
-        rate = len(beats) / expected * 100
-        passed = rate >= 90
-        stats_lines.append(f'期待拍数:     {expected} (BPM={args.bpm}, {args.duration}s)')
-        stats_lines.append(f'検出率:       {rate:.1f}%')
+        # 実測区間ベースの期待拍数（振り始め〜振り終わりの実時間）
+        expected_actual = round(elapsed_s * args.bpm / 60) + 1
+        # スクリプト設定時間ベースの期待拍数（参考値）
+        expected_full = round(args.duration * args.bpm / 60)
+
+        rate_actual = len(beats) / expected_actual * 100
+        rate_full = len(beats) / expected_full * 100
+
+        # 判定は実測区間ベースを使う（振っていない時間を含めない）
+        passed = 90 <= rate_actual <= 110
+        stats_lines.append(f'期待拍数 (実測区間): {expected_actual}'
+                           f' ({elapsed_s:.1f}s × {args.bpm} BPM)')
+        stats_lines.append(f'期待拍数 (設定時間): {expected_full}'
+                           f' ({args.duration}s × {args.bpm} BPM)')
+        stats_lines.append(f'検出率 (実測): {rate_actual:.1f}%')
+        stats_lines.append(f'検出率 (設定): {rate_full:.1f}%')
+        if rate_actual > 110:
+            stats_lines.append('⚠ 検出率 > 110%: 偽検出 (false positive) の疑い')
         stats_lines.append(f'判定: {"PASS" if passed else "FAIL"}')
     else:
         stats_lines.append('--bpm を指定すると検出率を計算します')
@@ -208,7 +235,8 @@ def main():
 
     # summary 保存
     stats_text = '\n'.join(stats_lines)
-    summary_path = common.write_summary(1, ts, passed if passed is not None else False,
+    summary_path = common.write_summary(1, ts,
+                                        passed if passed is not None else None,
                                         stats_text)
 
     print(f'\n  CSV:     {csv_path}')

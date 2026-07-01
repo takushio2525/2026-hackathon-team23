@@ -107,12 +107,19 @@ def open_csv(mop_number, fieldnames, timestamp=None):
 
 
 def write_summary(mop_number, timestamp, passed, stats_text):
-    """PASS/FAIL 判定と統計テキストを summary ファイルに書く。"""
+    """PASS/FAIL 判定と統計テキストを summary ファイルに書く。
+    passed が None の場合は「判定なし」として記録する。"""
     path = os.path.join(results_dir(mop_number),
                         f'{timestamp}_summary.txt')
+    if passed is None:
+        verdict = '判定なし (--bpm 未指定)'
+    elif passed:
+        verdict = 'PASS'
+    else:
+        verdict = 'FAIL'
     with open(path, 'w') as f:
         f.write(f"MOP{mop_number} — {datetime.now().isoformat()}\n")
-        f.write(f"判定: {'PASS' if passed else 'FAIL'}\n\n")
+        f.write(f"判定: {verdict}\n\n")
         f.write(stats_text)
     return path
 
