@@ -5,6 +5,7 @@
 
 #include "OrcReceiverModule.h"
 #include "SystemData.h"
+#include "MopTest.h"
 
 namespace {
 
@@ -58,6 +59,20 @@ void resetAfterMasterReset(SystemData& data) {
 void OrcReceiverModule::updateInput(SystemData& data) {
     // 1. CTRL を受信していれば時計同期 + 状態取り込み
     if (data.orcNet.hasNewCtrl) {
+#if MOP_TEST == 6
+        // MOP6: BPM 変化時に出力
+        {
+            static uint16_t sPrevBpmQ8_m6 = 0;
+            const uint16_t bpmQ8 = data.orcNet.lastCtrl.payload.bpmQ8;
+            if (bpmQ8 != sPrevBpmQ8_m6) {
+                mop_test::mprintf("M6,%u,0,%u,%lu\n",
+                                  (unsigned)cfg_.partId,
+                                  (unsigned)bpmQ8,
+                                  (unsigned long)millis());
+                sPrevBpmQ8_m6 = bpmQ8;
+            }
+        }
+#endif
         if (updateClockOffset(data,
                               data.orcNet.lastCtrl.header.timestampMs,
                               cfg_.clockSyncEmaAlpha,
@@ -111,6 +126,32 @@ void OrcReceiverModule::updateInput(SystemData& data) {
             data.receiver.pending.enqueuedAtMs = millis();
             data.receiver.lastBeatNo = bn;
             data.receiver.hasFirstBeat = true;
+
+#if MOP_TEST == 4
+            {
+                const uint32_t localMasterMs = millis() + (uint32_t)data.sync.offsetMs;
+                mop_test::mprintf("M4,%u,%u,%lu,%lu\n",
+                                  (unsigned)cfg_.partId, (unsigned)bn,
+                                  (unsigned long)localMasterMs,
+                                  (unsigned long)data.orcNet.lastBeat.payload.playAtMasterMs);
+            }
+#endif
+#if MOP_TEST == 5
+            {
+                const int32_t ahead =
+                    (int32_t)data.orcNet.lastBeat.payload.playAtMasterMs -
+                    (int32_t)(millis() + (uint32_t)data.sync.offsetMs);
+                mop_test::mprintf("M5I,%u,%u,%lu,%ld\n",
+                                  (unsigned)cfg_.partId, (unsigned)bn,
+                                  (unsigned long)millis(), (long)ahead);
+            }
+#endif
+#if MOP_TEST == 9
+            mop_test::mprintf("M9,%u,%u,%lu,%lu\n",
+                              (unsigned)cfg_.partId, (unsigned)bn,
+                              (unsigned long)data.orcNet.lastBeat.header.seq,
+                              (unsigned long)millis());
+#endif
         }
         // 重複でも lastBeatMs は更新する (受信タイムアウト監視・診断ログ用)
         data.receiver.lastBeatMs = millis();

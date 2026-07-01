@@ -16,6 +16,7 @@
 #include "NoteSenderModule.h"
 #include "StatusLedModule.h"
 #include "SerialDebug.h"
+#include "MopTest.h"
 
 void applyPattern(SystemData& data);
 
@@ -130,9 +131,13 @@ void setup() {
     // ホスト接続を待ちたいので、ここで明示的に Serial.begin() してから待つ。
     // SERIAL_DEBUG=0 のときは DBG_BEGIN/WAIT_HOST が空展開され、
     // 従来どおり NoteSenderModule.init() が Serial.begin() する。
+    mop_test::ensureSerial();
     DBG_BEGIN(115200);
     DBG_WAIT_HOST(1500);
     DBG_PRINTLN("");
+#if MOP_TEST == 7
+    mop_test::mprintf("M7,4,BOOT,%lu\n", (unsigned long)millis());
+#endif
     DBG_PRINTF("=== node_04 (round voice partId=0x%02X instr=%u headRest=%u) boot ===\n",
                (unsigned)ORC_RECEIVER_CONFIG.partId,
                (unsigned)NOTE_SENDER_CONFIG.instrumentId,
@@ -144,6 +149,9 @@ void setup() {
     initWithRetry(&gLed,  "StatusLedModule");
 
     DBG_PRINTLN("[N4 INIT] done");
+#if MOP_TEST == 7
+    mop_test::mprintf("M7,4,INIT,%lu\n", (unsigned long)millis());
+#endif
 }
 
 void loop() {
@@ -160,7 +168,20 @@ void loop() {
     for (auto* m : gOutputs) {
         if (m->enabled) m->updateOutput(gData);
     }
-#if SERIAL_DEBUG
+#if MOP_TEST == 7
+    static bool sMop7Wifi = false;
+    static bool sMop7Ready = false;
+    if (!sMop7Wifi && gData.orcNet.wifiConnected) {
+        mop_test::mprintf("M7,4,WIFI,%lu\n", (unsigned long)millis());
+        sMop7Wifi = true;
+    }
+    if (!sMop7Ready && gData.receiver.hasFirstBeat) {
+        mop_test::mprintf("M7,4,READY,%lu\n", (unsigned long)millis());
+        sMop7Ready = true;
+    }
+#endif
+
+#if SERIAL_DEBUG && MOP_TEST == 0
     dumpEdges(gData);
     dumpPeriodic(gData);
 #endif

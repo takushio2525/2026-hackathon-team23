@@ -12,6 +12,7 @@
 #include "SystemData.h"
 #include "OrcProtocol.h"
 #include "SerialDebug.h"
+#include "MopTest.h"
 
 bool NoteSenderModule::init() {
 #if SERIAL_DEBUG
@@ -69,6 +70,13 @@ void NoteSenderModule::updateOutput(SystemData& data) {
         buildAndSend(cfg_.partId, cfg_.instrumentId, /*gate=*/1, seq, now, data.noteOut);
 #endif
         data.noteSender.lastSentMs = now;
+#if MOP_TEST == 3
+        mop_test::mprintf("M3,%u,%u,%u,%lu\n",
+                          (unsigned)cfg_.partId,
+                          (unsigned)data.noteOut.noteNumber,
+                          (unsigned)data.noteOut.velocity,
+                          (unsigned long)data.noteSender.noteSeq);
+#endif
         data.noteOut.pendingOn = false;
     }
     // 細分音符スロット (8 分裏等)。メインと同一ループ反復で発火しても衝突しない。
