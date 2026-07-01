@@ -33,6 +33,7 @@ RE_BEAT_NX = re.compile(
     r'\[N(\d) EVT BEAT\] no=(\d+) playAt=(\d+) ahead=(-?\d+)')
 
 BEAT_LOOKAHEAD_MS = 45  # ProjectConfig.h の beatLookaheadMs
+THRESHOLD_MS = 10       # MOP-2 目標: ≤ 10 ms (MOPと参考文献メモ.md)
 
 
 def main():
@@ -121,7 +122,7 @@ def main():
             ser.close()
 
     # ── 結果 ──
-    common.print_header('MOP5: 指揮→楽器 通信遅延 (<= 30 ms)')
+    common.print_header(f'MOP5: 指揮→楽器 通信遅延 (<= {THRESHOLD_MS} ms)')
     stats_lines = []
 
     if not ahead_by_node:
@@ -133,15 +134,17 @@ def main():
             aheads = ahead_by_node[node_id]
             delays = [BEAT_LOOKAHEAD_MS - a for a in aheads]
             all_delays.extend(delays)
+            p95 = sorted(delays)[int(len(delays) * 0.95)] if len(delays) >= 2 else max(delays)
             stats_lines.append(
                 f'node_0{node_id}: ahead 平均={statistics.mean(aheads):.1f}ms '
                 f'推定遅延 平均={statistics.mean(delays):.1f}ms '
-                f'最大={max(delays):.1f}ms (n={len(delays)})')
+                f'p95={p95:.1f}ms 最大={max(delays):.1f}ms (n={len(delays)})')
 
+        all_p95 = sorted(all_delays)[int(len(all_delays) * 0.95)] if len(all_delays) >= 2 else max(all_delays)
         max_delay = max(all_delays)
-        stats_lines.append(f'全体最大推定遅延: {max_delay:.1f} ms')
-        passed = max_delay <= 30
-        stats_lines.append(f'判定: {"PASS" if passed else "FAIL"}')
+        stats_lines.append(f'全体: p95={all_p95:.1f}ms 最大={max_delay:.1f} ms')
+        passed = max_delay <= THRESHOLD_MS
+        stats_lines.append(f'判定: {"PASS" if passed else "FAIL"} (閾値 {THRESHOLD_MS} ms)')
 
     for line in stats_lines:
         print(f'  {line}')
