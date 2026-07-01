@@ -56,7 +56,9 @@ void NoteSenderModule::updateOutput(SystemData& data) {
     // メインスロット (4 分音符の拍頭)
     if (data.noteOut.pendingOn) {
         const uint32_t seq = ++data.noteSender.noteSeq;
-#if SERIAL_DEBUG
+#if MOP_TEST > 0
+        (void)seq;
+#elif SERIAL_DEBUG
         (void)seq;
         DBG_PRINTF("[N2 NOTE_ON ] part=0x%02X instr=%u note=%u vel=%u dur=%u seq=%lu t=%lu\n",
                    (unsigned)cfg_.partId,
@@ -82,7 +84,9 @@ void NoteSenderModule::updateOutput(SystemData& data) {
     // 細分音符スロット (8 分裏等)。メインと同一ループ反復で発火しても衝突しない。
     if (data.noteOutSub.pendingOn) {
         const uint32_t seq = ++data.noteSender.noteSeq;
-#if SERIAL_DEBUG
+#if MOP_TEST > 0
+        (void)seq;
+#elif SERIAL_DEBUG
         (void)seq;
         DBG_PRINTF("[N2 NOTE_SUB] part=0x%02X instr=%u note=%u vel=%u dur=%u seq=%lu t=%lu\n",
                    (unsigned)cfg_.partId,
@@ -96,6 +100,13 @@ void NoteSenderModule::updateOutput(SystemData& data) {
         buildAndSend(cfg_.partId, cfg_.instrumentId, /*gate=*/1, seq, now, data.noteOutSub);
 #endif
         data.noteSender.lastSentMs = now;
+#if MOP_TEST == 3
+        mop_test::mprintf("M3,%u,%u,%u,%lu\n",
+                          (unsigned)cfg_.partId,
+                          (unsigned)data.noteOutSub.noteNumber,
+                          (unsigned)data.noteOutSub.velocity,
+                          (unsigned long)data.noteSender.noteSeq);
+#endif
         data.noteOutSub.pendingOn = false;
     }
 }

@@ -17,20 +17,31 @@ import common
 
 RE_MOP3 = re.compile(r'^M3,(\d+),(\d+),(\d+),(\d+)')
 RE_NOTE_DBG = re.compile(
-    r'\[N\d NOTE_ON\s*\] part=0x(\w+) instr=\d+ note=(\d+) vel=(\d+) dur=\d+ seq=(\d+)')
+    r'\[N\d NOTE_(?:ON|SUB)\s*\] part=0x(\w+) instr=\d+ note=(\d+) vel=(\d+) dur=\d+ seq=(\d+)')
 
 # production score_data.cpp「かえるのうた」32拍 (金管ノード node_02-05 共通)
-EXPECTED_SCORE = [
-    (60, False), (62, False), (64, False), (65, False),
-    (64, False), (62, False), (60, False), (0,  True),
-    (64, False), (65, False), (67, False), (69, False),
-    (67, False), (65, False), (64, False), (0,  True),
-    (60, False), (0,  True),  (60, False), (0,  True),
-    (60, False), (0,  True),  (60, False), (0,  True),
-    (60, False), (62, False), (64, False), (65, False),
-    (64, False), (62, False), (60, False), (0,  True),
+# (noteNumber, isRest, subNoteNumber or None)
+# フレーズ4 拍25-28 は8分音符ペア: main→sub の順で2音ずつ発火する
+SCORE_DATA = [
+    # フレーズ 1 (拍 1-8)
+    (60, False, None), (62, False, None), (64, False, None), (65, False, None),
+    (64, False, None), (62, False, None), (60, False, None), (0,  True,  None),
+    # フレーズ 2 (拍 9-16)
+    (64, False, None), (65, False, None), (67, False, None), (69, False, None),
+    (67, False, None), (65, False, None), (64, False, None), (0,  True,  None),
+    # フレーズ 3 (拍 17-24)
+    (60, False, None), (0,  True,  None), (60, False, None), (0,  True,  None),
+    (60, False, None), (0,  True,  None), (60, False, None), (0,  True,  None),
+    # フレーズ 4 (拍 25-32): 8分音符ペア (sub=拍の後半)
+    (60, False, 60),   (62, False, 62),   (64, False, 64),   (65, False, 65),
+    (64, False, None), (62, False, None), (60, False, None), (0,  True,  None),
 ]
-EXPECTED_NOTES = [n for n, rest in EXPECTED_SCORE if not rest]
+EXPECTED_NOTES = []
+for _n, _rest, _sub in SCORE_DATA:
+    if not _rest:
+        EXPECTED_NOTES.append(_n)
+    if _sub is not None:
+        EXPECTED_NOTES.append(_sub)
 
 
 def parse_note(text):
