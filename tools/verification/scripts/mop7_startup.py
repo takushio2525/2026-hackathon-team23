@@ -3,13 +3,16 @@
 MOP7: 起動時間
 各ノードの電源投入から演奏可能状態までの時間を計測する。
 
-MOP_TEST=7: M7,<nodeId>,<event>,<ms>  (event=BOOT/WIFI/SYNC/READY)
+MOP_TEST=7: M7,<nodeId>,<event>,<ms>  (event=BOOT/INIT/WIFI/SYNC/READY)
 SERIAL_DEBUG=1:
   === node_0X ...
   [NX INIT] done
   [NX EVT WIFI] connected=1
   [NX EVT SYNC_CONVERGED] ...
   [NX EVT BEAT] ... (最初の BEAT = 演奏可能)
+
+指揮者 (nodeId=1): BOOT → INIT → READY (Calibrating 完了)
+楽器 (nodeId=2〜6): BOOT → INIT → WIFI → SYNC → READY (初回 BEAT 受信)
 """
 
 import argparse
@@ -55,6 +58,8 @@ def main():
 
     # nodeId -> {event -> pc_time}
     events = defaultdict(dict)
+    # nodeId -> {event -> device_ms} (MOP_TEST=7 のみ)
+    device_ms_events = defaultdict(dict)
     ts = common.make_timestamp()
     csv_fields = ['nodeId', 'event', 'pc_time', 'device_ms']
     csv_writer, csv_fh, csv_path = common.open_csv(7, csv_fields, ts)
@@ -80,8 +85,9 @@ def main():
                 if m:
                     node = m.group(1)
                     event = m.group(2)
-                    dev_ms = m.group(3)
+                    dev_ms = int(m.group(3))
                     events[node][event] = pc_time
+                    device_ms_events[node][event] = dev_ms
                     csv_writer.writerow({
                         'nodeId': node, 'event': event,
                         'pc_time': f'{pc_time:.6f}', 'device_ms': dev_ms,
@@ -122,6 +128,7 @@ def main():
     max_startup = 0
     for node in sorted(events):
         ev = events[node]
+        dev_ev = device_ms_events.get(node, {})
         boot_t = ev.get('BOOT')
         if boot_t is None:
             stats_lines.append(f'node_0{node}: BOOT 未検出')
@@ -129,15 +136,23 @@ def main():
 
         line_parts = [f'node_0{node}:']
         for label in ['INIT', 'WIFI', 'SYNC', 'READY']:
-            if label in ev:
+            if label in dev_ev:
+                # device_ms がある場合はデバイス時刻で算出（より正確）
+                dt = dev_ev[label] - dev_ev.get('BOOT', 0)
+                line_parts.append(f'{label}={dt}ms')
+            elif label in ev:
                 dt = (ev[label] - boot_t) * 1000
                 line_parts.append(f'{label}={dt:.0f}ms')
 
-        ready_t = ev.get('READY')
-        if ready_t:
-            startup = ready_t - boot_t
+        # 起動時間の算出: device_ms があればそちらを優先
+        if 'READY' in dev_ev:
+            startup_ms = dev_ev['READY']
+            max_startup = max(max_startup, startup_ms / 1000)
+            line_parts.append(f'→ {startup_ms}ms (電源投入から)')
+        elif 'READY' in ev:
+            startup = ev['READY'] - boot_t
             max_startup = max(max_startup, startup)
-            line_parts.append(f'→ {startup:.1f}s')
+            line_parts.append(f'→ {startup:.1f}s (BOOT起点)')
 
         stats_lines.append(' '.join(line_parts))
 

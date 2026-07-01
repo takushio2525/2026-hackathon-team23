@@ -168,12 +168,16 @@ void loop() {
         if (m->enabled) m->updateOutput(gData);
     }
 #if MOP_TEST == 7
-    // MOP7: WiFi 接続と初回 BEAT を READY として出力
     static bool sMop7Wifi = false;
+    static bool sMop7Sync = false;
     static bool sMop7Ready = false;
     if (!sMop7Wifi && gData.orcNet.wifiConnected) {
         mop_test::mprintf("M7,2,WIFI,%lu\n", (unsigned long)millis());
         sMop7Wifi = true;
+    }
+    if (!sMop7Sync && gData.sync.converged) {
+        mop_test::mprintf("M7,2,SYNC,%lu\n", (unsigned long)millis());
+        sMop7Sync = true;
     }
     if (!sMop7Ready && gData.receiver.hasFirstBeat) {
         mop_test::mprintf("M7,2,READY,%lu\n", (unsigned long)millis());

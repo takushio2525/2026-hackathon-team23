@@ -168,16 +168,76 @@ void loop() {
     for (auto* m : gOutputs) {
         if (m->enabled) m->updateOutput(gData);
     }
+#if MOP_TEST == 4
+    static uint16_t sPrevBeatNo_m4 = 0;
+    if (gData.orcNet.hasNewBeat && gData.receiver.lastBeatNo != sPrevBeatNo_m4) {
+        const uint32_t localMasterMs = millis() + (uint32_t)gData.sync.offsetMs;
+        mop_test::mprintf("M4,%u,%u,%lu,%lu\n",
+                          (unsigned)ORC_RECEIVER_CONFIG.partId,
+                          (unsigned)gData.receiver.lastBeatNo,
+                          (unsigned long)localMasterMs,
+                          (unsigned long)gData.orcNet.lastBeat.payload.playAtMasterMs);
+        sPrevBeatNo_m4 = gData.receiver.lastBeatNo;
+    }
+#endif
+
+#if MOP_TEST == 5
+    static uint16_t sPrevBeatNo_m5 = 0;
+    if (gData.orcNet.hasNewBeat && gData.receiver.lastBeatNo != sPrevBeatNo_m5) {
+        const int32_t ahead =
+            (int32_t)gData.orcNet.lastBeat.payload.playAtMasterMs -
+            (int32_t)(millis() + (uint32_t)gData.sync.offsetMs);
+        mop_test::mprintf("M5I,%u,%u,%lu,%ld\n",
+                          (unsigned)ORC_RECEIVER_CONFIG.partId,
+                          (unsigned)gData.receiver.lastBeatNo,
+                          (unsigned long)millis(),
+                          (long)ahead);
+        sPrevBeatNo_m5 = gData.receiver.lastBeatNo;
+    }
+#endif
+
+#if MOP_TEST == 6
+    {
+        static uint16_t sPrevBeatNo_m6 = 0;
+        const uint16_t bn = gData.receiver.lastBeatNo;
+        if (bn != sPrevBeatNo_m6 && gData.ctrl.bpmQ8 > 0) {
+            mop_test::mprintf("M6,%u,%u,%u,%lu\n",
+                              (unsigned)ORC_RECEIVER_CONFIG.partId,
+                              (unsigned)bn,
+                              (unsigned)gData.ctrl.bpmQ8,
+                              (unsigned long)millis());
+            sPrevBeatNo_m6 = bn;
+        }
+    }
+#endif
+
 #if MOP_TEST == 7
     static bool sMop7Wifi = false;
+    static bool sMop7Sync = false;
     static bool sMop7Ready = false;
     if (!sMop7Wifi && gData.orcNet.wifiConnected) {
         mop_test::mprintf("M7,6,WIFI,%lu\n", (unsigned long)millis());
         sMop7Wifi = true;
     }
+    if (!sMop7Sync && gData.sync.converged) {
+        mop_test::mprintf("M7,6,SYNC,%lu\n", (unsigned long)millis());
+        sMop7Sync = true;
+    }
     if (!sMop7Ready && gData.receiver.hasFirstBeat) {
         mop_test::mprintf("M7,6,READY,%lu\n", (unsigned long)millis());
         sMop7Ready = true;
+    }
+#endif
+
+#if MOP_TEST == 9
+    static uint16_t sPrevBeatNo_m9 = 0;
+    if (gData.orcNet.hasNewBeat && gData.receiver.lastBeatNo != sPrevBeatNo_m9) {
+        mop_test::mprintf("M9,%u,%u,%lu,%lu\n",
+                          (unsigned)ORC_RECEIVER_CONFIG.partId,
+                          (unsigned)gData.receiver.lastBeatNo,
+                          (unsigned long)gData.orcNet.lastBeat.header.seq,
+                          (unsigned long)millis());
+        sPrevBeatNo_m9 = gData.receiver.lastBeatNo;
     }
 #endif
 

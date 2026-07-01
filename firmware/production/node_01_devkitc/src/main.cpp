@@ -201,8 +201,11 @@ void loop() {
 #endif
 
 #if MOP_TEST == 7
+    // MOP7: Calibrating 完了 → Conducting/Menu 遷移 = 「演奏可能」
     static bool sMop7Ready = false;
-    if (!sMop7Ready && gData.beat.beatNo > 0) {
+    if (!sMop7Ready &&
+        gData.conductor.state != ConductorState::Idle &&
+        gData.conductor.state != ConductorState::Calibrating) {
         mop_test::mprintf("M7,1,READY,%lu\n", (unsigned long)millis());
         sMop7Ready = true;
     }
