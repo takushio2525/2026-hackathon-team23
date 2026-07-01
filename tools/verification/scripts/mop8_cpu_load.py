@@ -8,6 +8,7 @@ SERIAL_DEBUG=1: [N1 PERF] in=<us> logic=<us> out=<us> total=<us>
 """
 
 import argparse
+import math
 import re
 import signal
 import statistics
@@ -16,9 +17,18 @@ import time
 
 import common
 
+WARMUP_SAMPLES = 20
+
 RE_MOP8 = re.compile(r'^M8,(\d+),(\d+),(\d+)')
 RE_PERF = re.compile(
     r'\[N(\d) PERF\] in=(\d+) logic=(\d+) out=(\d+)')
+
+
+def percentile(data, pct):
+    """ソート済みリストから p-th パーセンタイルを返す（線形補間なし、切り上げ index）。"""
+    s = sorted(data)
+    k = math.ceil(len(s) * pct / 100) - 1
+    return s[max(0, min(k, len(s) - 1))]
 
 
 def parse_perf(text):
@@ -134,22 +144,35 @@ def main():
         stats_lines.append('[PERF] ログなし。MOP_TEST=8 のファームを使用してください。')
         passed = None
     else:
+        # ウォームアップ期間をスキップ（起動直後の I2C 初回読取等で最大値が歪むため）
+        if len(samples) > WARMUP_SAMPLES:
+            stats_lines.append(f'全サンプル数: {len(samples)}（先頭 {WARMUP_SAMPLES} 件をウォームアップとして除外）')
+            samples = samples[WARMUP_SAMPLES:]
+        else:
+            stats_lines.append(f'サンプル数: {len(samples)}（{WARMUP_SAMPLES} 件未満のためウォームアップ除外なし）')
+
         inputs = [s[0] for s in samples]
         logics = [s[1] for s in samples]
         outputs = [s[2] for s in samples]
         totals = [s[0] + s[1] + s[2] for s in samples]
 
-        stats_lines.append(f'サンプル数: {len(samples)}')
+        stats_lines.append(f'有効サンプル数: {len(samples)}')
         for label, vals in [('入力', inputs), ('ロジック', logics),
                             ('出力', outputs), ('合計', totals)]:
             mx = max(vals)
+            p99 = percentile(vals, 99)
             stats_lines.append(
                 f'{label}: 平均={statistics.mean(vals):.0f}us '
+                f'p99={p99}us ({p99 / 1000:.2f}ms) '
                 f'最大={mx}us ({mx / 1000:.2f}ms)')
 
         worst_input = max(inputs)
+        worst_total = max(totals)
         passed = worst_input / 1000 <= 2.0
-        stats_lines.append(f'入力フェーズ最大: {worst_input}us ({worst_input / 1000:.2f}ms)')
+        stats_lines.append(f'入力フェーズ最大: {worst_input}us ({worst_input / 1000:.2f}ms) → {"PASS" if passed else "FAIL"}')
+
+        total_ok = worst_total / 1000 <= 5.0
+        stats_lines.append(f'合計最大: {worst_total}us ({worst_total / 1000:.2f}ms) → {"OK" if total_ok else "WARNING (>5ms)"}')
         stats_lines.append(f'判定: {"PASS" if passed else "FAIL"}')
 
     for line in stats_lines:
