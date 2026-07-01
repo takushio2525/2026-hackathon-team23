@@ -5,13 +5,13 @@
 
 ## 現在の対象
 
-- `umezawa_work` の docs 更新コミットだけを `main` に取り込み
+- `umezawa_work` の docs 更新コミットだけを `main` に取り込み済み
+- `origin/main` への push と docs 本番ビルド確認まで完了
 - 後続の week9 作業ログコミットは対象外として未取り込み
-- 競合した発表日程は `main` の 2026-07-08 延期内容を新しい `history/schedule.md` に反映
 
 ## 次の一手
 
-- docs 更新と作業履歴メモをコミットして `origin/main` へ push
+- 必要に応じて公開環境で表示を確認する
 - 未追跡の `pc_app/common/sketch.properties` は対象外として保持
 
 ## 現フェーズで Read すべき設計書
