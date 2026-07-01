@@ -18,7 +18,7 @@ bool OrcNetModule::init() {
 bool OrcNetModule::startSoftAp() {
 #if defined(ARDUINO_ARCH_ESP32)
     WiFi.mode(WIFI_AP);
-    if (!WiFi.softAP(cfg_.ssid, cfg_.pass, cfg_.channel)) {
+    if (!WiFi.softAP(cfg_.ssid, cfg_.pass, cfg_.channel, 0, 6)) {
         return false;
     }
     delay(100);
