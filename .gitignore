@@ -74,6 +74,12 @@ __pycache__/
 venv/
 .env
 
+# ===== MOP 検証結果 (CSV / summary は大量になるのでコミットしない) =====
+tools/verification/results/**/*.csv
+tools/verification/results/**/*_summary.txt
+# evaluation.md はコミット対象
+!tools/verification/results/**/evaluation.md
+
 # ===== Node / 一般 =====
 node_modules/
 docs/.astro/
