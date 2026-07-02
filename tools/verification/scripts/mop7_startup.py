@@ -86,8 +86,7 @@ def collect_events(port, node_id, target_events, timeout_sec, raw_log_fh,
     if ser is None:
         return collected
 
-    # upload 直後のゴミを捨てる
-    time.sleep(0.3)
+    # upload 直後のゴミバイトだけ捨てて、すぐ読み始める
     ser.reset_input_buffer()
 
     start = time.time()
@@ -248,8 +247,8 @@ def main():
             print()
             continue
 
-        # upload 後にポートが再出現するまで少し待つ
-        time.sleep(1.0)
+        # upload 後にポートが再出現するまで待つ（短めにして初期イベントを取り逃さない）
+        time.sleep(0.5)
 
         # シリアル読み取り
         if is_conductor:
