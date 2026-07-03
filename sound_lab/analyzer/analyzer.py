@@ -39,9 +39,12 @@ ONE_CYCLE_POINTS = 1024          # 単一周期波形の点数
 NOISE_BANDS_HZ = [0, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, SR // 2]
 ATTACK_SAMPLE_SR = 22050         # 原音アタック波形の保存サンプルレート
 ATTACK_SAMPLE_SEC = 0.18         # トランペットのタンギング/バズ感として重ねる原音先頭の長さ
-STRING_ATTACK_SAMPLE_SEC = 0.28  # ヴァイオリンの弓の立ち上がりとして重ねる原音先頭の長さ
-SUSTAIN_SAMPLE_SR = 44100        # トランペット定常部の保存サンプルレート
-SUSTAIN_SAMPLE_SEC = 0.22        # トランペットの管鳴り/唇のバズ感として薄くループする長さ
+FLUTE_ATTACK_SAMPLE_SEC = 0.16   # フルートの息/タンギング感として重ねる原音先頭の長さ
+ORGAN_ATTACK_SAMPLE_SEC = 0.08   # オルガンのキークリック/立ち上がりとして重ねる原音先頭の長さ
+SUSTAIN_SAMPLE_SR = 44100        # 持続音定常部の保存サンプルレート
+SUSTAIN_SAMPLE_SEC = 0.22        # 持続音の管鳴り/息/倍音の芯として薄くループする長さ
+TONE_SAMPLE_SR = 22050           # 持続楽器の原音本体サンプル。JSON サイズを抑えつつ音色を残す。
+TONE_SAMPLE_SEC = 4.0            # フルートなどを原音主導で鳴らすために保存する最大秒数
 DRUM_ATTACK_SAMPLE_SEC = 0.45     # ドラム用に保存する原音アタック/胴鳴りの長さ
 DRUM_SAMPLE_SR = 44100           # ドラム本体サンプルの保存サンプルレート。ハイハットの高域を残すため 44.1kHz。
 DRUM_SAMPLE_SEC = 3.0            # ドラム本体として保存する最大秒数
@@ -51,8 +54,10 @@ INSTRUMENT_PROFILES = {
     "auto": {"label": "自動", "fmin": FMIN, "fmax": FMAX},
     # トランペットは倍音が明るく、基音候補を低く取りすぎると 1/2 倍音側に誤認しやすい。
     "trumpet": {"label": "トランペット", "fmin": 120.0, "fmax": 1400.0},
-    # 主旋律 C4〜A4 の弦楽器音源はヴァイオリン相当として扱う。下限は G3 近辺まで少し余裕を持たせる。
-    "violin": {"label": "ヴァイオリン / 弦楽器", "fmin": 180.0, "fmax": 1800.0},
+    # フルートは高めの持続音が中心。息成分を残しつつ、低すぎる誤検出を避ける。
+    "flute": {"label": "フルート", "fmin": 220.0, "fmax": 2400.0},
+    # オルガンは低音〜高音まで使えるが、持続音として安定した基音を優先する。
+    "organ": {"label": "オルガン", "fmin": 35.0, "fmax": 2200.0},
     # ドラムは明確な基音が無い音も多いため、低域ピークを再生時の便宜的な基準音として使う。
     "drum": {"label": "ドラム / 打楽器", "fmin": 35.0, "fmax": 900.0, "percussive": True},
 }
@@ -184,6 +189,7 @@ def analyze_file(path: str, name: str | None = None, profile: str = "auto") -> d
 
     # ── ADSR + ループ点の当てはめ ────────────────────────
     adsr = _fit_adsr(env, ENV_HZ)
+    adsr = _adjust_adsr_for_profile(adsr, profile)
     sustaining = False if is_percussive else adsr["sustain_level"] > 0.18
 
     # ── 定常部(倍音解析に使う窓) ────────────────────────
@@ -213,12 +219,17 @@ def analyze_file(path: str, name: str | None = None, profile: str = "auto") -> d
     one_cycle = _extract_one_cycle(steady, fundamental, SR)
     attack_sample = None
     sustain_sample = None
+    tone_sample = None
     drum_sample = None
     if profile == "trumpet":
         attack_sample = _extract_attack_sample(y, SR, midi, ATTACK_SAMPLE_SEC)
         sustain_sample = _extract_sustain_sample(steady, SR, midi, fundamental)
-    elif profile == "violin":
-        attack_sample = _extract_attack_sample(y, SR, midi, STRING_ATTACK_SAMPLE_SEC)
+    elif profile == "flute":
+        attack_sample = _extract_attack_sample(y, SR, midi, FLUTE_ATTACK_SAMPLE_SEC)
+        sustain_sample = _extract_sustain_sample(steady, SR, midi, fundamental)
+        tone_sample = _extract_tone_sample(y, SR, midi, adsr, fundamental)
+    elif profile == "organ":
+        attack_sample = _extract_attack_sample(y, SR, midi, ORGAN_ATTACK_SAMPLE_SEC)
         sustain_sample = _extract_sustain_sample(steady, SR, midi, fundamental)
     elif is_percussive:
         attack_sample = _extract_attack_sample(y, SR, midi, DRUM_ATTACK_SAMPLE_SEC)
@@ -277,6 +288,8 @@ def analyze_file(path: str, name: str | None = None, profile: str = "auto") -> d
         instrument["attack_sample"] = attack_sample
     if sustain_sample is not None:
         instrument["sustain_sample"] = sustain_sample
+    if tone_sample is not None:
+        instrument["tone_sample"] = tone_sample
     if drum_sample is not None:
         instrument["drum_sample"] = drum_sample
 
@@ -526,6 +539,19 @@ def _fit_adsr(env: np.ndarray, rate_hz: int) -> dict:
 
     return dict(attack_sec=attack_sec, decay_sec=decay_sec, sustain_level=sustain_level,
                 release_sec=release_sec, loop_start_sec=loop_start_sec, loop_end_sec=loop_end_sec)
+
+
+def _adjust_adsr_for_profile(adsr: dict, profile: str) -> dict:
+    """楽器プロファイルごとに、再合成で不自然になりやすい ADSR だけ軽く補正する。"""
+    out = dict(adsr)
+    if profile == "flute":
+        # GarageBand のフルート音源は録音頭に表情としてのフェードが入りやすい。
+        # 解析値をそのまま使うと「ゆっくり鳴る笛」になり、フルートらしいタンギングが消える。
+        out["attack_sec"] = float(np.clip(out.get("attack_sec", 0.035), 0.018, 0.055))
+        out["decay_sec"] = float(np.clip(out.get("decay_sec", 0.12), 0.075, 0.18))
+        out["sustain_level"] = float(np.clip(max(out.get("sustain_level", 0.0), 0.72), 0.0, 0.88))
+        out["release_sec"] = float(np.clip(out.get("release_sec", 0.36), 0.24, 0.58))
+    return out
 
 
 # ── 倍音 ─────────────────────────────────────────────────────
@@ -798,6 +824,156 @@ def _extract_sustain_sample(steady: np.ndarray, sr: int, midi: float, f0: float)
         "source_rms": _r(rms, 5),
         "values": _r(seg, 4),
     }
+
+
+def _extract_tone_sample(y: np.ndarray, sr: int, midi: float, adsr: dict, f0: float) -> dict:
+    """フルートなど、倍音合成だけでは質感が崩れる持続楽器用に原音本体を保存する。"""
+    n = min(y.size, int(round(TONE_SAMPLE_SEC * sr)))
+    seg = np.array(y[:n], dtype=float, copy=True)
+    if seg.size < 16:
+        seg = np.zeros(16, dtype=float)
+
+    fade_in = min(seg.size, int(round(0.001 * sr)))
+    if fade_in > 1:
+        seg[:fade_in] *= np.linspace(0.0, 1.0, fade_in)
+    fade_out = min(seg.size, int(round(0.040 * sr)))
+    if fade_out > 1:
+        seg[-fade_out:] *= np.linspace(1.0, 0.0, fade_out)
+
+    peak = float(np.max(np.abs(seg))) or 1.0
+    seg = seg / peak
+
+    dur = seg.size / sr
+    loop_start, loop_end = _choose_tone_loop(seg, sr, f0, adsr)
+    loop_start = float(np.clip(loop_start, 0.03, max(0.03, dur - 0.08)))
+    loop_end = float(np.clip(loop_end, loop_start + 0.08, dur))
+    if sr != TONE_SAMPLE_SR:
+        seg = librosa.resample(seg, orig_sr=sr, target_sr=TONE_SAMPLE_SR)
+    loop_start_sample = int(round(loop_start * TONE_SAMPLE_SR))
+    loop_end_sample = int(round(loop_end * TONE_SAMPLE_SR))
+    loop_start = loop_start_sample / TONE_SAMPLE_SR
+    loop_end = loop_end_sample / TONE_SAMPLE_SR
+    seg = _stabilize_loop_level(seg, TONE_SAMPLE_SR, loop_start, loop_end)
+    seg = _crossfade_loop_region(seg, TONE_SAMPLE_SR, loop_start, loop_end)
+
+    return {
+        "sample_rate": TONE_SAMPLE_SR,
+        "duration_sec": _r(seg.size / TONE_SAMPLE_SR, 4),
+        "root_midi_note": int(round(midi)),
+        "loop_start_sec": _r(loop_start, 6),
+        "loop_end_sec": _r(loop_end, 6),
+        "loop_start_sample": loop_start_sample,
+        "loop_end_sample": loop_end_sample,
+        "source_peak": _r(peak, 5),
+        "values": _r(seg, 4),
+    }
+
+
+def _choose_tone_loop(seg: np.ndarray, sr: int, f0: float, adsr: dict) -> tuple[float, float]:
+    """長く鳴らしても途切れにくい、音量と波形の境目が近いループ区間を選ぶ。"""
+    n = seg.size
+    dur = n / sr
+    if n < int(0.25 * sr) or not np.isfinite(f0) or f0 <= 0:
+        start = float(adsr.get("loop_start_sec", dur * 0.35))
+        end = float(adsr.get("loop_end_sec", dur * 0.70))
+        return start, end
+
+    period = sr / f0
+    xf = int(np.clip(round(0.020 * sr), period * 3, 0.05 * sr))
+    min_start = int(np.clip(0.20 * n, 0, max(0, n - 1)))
+    max_start_base = int(np.clip(0.72 * n, min_start + 1, max(min_start + 1, n - 1)))
+    step = max(8, int(round(period / 4)))
+    targets = (0.18, 0.22, 0.26, 0.30, 0.36, 0.45, 0.55, 0.65)
+    best = None
+
+    for target_sec in targets:
+        cycles = max(12, int(round(target_sec * f0)))
+        loop_len = int(round(cycles * period))
+        if loop_len < int(0.20 * sr) or loop_len + xf + 8 >= n:
+            continue
+        max_start = min(max_start_base, n - loop_len - 1)
+        if max_start <= min_start:
+            continue
+        for start in range(min_start, max_start, step):
+            end = start + loop_len
+            head = seg[start:start + xf]
+            tail = seg[end - xf:end]
+            body = seg[start:end]
+            if head.size != xf or tail.size != xf or body.size < xf:
+                continue
+            rms_body = float(np.sqrt(np.mean(body ** 2))) + 1e-9
+            if rms_body < 0.025:
+                continue
+            rms_head = float(np.sqrt(np.mean(head ** 2)))
+            rms_tail = float(np.sqrt(np.mean(tail ** 2)))
+            edge_diff = float(np.sqrt(np.mean((head - tail) ** 2)))
+            endpoint_diff = abs(float(seg[end - 1] - seg[start])) / rms_body
+            slope_diff = abs(float((seg[end - 1] - seg[end - 2]) - (seg[start + 1] - seg[start]))) / rms_body
+            rms_win = max(64, int(round(0.035 * sr)))
+            rms_step = max(16, rms_win // 2)
+            rms_vals = []
+            for j in range(0, max(1, body.size - rms_win), rms_step):
+                c = body[j:j + rms_win]
+                if c.size:
+                    rms_vals.append(np.sqrt(np.mean(c ** 2)))
+            chunk_rms = np.array(rms_vals, dtype=float)
+            stability = float(np.std(chunk_rms) / (np.mean(chunk_rms) + 1e-9)) if chunk_rms.size else 1.0
+            min_ratio = float(np.min(chunk_rms) / (np.mean(chunk_rms) + 1e-9)) if chunk_rms.size else 1.0
+            level_match = abs(rms_head - rms_tail) / rms_body
+            low_spot = max(0.0, 0.74 - min_ratio)
+            cost = 0.25 * edge_diff / rms_body + 2.8 * endpoint_diff + 1.2 * slope_diff + 0.5 * level_match + 4.0 * stability + 4.0 * low_spot - 0.16 * rms_body
+            if best is None or cost < best[0]:
+                best = (cost, start / sr, end / sr)
+
+    if best is not None:
+        return best[1], best[2]
+
+    start = float(adsr.get("loop_start_sec", dur * 0.35))
+    end = float(adsr.get("loop_end_sec", dur * 0.70))
+    return start, end
+
+
+def _crossfade_loop_region(seg: np.ndarray, sr: int, loop_start: float, loop_end: float) -> np.ndarray:
+    """ループ先頭をループ末尾の瞬間値へ短くなじませ、境界のプツ切れを減らす。"""
+    out = np.array(seg, dtype=float, copy=True)
+    ls = int(round(loop_start * sr))
+    le = int(round(loop_end * sr))
+    if le <= ls + 32:
+        return out
+    xf = min(int(round(0.012 * sr)), (le - ls) // 8)
+    if xf < 8 or ls + xf > out.size or le - 1 < 0:
+        return out
+    correction = out[le - 1] - out[ls]
+    fade = np.linspace(1.0, 0.0, xf)
+    out[ls:ls + xf] += correction * fade
+    return out
+
+
+def _stabilize_loop_level(seg: np.ndarray, sr: int, loop_start: float, loop_end: float) -> np.ndarray:
+    """ループ内の大きな音量の谷を軽くならし、長く鳴らした時の途切れ感を減らす。"""
+    out = np.array(seg, dtype=float, copy=True)
+    ls = int(round(loop_start * sr))
+    le = int(round(loop_end * sr))
+    if le <= ls + int(0.08 * sr):
+        return out
+    body = out[ls:le]
+    win = max(64, int(round(0.045 * sr)))
+    if body.size <= win * 2:
+        return out
+    sq = body ** 2
+    kernel = np.ones(win, dtype=float) / win
+    rms = np.sqrt(np.convolve(sq, kernel, mode="same") + 1e-9)
+    target = float(np.median(rms))
+    if not target > 0:
+        return out
+    gain = np.clip(target / np.maximum(rms, target * 0.55), 0.78, 1.28)
+    smooth = max(16, int(round(0.020 * sr)))
+    gain = np.convolve(gain, np.ones(smooth) / smooth, mode="same")
+    body *= gain
+    peak = float(np.max(np.abs(out))) or 1.0
+    if peak > 1.0:
+        out /= peak
+    return out
 
 
 def _extract_drum_sample(y: np.ndarray, sr: int, midi: float) -> dict:

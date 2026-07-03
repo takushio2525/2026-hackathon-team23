@@ -1,10 +1,16 @@
 # Active Context
 
 - 2026-06-26: ユーザー指示により、通常作業は `saitou-work` ブランチで行う。`firmware/` と `pc_app/` 配下のプログラムは変更しない。
-- 2026-06-26: `work/saito/week10/kaeru_score_week10_adjusted/` に、week9 の個人用 Processing スケッチをもとにした修正版プログラムを作成した。
-- week10 修正版の変更点: ドラムを 56 拍の 4/4（1・3拍目キック、2・4拍目スネア）に整理、各声部の入りと最後だけクラッシュ+キック、チューバは共通譜から -24 semitone（C2相当）、全体音量 `MASTER_GAIN=1.35` と各パート音量・ドラム音量を増加。
-- 2026-06-27: 金管とドラムの聴感上のズレ対策として、拍位置は変えずに金管の attack だけ短縮。`BRASS_ATTACK_SCALE=0.45` を追加し、`BrassNote` の ADSR attack を `max(0.003, attackSec*0.45)` に変更した。
-- 2026-06-27: 音割れ回避のため、week10 修正版のチューバ `amplitude` を `0.38f` から `0.36f` に少し下げた。他パート、拍位置、ドラム譜は変更なし。
-- 2026-06-27: ドラムの音量をほんの少し下げるため、`DRUM_AMPLITUDE` を `0.12f` から `0.11f` に変更した。ドラム譜・拍位置・金管側は変更なし。
-- 音色 JSON 8 ファイルは `work/saito/week10/kaeru_score_week10_adjusted/data/` に同梱し、外部参照なしで実行できる。`processing-java --sketch="$PWD/work/saito/week10/kaeru_score_week10_adjusted" --build --output=/tmp/kaeru_score_week10_adjusted_build` 成功。
-- 未追跡として `firmware/production/node_04/.vscode/` の VS Code 設定ファイルが見えているが、コミット対象にしない。
+- 2026-07-03: フルートとオルガンの音源制作に向け、`sound_lab/analyzer` の解析プロファイルとスタジオ調整 UI を更新した。ヴァイオリン / 弦楽器モードは画面・プリセット・エンジン初期値から削除済み。
+- 追加内容: `flute` / `organ` プロファイル、フルート/オルガン向け強化ボタン、個別調整パネル、ブラウザ合成エンジンの初期パラメータ、README の手順更新。
+- 2026-07-03: `flute.wav` の解析結果がフルートらしくない問題を修正。フルートの ADSR を遅い録音フェードに引っ張られないよう補正し、息ノイズを削りすぎない設定に変更、原音波形/持続サンプルの混合をフルートでも有効化した。
+- 2026-07-03: フルート改善後に砂嵐のようなノイズが出たため、連続白色ノイズをさらに抑制。`noiseMode` は `recorded`、フルート初期値は `noiseLevel=0.08`、`breathAmount=0`、`attackNoise=0.02` に調整。古いフルート JSON の `fx` 読み込み時もノイズ値を自動クランプする。
+- 2026-07-03: 砂嵐を避けた結果フルートらしさが不足したため、ノイズではなく原音波形/持続サンプル/ビブラートを強める方向に再調整した。
+- 2026-07-03: その後、高い音と低い音が二重に聞こえる問題が出たため、フルートの原音波形/持続サンプル/ビブラートを控えめに再調整した。
+- 2026-07-03: さらに「全然フルートではない」とのフィードバックを受け、解析値の忠実再現よりフルートらしい聞こえを優先する方向へ変更。2倍音以降を専用 `harmGains` で抑え、原音波形/持続サンプル混合をほぼ切り、細い正弦波寄りの芯と高域の息成分を足す設定にした。現在のフルート初期値は `trumpetWaveMix=0.04`、`sustainSampleMix=0.02`、`attackSampleMix=0.10`、`vibDepthCents=9`。
+- 2026-07-03: 「原音と全く違うため根本から修正した方がよい」とのフィードバックを受け、フルートは倍音合成メインではなく原音本体サンプル主導へ変更。解析時に `tone_sample` を保存し、ブラウザエンジンでは `toneSampleMix=1.0` で主音としてループ再生する。合成倍音/ノイズ/短い原音ループは補助に下げた。既存の古いフルート JSON ではなく、`flute.wav` を再解析すると効果が出る。
+- 2026-07-03: C5 付近でフルートらしくなった一方、鳴らし続けると途切れる問題が出たため、`tone_sample` のループ点選定を修正。ADSR 由来の開始/終了をそのまま使わず、音量が安定し、先頭/末尾の瞬間値と傾きが近い区間を選ぶ。保存時とブラウザ再生時の両方でループ先頭を短く補正し、`flute.sampled.instrument.json` の境界段差が 0 になることを確認済み。
+- 2026-07-03: まだ長音で途切れるフィードバックを受け、境界だけでなくループ内部の音量変動も評価するよう再修正。短めで安定した区間を優先し、ループ内の大きな音量谷を軽くならす処理を追加。`flute.sampled.instrument.json` はループ 1.012381〜1.232154 秒、境界段差 0、ループ RMS の CV 約 0.06 まで改善。
+- 2026-07-03: さらに小さな途切れが残るため、`tone_sample` に `loop_start_sample` / `loop_end_sample` を保存し、ブラウザ側ではサンプル番号を優先してループ位置を決めるよう変更。フルートのサンプル主導再生では安定した合成芯も少し増やし、ループの薄さを補う。
+- 検証: `python3 -m py_compile sound_lab/analyzer/analyzer.py sound_lab/analyzer/app.py`、`.venv/bin/python -m py_compile ...`、`node --check sound_lab/analyzer/static/app.js`、`node --check sound_lab/analyzer/static/engine.js` 成功。Flask `/analyze` で `flute.wav` が `attack_sec=0.055`、`noise.level=0.0281`、`tone_sample` ありとして返ることを確認。
+- 現在 `sound_lab/analyzer/.venv/bin/python sound_lab/analyzer/app.py` を起動中。試用 URL は `http://127.0.0.1:5005/`。

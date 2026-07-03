@@ -113,8 +113,11 @@ window.SL = window.SL || {};
       this.waveSrc = null; this.waveGain = null;
       this.attackSrc = null; this.attackGain = null;
       this.sustainSrc = null; this.sustainTone = null; this.sustainGain = null;
+      this.toneSrc = null; this.toneGain = null;
       this.drumSrc = null; this.drumGain = null;
-      this.isTrumpet = (S.instrument && S.instrument.instrument_profile) === "trumpet";
+      this.profile = S.instrument && S.instrument.instrument_profile || "auto";
+      this.isTrumpet = this.profile === "trumpet";
+      this.usesWaveCycleMix = this.profile === "trumpet" || this.profile === "flute";
 
       // ドラムは倍音合成よりも原音1打の非周期成分が本体なので、解析元サンプルを主音として鳴らす。
       const drumBuf = S._getDrumBuffer && S._getDrumBuffer();
@@ -135,6 +138,29 @@ window.SL = window.SL || {};
         src.start(t0);
         try { src.stop(t0 + drumBuf.duration / rate + 0.08); } catch (_) {}
         this.drumSrc = src; this.drumGain = g;
+      }
+
+      // フルートのように倍音合成だけでは原音から離れやすい持続楽器は、
+      // 解析元サンプルを主音としてループ再生し、合成音は補助に回す。
+      const toneBuf = S._getToneBuffer && S._getToneBuffer();
+      if (toneBuf && (P.toneSampleMix || 0) > 0.001) {
+        const src = ctx.createBufferSource();
+        const g = ctx.createGain();
+        const smp = S.instrument.tone_sample || {};
+        const root = smp.root_midi_note || S.instrument.midi_note || midi;
+        this.tonePitchDelta = midi - root + (P.transposeSemis || 0);
+        const rate = clamp(Math.pow(2, this.tonePitchDelta / 12), 0.25, 4);
+        const loopStart = smp.loop_start_sample != null ? smp.loop_start_sample / toneBuf.sampleRate : (smp.loop_start_sec || 0.04);
+        const loopEnd = smp.loop_end_sample != null ? smp.loop_end_sample / toneBuf.sampleRate : (smp.loop_end_sec || toneBuf.duration);
+        src.buffer = toneBuf;
+        src.loop = true;
+        src.loopStart = clamp(loopStart, 0, Math.max(0, toneBuf.duration - 0.02));
+        src.loopEnd = clamp(loopEnd, src.loopStart + 0.02, toneBuf.duration);
+        src.playbackRate.setValueAtTime(rate, t0);
+        src.connect(g); g.connect(S.voiceMix);
+        this.toneSrc = src; this.toneGain = g;
+        this.applyToneMix(true);
+        src.start(t0);
       }
 
       // トランペットは倍音加算だけだと芯がサイン波寄りになりやすいので、
@@ -277,6 +303,15 @@ window.SL = window.SL || {};
         else this.sustainSrc.playbackRate.setTargetAtTime(rate, t, Math.max(0.004, (P.glideMs || 0) / 1000 / 3));
         this.applySustainMix(false);
       }
+      if (this.toneSrc) {
+        const smp = S.instrument.tone_sample || {};
+        const root = smp.root_midi_note || S.instrument.midi_note || this.midi;
+        this.tonePitchDelta = this.midi - root + (P.transposeSemis || 0);
+        const rate = clamp(Math.pow(2, this.tonePitchDelta / 12), 0.25, 4);
+        if (immediate || !this.everFreq || (P.glideMs || 0) < 6) this.toneSrc.playbackRate.setValueAtTime(rate, t);
+        else this.toneSrc.playbackRate.setTargetAtTime(rate, t, Math.max(0.004, (P.glideMs || 0) / 1000 / 3));
+        this.applyToneMix(false);
+      }
       if (this.waveSrc) {
         const root = S.instrument.midi_note || this.midi;
         const rate = clamp(Math.pow(2, (this.midi - root + (P.transposeSemis || 0)) / 12), 0.25, 4);
@@ -311,6 +346,16 @@ window.SL = window.SL || {};
       }
     }
 
+    applyToneMix(immediate) {
+      if (!this.toneGain) return;
+      const t = this.S.ctx.currentTime;
+      const semis = Math.abs(this.tonePitchDelta || 0);
+      const pitchSafe = 1 / (1 + semis * 0.035);
+      const target = clamp(this.S.params.toneSampleMix || 0, 0, 1.2) * this.vel * 0.92 * pitchSafe;
+      if (immediate) this.toneGain.gain.setValueAtTime(target, t);
+      else this.toneGain.gain.setTargetAtTime(target, t, 0.025);
+    }
+
     // 倍音ごとの静的振幅: ampBase × n^brightness × exp(-rolloff(n-1)) × odd/even × 手動ゲイン × 倍音数制限
     ampScalar(h) {
       const P = this.S.params, n = h.n;
@@ -328,7 +373,7 @@ window.SL = window.SL || {};
       const scal = this.harm.map((h) => this.ampScalar(h));
       const sum = scal.reduce((s, v) => s + v, 0) || 1;
       const brassLayerMix = this.isTrumpet ? clamp(S.params.brassLayerMix || 0, 0, 0.75) : 0;
-      const waveMix = this.isTrumpet ? clamp(S.params.trumpetWaveMix || 0, 0, 1) : 0;
+      const waveMix = this.usesWaveCycleMix ? clamp(S.params.trumpetWaveMix || 0, 0, 1) : 0;
       for (let i = 0; i < this.harm.length; i++) {
         const h = this.harm[i];
         const target = (scal[i] / sum) * (S.params.harmonicGainTrim != null ? S.params.harmonicGainTrim : 1);
@@ -454,6 +499,7 @@ window.SL = window.SL || {};
       if (k("*") || k("brightness") || k("harmRolloff") || k("oddEvenBal") || k("harmLimit") || k("harmGains") || k("brassLayerMix") || k("trumpetWaveMix")) this.applyAmpGains(false);
       if (k("*") || k("trumpetWaveMix")) this.applyWaveMix(false);
       if (k("*") || k("sustainSampleMix")) this.applySustainMix(false);
+      if (k("*") || k("toneSampleMix")) this.applyToneMix(false);
       if (k("*") || k("noiseHpHz") || k("noiseLpHz")) this.applyNoiseFilters(false);
     }
 
@@ -478,6 +524,10 @@ window.SL = window.SL || {};
       if (this.sustainGain) {
         holdParam(this.sustainGain.gain, t);
         this.sustainGain.gain.setTargetAtTime(0.0001, t, relSec / 4);
+      }
+      if (this.toneGain) {
+        holdParam(this.toneGain.gain, t);
+        this.toneGain.gain.setTargetAtTime(0.0001, t, relSec / 3.5);
       }
       if (this.drumGain) {
         holdParam(this.drumGain.gain, t);
@@ -512,6 +562,8 @@ window.SL = window.SL || {};
       try { if (this.attackSrc) this.attackSrc.disconnect(); if (this.attackGain) this.attackGain.disconnect(); } catch (_) {}
       try { if (this.sustainSrc) this.sustainSrc.stop(); } catch (_) {}
       try { if (this.sustainSrc) this.sustainSrc.disconnect(); if (this.sustainTone) this.sustainTone.disconnect(); if (this.sustainGain) this.sustainGain.disconnect(); } catch (_) {}
+      try { if (this.toneSrc) this.toneSrc.stop(); } catch (_) {}
+      try { if (this.toneSrc) this.toneSrc.disconnect(); if (this.toneGain) this.toneGain.disconnect(); } catch (_) {}
       try { if (this.drumSrc) this.drumSrc.stop(); } catch (_) {}
       try { if (this.drumSrc) this.drumSrc.disconnect(); if (this.drumGain) this.drumGain.disconnect(); } catch (_) {}
       try { this.noiseSrc.disconnect(); this.noiseHP.disconnect(); this.noiseLP.disconnect(); this.noiseGain.disconnect(); this.amp.disconnect(); this.vibGate.disconnect(); } catch (_) {}
@@ -643,7 +695,8 @@ window.SL = window.SL || {};
       const e = I.envelope || {}, mod = I.modulation || {}, vib = mod.vibrato || {}, trem = mod.tremolo || {};
       const profile = I.instrument_profile || "auto";
       const isTrumpet = profile === "trumpet";
-      const isViolin = profile === "violin";
+      const isFlute = profile === "flute";
+      const isOrgan = profile === "organ";
       const isDrum = profile === "drum";
       const drumGuess = I.features && I.features.drum_type_guess || "";
       const isCymbal = drumGuess === "crash" || drumGuess === "hihat" || drumGuess === "cymbal";
@@ -672,30 +725,33 @@ window.SL = window.SL || {};
         vibRateHz: vib.detected ? clamp(vib.rate_hz || 5.5, 0.1, 14) : 5.5,
         vibShape: "sine", vibOnsetSec: 0,
         // 倍音
-        brightness: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.1 : -0.18) : isTrumpet ? 0.24 : isViolin ? -0.03 : 0,
-        harmRolloff: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.02 : 0.12) : isTrumpet ? -0.012 : isViolin ? 0.032 : 0,
-        oddEvenBal: isViolin ? 0.02 : 0,
-        inharmMul: isDrum ? 1.0 : isViolin ? 0.50 : 1,
-        harmLimit: isDrum ? Math.min(maxN, isCymbal ? 18 : 10) : maxN,
+        brightness: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.1 : -0.18) : isTrumpet ? 0.24 : isFlute ? -0.08 : isOrgan ? 0.04 : 0,
+        harmRolloff: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.02 : 0.12) : isTrumpet ? -0.012 : isFlute ? 0.085 : isOrgan ? 0.028 : 0,
+        oddEvenBal: isFlute ? 0.08 : isOrgan ? 0.12 : 0,
+        inharmMul: isDrum ? 1.0 : isFlute ? 0 : isOrgan ? 0 : 1,
+        harmLimit: isDrum ? Math.min(maxN, isCymbal ? 18 : 10) : isFlute ? Math.min(maxN, 10) : maxN,
         // 解析した倍音包絡には録音ノイズ由来の細かい上下が乗るため、初期状態では固定倍音で安定させる。
-        harmFollowEnv: false, harmGains: {}, harmonicGainTrim: isDrum ? (isPlainDrumSample ? 0 : 0.12) : 1,
+        harmFollowEnv: false,
+        harmGains: isFlute ? { 2: 0.24, 3: 0.42, 4: 0.28, 5: 0.18, 6: 0.12, 7: 0.08, 8: 0.06, 9: 0.04, 10: 0.03 } : {},
+        harmonicGainTrim: isDrum ? (isPlainDrumSample ? 0 : 0.12) : isFlute && I.tone_sample ? 0.18 : isFlute ? 1.12 : 1,
         // トレモロ
         tremDepth: 0,
         tremRateHz: trem.detected ? clamp(trem.rate_hz || 5, 0.1, 14) : 5, tremShape: "sine",
         // ノイズ / 息
         // 残差ノイズは白色ノイズ再合成なので、初期状態では混ぜない。必要なときだけスライダーで足す。
-        noiseLevel: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.08 : 0.06) : isViolin ? 0.26 : 0,
-        noiseHpHz: isDrum ? (drumGuess === "kick" ? 35 : isCymbal ? 900 : 120) : isViolin ? 560 : nhp,
-        noiseLpHz: isDrum ? (drumGuess === "kick" ? 5200 : isCymbal ? 18000 : 14500) : isViolin ? 9800 : nlp,
-        attackNoise: isDrum ? 0 : isViolin ? 0.62 : 0,
-        breathAmount: 0,
-        noiseMode: isDrum ? "recorded" : "recorded",
+        noiseLevel: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.08 : 0.06) : isFlute && I.tone_sample ? 0.025 : isFlute ? 0.10 : 0,
+        noiseHpHz: isDrum ? (drumGuess === "kick" ? 35 : isCymbal ? 900 : 120) : isFlute ? 2600 : isOrgan ? 80 : nhp,
+        noiseLpHz: isDrum ? (drumGuess === "kick" ? 5200 : isCymbal ? 18000 : 14500) : isFlute ? 9000 : isOrgan ? 10000 : nlp,
+        attackNoise: isDrum ? 0 : isFlute && I.tone_sample ? 0.010 : isFlute ? 0.045 : isOrgan ? 0.04 : 0,
+        breathAmount: isFlute && I.tone_sample ? 0.006 : isFlute ? 0.028 : 0,
+        noiseMode: "recorded",
         // トランペット/ドラム指定時は、合成だけでは抜けやすい原音アタックを短く重ねる。
-        attackSampleMix: I.attack_sample ? (isDrum ? 0 : isTrumpet ? 0.75 : isViolin ? 0.52 : 0) : 0,
+        attackSampleMix: I.attack_sample ? (isDrum ? 0 : isTrumpet ? 0.75 : isFlute && I.tone_sample ? 0 : isFlute ? 0.10 : isOrgan ? 0.10 : 0) : 0,
         // 解析した原音1周期波形を主成分として混ぜ、サイン波っぽさを減らす。
-        trumpetWaveMix: isTrumpet && I.waveform && I.waveform.one_cycle ? 0.28 : 0,
+        trumpetWaveMix: (isTrumpet || isFlute) && I.waveform && I.waveform.one_cycle ? (isFlute && I.tone_sample ? 0 : isFlute ? 0.04 : 0.28) : 0,
         // トランペットの定常部にあるバズ/管鳴りを薄いループとして補う。
-        sustainSampleMix: I.sustain_sample && (isTrumpet || isViolin) ? (isViolin ? 0.40 : 0.08) : 0,
+        sustainSampleMix: I.sustain_sample && (isTrumpet || isFlute || isOrgan) ? (isFlute && I.tone_sample ? 0 : isFlute ? 0.02 : isOrgan ? 0.10 : 0.08) : 0,
+        toneSampleMix: isFlute && I.tone_sample ? 1.0 : 0,
         // トランペットの唇のバズ/管の反射に近い、わずかにずれた倍音レイヤー。
         brassLayerMix: isTrumpet ? 0.22 : 0,
         brassLayerDetuneCents: isTrumpet ? 5.5 : 0,
@@ -705,26 +761,26 @@ window.SL = window.SL || {};
         // エンベロープ
         // 録音RMSの微細な揺れではなく、まず ADSR で安定した包絡から始める。
         envMode: isDrum ? "recorded" : "adsr",
-        attackMs: isDrum ? Math.max(1, Math.min(12, Math.round((e.attack_sec || 0.005) * 1000))) : isViolin ? Math.max(76, Math.round((e.attack_sec || 0.076) * 1000)) : Math.round((e.attack_sec || 0.01) * 1000),
-        decayMs: isDrum ? (isCymbal ? 900 : drumGuess === "kick" ? 180 : 320) : isViolin ? Math.max(250, Math.round((e.decay_sec || 0.25) * 1000)) : Math.round((e.decay_sec || 0.1) * 1000),
-        sustainLvl: isDrum ? 0.02 : isViolin ? clamp(Math.max(e.sustain_level == null ? 0.76 : e.sustain_level, 0.76), 0, 1) : clamp(e.sustain_level == null ? 0.7 : e.sustain_level, 0, 1),
-        releaseMs: isDrum ? (drumGuess === "crash" ? 1500 : drumGuess === "hihat" ? 500 : drumGuess === "kick" ? 120 : 260) : isViolin ? Math.max(760, Math.round((e.release_sec || 0.76) * 1000)) : Math.round((e.release_sec || 0.12) * 1000),
-        attackCurve: isDrum ? "exp" : "lin", decayStretch: 1,
+        attackMs: isDrum ? Math.max(1, Math.min(12, Math.round((e.attack_sec || 0.005) * 1000))) : isFlute ? 42 : isOrgan ? Math.max(10, Math.round((e.attack_sec || 0.016) * 1000)) : Math.round((e.attack_sec || 0.01) * 1000),
+        decayMs: isDrum ? (isCymbal ? 900 : drumGuess === "kick" ? 180 : 320) : isFlute ? 130 : isOrgan ? 80 : Math.round((e.decay_sec || 0.1) * 1000),
+        sustainLvl: isDrum ? 0.02 : isFlute ? 0.88 : isOrgan ? clamp(Math.max(e.sustain_level == null ? 0.94 : e.sustain_level, 0.88), 0, 1) : clamp(e.sustain_level == null ? 0.7 : e.sustain_level, 0, 1),
+        releaseMs: isDrum ? (drumGuess === "crash" ? 1500 : drumGuess === "hihat" ? 500 : drumGuess === "kick" ? 120 : 260) : isFlute ? 420 : isOrgan ? Math.max(180, Math.round((e.release_sec || 0.18) * 1000)) : Math.round((e.release_sec || 0.12) * 1000),
+        attackCurve: isDrum || isOrgan ? "exp" : "lin", decayStretch: 1,
         // 空間 / 響き
-        reverbMix: isViolin ? 0.16 : 0, reverbSizeSec: isViolin ? 2.4 : 2.2, reverbDamping: isViolin ? 0.42 : 0.35, reverbPreMs: 0, reverbWidth: 0.85,
+        reverbMix: isFlute ? 0.13 : isOrgan ? 0.12 : 0, reverbSizeSec: isOrgan ? 2.1 : isFlute ? 1.8 : 2.2, reverbDamping: isFlute ? 0.34 : isOrgan ? 0.38 : 0.35, reverbPreMs: 0, reverbWidth: 0.85,
         // エフェクト
-        driveAmount: isDrum ? (isPlainDrumSample ? 0 : 0.035) : isTrumpet ? 0.035 : isViolin ? 0.02 : 0,
-        driveToneHz: isTrumpet ? 18000 : isViolin ? 13500 : 16000,
-        chorusMix: isViolin ? 0.18 : 0, chorusRateHz: isViolin ? 0.2 : 0.25, chorusDepth: isViolin ? 0.54 : 0.4, chorusWidth: isViolin ? 0.78 : 0.8,
+        driveAmount: isDrum ? (isPlainDrumSample ? 0 : 0.035) : isTrumpet ? 0.035 : 0,
+        driveToneHz: isTrumpet ? 18000 : 16000,
+        chorusMix: isOrgan ? 0.04 : 0, chorusRateHz: isOrgan ? 0.18 : 0.25, chorusDepth: isOrgan ? 0.22 : 0.4, chorusWidth: isOrgan ? 0.75 : 0.8,
         filterMode: "off", filterCutoffHz: 6000, filterQ: 1, filterLfoRateHz: 1.5, filterLfoDepth: 0,
         trumpetResonance: isTrumpet ? 0.62 : 0,
         // ボディ EQ
-        eqLowGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? -4.0 : 0.5) : isTrumpet ? -2.0 : isViolin ? 0.7 : 0,
-        eqMidFreq: isDrum ? (drumGuess === "kick" ? 180 : isCymbal ? 4200 : 950) : isTrumpet ? 780 : isViolin ? 560 : 900,
-        eqMidGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.6 : 1.8) : isTrumpet ? -1.2 : isViolin ? 2.4 : 0,
+        eqLowGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? -4.0 : 0.5) : isTrumpet ? -2.0 : isFlute ? -4.8 : isOrgan ? 0.2 : 0,
+        eqMidFreq: isDrum ? (drumGuess === "kick" ? 180 : isCymbal ? 4200 : 950) : isTrumpet ? 780 : isFlute ? 1050 : isOrgan ? 720 : 900,
+        eqMidGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 0.6 : 1.8) : isTrumpet ? -1.2 : isFlute ? -0.8 : isOrgan ? 0.8 : 0,
         eqMidQ: isDrum ? 1.1 : isTrumpet ? 1.3 : 1,
-        eqPresGain: isDrum ? (isPlainDrumSample ? 0 : 2.0) : isTrumpet ? 3.4 : isViolin ? 3.0 : 0,
-        eqHighGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 2.0 : 1.2) : isTrumpet ? 2.4 : isViolin ? 0.45 : 0,
+        eqPresGain: isDrum ? (isPlainDrumSample ? 0 : 2.0) : isTrumpet ? 3.4 : isFlute ? 3.2 : isOrgan ? 1.0 : 0,
+        eqHighGain: isDrum ? (isPlainDrumSample ? 0 : isCymbal ? 2.0 : 1.2) : isTrumpet ? 2.4 : isFlute ? 1.4 : isOrgan ? 0.4 : 0,
       };
     }
 
@@ -736,6 +792,8 @@ window.SL = window.SL || {};
       this._waveCycleBufferKey = "";
       this._sustainBuffer = null;
       this._sustainBufferKey = "";
+      this._toneBuffer = null;
+      this._toneBufferKey = "";
       this._drumBuffer = null;
       this._drumBufferKey = "";
       this._maxHarmN = (I.harmonics || []).filter((h) => h.amp > 0).reduce((m, h) => Math.max(m, h.n), 1);
@@ -769,7 +827,7 @@ window.SL = window.SL || {};
       return b;
     }
     _getWaveCycleBuffer() {
-      if (!this.ctx || !this.instrument || !this.instrument.waveform || this.instrument.instrument_profile !== "trumpet") return null;
+      if (!this.ctx || !this.instrument || !this.instrument.waveform || !["trumpet", "flute"].includes(this.instrument.instrument_profile)) return null;
       const vals = this.instrument.waveform.one_cycle || [];
       const f0 = this.instrument.fundamental_hz || 440;
       if (vals.length < 8 || !(f0 > 0)) return null;
@@ -815,7 +873,7 @@ window.SL = window.SL || {};
       let vals = a.values || [];
       let sr = a.sample_rate || this.ctx.sampleRate;
       this._sustainBufferIsFallback = false;
-      if (!vals.length && (this.instrument.instrument_profile === "trumpet" || this.instrument.instrument_profile === "violin") && this.instrument.waveform && this.instrument.waveform.one_cycle) {
+      if (!vals.length && ["trumpet", "flute", "organ"].includes(this.instrument.instrument_profile) && this.instrument.waveform && this.instrument.waveform.one_cycle) {
         const cyc = this.instrument.waveform.one_cycle || [];
         const repeats = Math.max(8, Math.ceil(0.18 * (this.instrument.fundamental_hz || 440)));
         vals = [];
@@ -848,13 +906,44 @@ window.SL = window.SL || {};
       this._drumBufferKey = key;
       return b;
     }
+    _getToneBuffer() {
+      if (!this.ctx || !this.instrument || !this.instrument.tone_sample) return null;
+      const a = this.instrument.tone_sample;
+      const vals = a.values || [];
+      if (!vals.length) return null;
+      const sr = a.sample_rate || this.ctx.sampleRate;
+      const key = vals.length + ":" + sr + ":" + (a.loop_start_sample != null ? a.loop_start_sample : a.loop_start_sec || 0) + ":" + (a.loop_end_sample != null ? a.loop_end_sample : a.loop_end_sec || 0);
+      if (this._toneBuffer && this._toneBufferKey === key) return this._toneBuffer;
+      const b = this.ctx.createBuffer(1, vals.length, sr);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < vals.length; i++) d[i] = vals[i] || 0;
+      const loopStart = a.loop_start_sample != null ? a.loop_start_sample / sr : (a.loop_start_sec || 0);
+      const loopEnd = a.loop_end_sample != null ? a.loop_end_sample / sr : (a.loop_end_sec || b.duration);
+      this._softenToneLoop(d, sr, loopStart, loopEnd);
+      this._toneBuffer = b;
+      this._toneBufferKey = key;
+      return b;
+    }
+    _softenToneLoop(d, sr, loopStartSec, loopEndSec) {
+      const ls = Math.max(0, Math.min(d.length - 1, Math.round((loopStartSec || 0) * sr)));
+      const le = Math.max(ls + 1, Math.min(d.length, Math.round((loopEndSec || d.length / sr) * sr)));
+      const span = le - ls;
+      if (span < 64) return;
+      const xf = Math.min(Math.round(0.012 * sr), Math.floor(span / 8));
+      if (xf < 8 || ls + xf >= d.length || le - 1 < 0) return;
+      const correction = d[le - 1] - d[ls];
+      for (let i = 0; i < xf; i++) {
+        const f = i / Math.max(1, xf - 1);
+        d[ls + i] += correction * (1 - f);
+      }
+    }
 
     // ── パラメータ反映 ──
     set(key, value) {
       this.params[key] = value;
       this._apply([key]);
       // 「録音エンベロープ ↔ ADSR」など、鳴っている音に構造的に効くものは drone を貼り直し
-      if (this.drone && (key === "envMode" || key === "noiseMode" || key === "harmFollowEnv" || key === "decayStretch" || key === "attackCurve" || key === "attackSampleMix" || key === "sustainSampleMix" || key === "drumSampleMix" || key === "drumPitchFollow")) {
+      if (this.drone && (key === "envMode" || key === "noiseMode" || key === "harmFollowEnv" || key === "decayStretch" || key === "attackCurve" || key === "attackSampleMix" || key === "sustainSampleMix" || key === "toneSampleMix" || key === "drumSampleMix" || key === "drumPitchFollow")) {
         this._retriggerDrone();
       }
     }
@@ -923,7 +1012,7 @@ window.SL = window.SL || {};
       // 倍音 limit の上限値クランプ
       if (has("harmLimit")) this.params.harmLimit = clamp(Math.round(P.harmLimit), 1, this._maxHarmN);
       // 鳴っているボイスへ即反映できるもの
-      const liveKeys = (keys === "*") ? "*" : keys.filter((k) => ["fineCents", "transposeSemis", "inharmMul", "glideMs", "brightness", "harmRolloff", "oddEvenBal", "harmLimit", "harmGains", "brassLayerMix", "brassLayerDetuneCents", "noiseHpHz", "noiseLpHz"].indexOf(k) >= 0);
+      const liveKeys = (keys === "*") ? "*" : keys.filter((k) => ["fineCents", "transposeSemis", "inharmMul", "glideMs", "brightness", "harmRolloff", "oddEvenBal", "harmLimit", "harmGains", "brassLayerMix", "brassLayerDetuneCents", "toneSampleMix", "noiseHpHz", "noiseLpHz"].indexOf(k) >= 0);
       if (liveKeys === "*" || (liveKeys && liveKeys.length)) for (const v of this.voices) v.refreshLive(liveKeys);
     }
 
@@ -1016,7 +1105,7 @@ window.SL = window.SL || {};
         transpose_semis: P.transposeSemis, fine_cents: P.fineCents, glide_ms: P.glideMs, humanize_cents: P.humanizeCents,
         modulation: { vibrato_depth_cents: P.vibDepthCents, vibrato_rate_hz: P.vibRateHz, vibrato_onset_sec: P.vibOnsetSec, vibrato_shape: P.vibShape, tremolo_depth: P.tremDepth, tremolo_rate_hz: P.tremRateHz, tremolo_shape: P.tremShape },
         env_mode: P.envMode, harm_follow_env: P.harmFollowEnv, decay_stretch: P.decayStretch, attack_curve: P.attackCurve,
-        attack_sample_mix: P.attackSampleMix, trumpet_wave_mix: P.trumpetWaveMix, sustain_sample_mix: P.sustainSampleMix, drum_sample_mix: P.drumSampleMix, drum_pitch_follow: P.drumPitchFollow,
+        attack_sample_mix: P.attackSampleMix, trumpet_wave_mix: P.trumpetWaveMix, sustain_sample_mix: P.sustainSampleMix, tone_sample_mix: P.toneSampleMix, drum_sample_mix: P.drumSampleMix, drum_pitch_follow: P.drumPitchFollow,
         brass_layer: { mix: P.brassLayerMix, detune_cents: P.brassLayerDetuneCents },
         trumpet_resonance: P.trumpetResonance,
         noise_mode: P.noiseMode, noise_hp_hz: P.noiseHpHz, noise_lp_hz: P.noiseLpHz, attack_noise: P.attackNoise, breath_amount: P.breathAmount,

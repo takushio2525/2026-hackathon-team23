@@ -100,9 +100,19 @@
       ],
     },
     {
-      id: "strings", icon: "🎻", title: "弦楽器 / ヴァイオリン調整", keys: ["brightness", "harmRolloff", "oddEvenBal", "inharmMul", "attackSampleMix", "sustainSampleMix", "noiseLevel", "noiseHpHz", "noiseLpHz", "attackNoise", "vibDepthCents", "vibRateHz", "vibOnsetSec", "chorusMix", "chorusRateHz", "chorusDepth", "reverbMix", "eqLowGain", "eqMidFreq", "eqMidGain", "eqPresGain", "eqHighGain"], controls: [
-        { type: "note", html: "C4〜A4 の主旋律をヴァイオリン相当として扱うための調整です。弓の立ち上がり、こすれるノイズ、少し暗めの倍音、細い揺れ、胴鳴りをまとめて整えます。" },
-        { type: "buttons", items: [["ヴァイオリン向けに整える", applyStringQualityPreset], ["弦らしさ強め", () => applyStringPreset("bowed")], ["弓感最大", () => applyStringPreset("rosin")], ["やわらかめ", () => applyStringPreset("soft")], ["明るめ", () => applyStringPreset("bright")], ["弓ノイズ控えめ", () => applyStringPreset("clean")]] },
+      id: "flute", icon: "🌬", title: "フルート調整", keys: ["toneSampleMix", "brightness", "harmRolloff", "oddEvenBal", "inharmMul", "attackSampleMix", "trumpetWaveMix", "sustainSampleMix", "noiseLevel", "breathAmount", "noiseHpHz", "noiseLpHz", "attackNoise", "vibDepthCents", "vibRateHz", "vibOnsetSec", "reverbMix", "eqLowGain", "eqMidFreq", "eqMidGain", "eqPresGain", "eqHighGain"], controls: [
+        { type: "note", html: "フルート向けに、息成分、タンギング、細めの倍音、控えめなビブラート、軽い空間感をまとめて整えます。" },
+        { type: "range", key: "toneSampleMix", label: "原音サンプルを主音にする", min: 0, max: 1.2, step: 0.01, fmt: fmtPct },
+        { type: "range", key: "trumpetWaveMix", label: "原音波形の芯を混ぜる", min: 0, max: 0.7, step: 0.01, fmt: fmtPct },
+        { type: "range", key: "sustainSampleMix", label: "原音の伸びを重ねる", min: 0, max: 0.9, step: 0.01, fmt: fmtPct },
+        { type: "range", key: "breathAmount", label: "息ノイズを足す", min: 0, max: 1, step: 0.01, fmt: fmtPct },
+        { type: "buttons", items: [["フルート向けに整える", applyFluteQualityPreset], ["息を強める", () => applyFlutePreset("breathy")], ["明るく抜ける", () => applyFlutePreset("bright")], ["やわらかめ", () => applyFlutePreset("soft")], ["息ノイズ控えめ", () => applyFlutePreset("clean")]] },
+      ],
+    },
+    {
+      id: "organ", icon: "🎹", title: "オルガン調整", keys: ["brightness", "harmRolloff", "oddEvenBal", "inharmMul", "attackSampleMix", "sustainSampleMix", "noiseLevel", "attackNoise", "vibDepthCents", "chorusMix", "chorusRateHz", "chorusDepth", "reverbMix", "driveAmount", "eqLowGain", "eqMidFreq", "eqMidGain", "eqPresGain", "eqHighGain"], controls: [
+        { type: "note", html: "オルガン向けに、安定した持続音、短い立ち上がり、低ノイズ、倍音の厚み、控えめなコーラスと響きをまとめて整えます。" },
+        { type: "buttons", items: [["オルガン向けに整える", applyOrganQualityPreset], ["厚くする", () => applyOrganPreset("thick")], ["明るくする", () => applyOrganPreset("bright")], ["教会風", () => applyOrganPreset("church")], ["シンプル", () => applyOrganPreset("clean")]] },
       ],
     },
     {
@@ -223,7 +233,8 @@
   drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) setFile(f); });
   $("#analyzeBtn").addEventListener("click", analyze);
   $("#singleMetalBtn").addEventListener("click", async () => { await ensureAudio(); applyMetalQualityPreset(); });
-  $("#singleStringBtn").addEventListener("click", async () => { await ensureAudio(); applyStringQualityPreset(); });
+  $("#singleFluteBtn").addEventListener("click", async () => { await ensureAudio(); applyFluteQualityPreset(); });
+  $("#singleOrganBtn").addEventListener("click", async () => { await ensureAudio(); applyOrganQualityPreset(); });
   $("#singleDrumBtn").addEventListener("click", async () => { await ensureAudio(); applyDrumPunchPreset(); });
   $("#demoBtn").addEventListener("click", () => { instrument = JSON.parse(JSON.stringify(DEMO_INSTRUMENT)); preview = null; pickedFile = null; setStatus("内蔵デモ音色を読み込みました（波形プレビューはありません）"); openStudio(); });
   $("#loadJsonBtn").addEventListener("click", () => $("#jsonFile").click());
@@ -270,7 +281,8 @@
       setStatus("解析完了 ✓  下のスタジオで鳴らしながら調整できます");
       openStudio();
       $("#singleMetalBtn").disabled = false;
-      $("#singleStringBtn").disabled = false;
+      $("#singleFluteBtn").disabled = false;
+      $("#singleOrganBtn").disabled = false;
       $("#singleDrumBtn").disabled = false;
     } catch (err) {
       if (location.protocol === "file:" || /Failed to fetch|NetworkError/.test(err.message)) {
@@ -298,7 +310,8 @@
       setStatus("JSON を読み込みました（波形プレビューは無し。鳴らして編集できます）");
       openStudio();
       $("#singleMetalBtn").disabled = false;
-      $("#singleStringBtn").disabled = false;
+      $("#singleFluteBtn").disabled = false;
+      $("#singleOrganBtn").disabled = false;
       $("#singleDrumBtn").disabled = false;
     } catch (e) { setStatus("JSON を読めませんでした: " + e.message, true); }
   }
@@ -366,7 +379,8 @@
     synth.setOriginalBuffer(null); decodeTried = false;
     $("#playOrigBtn").disabled = !pickedFile;
     $("#singleMetalBtn").disabled = false;
-    $("#singleStringBtn").disabled = false;
+    $("#singleFluteBtn").disabled = false;
+    $("#singleOrganBtn").disabled = false;
     $("#singleDrumBtn").disabled = false;
     $("#curNoteLbl").textContent = SL.midiName(curNote) + " (" + curNote + ")";
     $("#tVol").value = synth.params.masterVol;
@@ -425,7 +439,7 @@
     const P = synth.params, set = (k, v) => { if (v != null && !Number.isNaN(v)) P[k] = v; };
     set("transposeSemis", fx.transpose_semis); set("fineCents", fx.fine_cents); set("glideMs", fx.glide_ms); set("humanizeCents", fx.humanize_cents);
     if (fx.env_mode) P.envMode = fx.env_mode; if (fx.harm_follow_env != null) P.harmFollowEnv = !!fx.harm_follow_env; set("decayStretch", fx.decay_stretch); if (fx.attack_curve) P.attackCurve = fx.attack_curve;
-    set("attackSampleMix", fx.attack_sample_mix); set("trumpetWaveMix", fx.trumpet_wave_mix); set("sustainSampleMix", fx.sustain_sample_mix); set("drumSampleMix", fx.drum_sample_mix); if (fx.drum_pitch_follow != null) P.drumPitchFollow = !!fx.drum_pitch_follow;
+    set("attackSampleMix", fx.attack_sample_mix); set("trumpetWaveMix", fx.trumpet_wave_mix); set("sustainSampleMix", fx.sustain_sample_mix); set("toneSampleMix", fx.tone_sample_mix); set("drumSampleMix", fx.drum_sample_mix); if (fx.drum_pitch_follow != null) P.drumPitchFollow = !!fx.drum_pitch_follow;
     if (fx.noise_mode) P.noiseMode = fx.noise_mode; set("noiseHpHz", fx.noise_hp_hz); set("noiseLpHz", fx.noise_lp_hz); set("attackNoise", fx.attack_noise); set("breathAmount", fx.breath_amount);
     const r = fx.reverb || {}; set("reverbMix", r.mix); set("reverbSizeSec", r.size_sec); set("reverbDamping", r.damping); set("reverbPreMs", r.pre_ms); set("reverbWidth", r.width);
     const d = fx.drive || {}; set("driveAmount", d.amount); set("driveToneHz", d.tone_hz);
@@ -437,6 +451,35 @@
     const m = fx.modulation || {};
     set("vibDepthCents", m.vibrato_depth_cents); set("vibRateHz", m.vibrato_rate_hz); set("vibOnsetSec", m.vibrato_onset_sec); if (m.vibrato_shape) P.vibShape = m.vibrato_shape;
     set("tremDepth", m.tremolo_depth); set("tremRateHz", m.tremolo_rate_hz); if (m.tremolo_shape) P.tremShape = m.tremolo_shape;
+    if (instrument && instrument.instrument_profile === "flute") normalizeFluteParams(P, instrument);
+  }
+
+  function normalizeFluteParams(P, I) {
+    P.noiseMode = "recorded";
+    const sampleDriven = !!(I && I.tone_sample);
+    P.toneSampleMix = sampleDriven ? clamp(P.toneSampleMix == null ? 1.0 : P.toneSampleMix, 0.85, 1.15) : 0;
+    P.harmGains = Object.assign({}, P.harmGains || {}, fluteHarmGains());
+    P.harmLimit = Math.min(P.harmLimit || 10, 10);
+    P.harmRolloff = clamp(Math.max(P.harmRolloff || 0, 0.085), -0.15, 0.6);
+    P.brightness = clamp(Math.min(P.brightness || 0, -0.06), -1.5, 1.5);
+    P.oddEvenBal = clamp(Math.max(P.oddEvenBal || 0, 0.08), -1, 1);
+    P.inharmMul = 0;
+    P.harmonicGainTrim = sampleDriven ? 0.18 : 1.12;
+    P.noiseLevel = sampleDriven ? clamp(P.noiseLevel == null ? 0.025 : P.noiseLevel, 0, 0.05) : clamp(P.noiseLevel == null ? 0.10 : P.noiseLevel, 0.06, 0.16);
+    P.breathAmount = sampleDriven ? clamp(P.breathAmount == null ? 0.006 : P.breathAmount, 0, 0.015) : clamp(P.breathAmount == null ? 0.028 : P.breathAmount, 0.012, 0.045);
+    P.attackNoise = sampleDriven ? clamp(P.attackNoise == null ? 0.010 : P.attackNoise, 0, 0.02) : clamp(P.attackNoise == null ? 0.045 : P.attackNoise, 0.015, 0.07);
+    P.noiseHpHz = clamp(Math.max(P.noiseHpHz || 2600, 2400), 20, 4200);
+    P.noiseLpHz = clamp(Math.max(P.noiseLpHz || 9000, 7600), 500, 12000);
+    if (I && I.attack_sample) P.attackSampleMix = sampleDriven ? 0 : clamp(P.attackSampleMix == null ? 0.10 : P.attackSampleMix, 0, 0.16);
+    if (I && I.sustain_sample) P.sustainSampleMix = sampleDriven ? 0 : clamp(P.sustainSampleMix == null ? 0.02 : P.sustainSampleMix, 0, 0.04);
+    if (I && I.waveform && I.waveform.one_cycle) P.trumpetWaveMix = sampleDriven ? 0 : clamp(P.trumpetWaveMix == null ? 0.04 : P.trumpetWaveMix, 0, 0.08);
+    P.vibDepthCents = clamp(P.vibDepthCents == null ? 9 : P.vibDepthCents, 5, 12);
+    P.vibRateHz = clamp(P.vibRateHz || 5.7, 0.1, 12);
+    P.vibOnsetSec = clamp(P.vibOnsetSec == null ? 0.20 : P.vibOnsetSec, 0.12, 0.35);
+  }
+
+  function fluteHarmGains() {
+    return { 2: 0.24, 3: 0.42, 4: 0.28, 5: 0.18, 6: 0.12, 7: 0.08, 8: 0.06, 9: 0.04, 10: 0.03 };
   }
 
   function updateSummary() {
@@ -575,64 +618,119 @@
     }
     return P;
   }
-  function applyStringParams(P, I, strength, tone) {
+  function applyFluteParams(P, I, strength, tone) {
     strength = strength == null ? 1 : strength;
     tone = tone || "natural";
     const f0 = I && I.fundamental_hz ? +I.fundamental_hz : 440;
     const soft = tone === "soft";
     const bright = tone === "bright";
     const clean = tone === "clean";
-    const bowed = tone === "bowed";
-    const rosin = tone === "rosin";
+    const breathy = tone === "breathy";
 
     P.envMode = "adsr";
     P.attackCurve = "lin";
-    P.attackMs = clamp(Math.max(P.attackMs || 0, soft ? 95 : rosin ? 90 : bowed ? 76 : 60), 1, 2000);
-    P.decayMs = clamp(Math.max(P.decayMs || 0, soft ? 270 : rosin ? 300 : bowed ? 250 : 190), 1, 3000);
-    P.sustainLvl = clamp(Math.max(P.sustainLvl == null ? 0.72 : P.sustainLvl, soft ? 0.78 : rosin ? 0.80 : bowed ? 0.76 : 0.72), 0, 1);
-    P.releaseMs = clamp(Math.max(P.releaseMs || 0, soft ? 760 : rosin ? 920 : bowed ? 720 : 560), 5, 4000);
+    P.attackMs = clamp(soft ? 55 : breathy ? 38 : bright ? 30 : 42, 1, 2000);
+    P.decayMs = clamp(soft ? 170 : 130, 1, 3000);
+    P.sustainLvl = clamp(soft ? 0.90 : breathy ? 0.84 : 0.88, 0, 1);
+    P.releaseMs = clamp(soft ? 620 : 420, 5, 4000);
 
-    P.brightness = clamp(bright ? 0.10 : soft ? -0.20 : rosin ? 0.02 : bowed ? -0.02 : -0.10, -1.5, 1.5);
-    P.harmRolloff = clamp(bright ? 0.012 : soft ? 0.075 : rosin ? 0.022 : bowed ? 0.032 : 0.052, -0.15, 0.6);
-    P.oddEvenBal = clamp(soft ? -0.12 : rosin ? 0.08 : bowed ? 0.04 : -0.05, -1, 1);
-    P.inharmMul = clamp(clean ? 0.22 : rosin ? 0.62 : bowed ? 0.52 : 0.38, 0, 4);
-    P.harmFollowEnv = rosin;
+    P.brightness = clamp(bright ? 0.02 : soft ? -0.16 : clean ? -0.10 : -0.08, -1.5, 1.5);
+    P.harmRolloff = clamp(bright ? 0.060 : soft ? 0.120 : 0.085, -0.15, 0.6);
+    P.oddEvenBal = clamp(bright ? 0.04 : clean ? 0.12 : 0.08, -1, 1);
+    P.inharmMul = 0;
+    P.harmLimit = 10;
+    const sampleDriven = !!(I && I.tone_sample);
+    P.toneSampleMix = sampleDriven ? clamp(clean ? 0.95 : breathy ? 1.05 : 1.0, 0, 1.2) : 0;
+    P.harmGains = Object.assign({}, P.harmGains || {}, fluteHarmGains());
+    P.harmonicGainTrim = sampleDriven ? 0.18 : 1.12;
+    P.harmFollowEnv = false;
 
-    if (I && I.attack_sample) P.attackSampleMix = clamp(clean ? 0.14 : soft ? 0.26 : rosin ? 0.68 : bowed ? 0.52 : 0.36, 0, 1.2);
-    if (I && I.sustain_sample) P.sustainSampleMix = clamp(soft ? 0.28 : rosin ? 0.52 : bowed ? 0.40 : 0.24, 0, 0.9);
+    if (I && I.attack_sample) P.attackSampleMix = sampleDriven ? 0 : clamp(clean ? 0.04 : breathy ? 0.14 : 0.10, 0, 1.2);
+    if (I && I.sustain_sample) P.sustainSampleMix = sampleDriven ? 0 : clamp(soft ? 0.015 : breathy ? 0.035 : 0.02, 0, 0.9);
+    P.trumpetWaveMix = sampleDriven ? 0 : clamp((I && I.waveform && I.waveform.one_cycle) ? (clean ? 0.00 : breathy ? 0.06 : 0.04) : 0, 0, 0.7);
+    P.brassLayerMix = 0;
+    P.brassLayerDetuneCents = 0;
+    P.trumpetResonance = 0;
+
+    P.noiseMode = "recorded";
+    P.noiseLevel = sampleDriven ? clamp(breathy ? 0.05 : clean ? 0 : 0.025, 0, 3) : clamp(clean ? 0.055 : breathy ? 0.16 : 0.10, 0, 3);
+    P.breathAmount = sampleDriven ? clamp(breathy ? 0.015 : clean ? 0 : 0.006, 0, 1) : clamp(clean ? 0.012 : breathy ? 0.045 : 0.028, 0, 1);
+    P.attackNoise = sampleDriven ? clamp(breathy ? 0.020 : clean ? 0 : 0.010, 0, 3) : clamp(clean ? 0.015 : breathy ? 0.07 : 0.045, 0, 3);
+    P.noiseHpHz = clamp(bright ? 3000 : 2600, 20, 4200);
+    P.noiseLpHz = clamp(bright ? 10500 : soft ? 7600 : 9000, 500, 18000);
+
+    P.vibDepthCents = clamp(clean ? 5 : soft ? 7 : 9, 0, 120);
+    P.vibRateHz = clamp(5.7, 0.1, 12);
+    P.vibOnsetSec = clamp(0.20, 0, 2);
+    P.vibShape = "sine";
+
+    P.chorusMix = 0;
+    P.reverbMix = clamp(soft ? 0.15 : 0.13, 0, 1);
+    P.reverbSizeSec = clamp(1.8, 0.1, 6);
+    P.reverbDamping = clamp(0.34, 0, 0.98);
+    P.driveAmount = 0;
+    P.driveToneHz = 15000;
+    P.eqLowGain = clamp(f0 < 330 ? -2.4 : -4.8, -15, 15);
+    P.eqMidFreq = clamp(1050, 150, 6000);
+    P.eqMidGain = clamp(soft ? -1.2 : -0.8, -15, 15);
+    P.eqMidQ = 1.0;
+    P.eqPresGain = clamp(bright ? 3.8 : clean ? 2.2 : 3.2, -15, 15);
+    P.eqHighGain = clamp(bright ? 2.2 : soft ? 0.6 : 1.4, -15, 15);
+    P.filterMode = "off";
+    return P;
+  }
+  function applyOrganParams(P, I, strength, tone) {
+    strength = strength == null ? 1 : strength;
+    tone = tone || "natural";
+    const f0 = I && I.fundamental_hz ? +I.fundamental_hz : 440;
+    const thick = tone === "thick";
+    const bright = tone === "bright";
+    const church = tone === "church";
+    const clean = tone === "clean";
+
+    P.envMode = "adsr";
+    P.attackCurve = "exp";
+    P.attackMs = clamp(clean ? 10 : 16, 1, 2000);
+    P.decayMs = clamp(80, 1, 3000);
+    P.sustainLvl = clamp(clean ? 0.88 : 0.94, 0, 1);
+    P.releaseMs = clamp(church ? 640 : clean ? 120 : 240, 5, 4000);
+
+    P.brightness = clamp(bright ? 0.18 : thick ? -0.06 : 0.04, -1.5, 1.5);
+    P.harmRolloff = clamp(bright ? 0.018 : thick ? 0.040 : 0.028, -0.15, 0.6);
+    P.oddEvenBal = clamp(thick ? 0.18 : bright ? 0.08 : 0.12, -1, 1);
+    P.inharmMul = 0;
+    P.harmFollowEnv = false;
+    if (I && I.attack_sample) P.attackSampleMix = clamp(clean ? 0.04 : 0.10, 0, 1.2);
+    if (I && I.sustain_sample) P.sustainSampleMix = clamp(clean ? 0.04 : thick ? 0.16 : 0.10, 0, 0.9);
     P.trumpetWaveMix = 0;
     P.brassLayerMix = 0;
     P.brassLayerDetuneCents = 0;
     P.trumpetResonance = 0;
 
     P.noiseMode = "recorded";
-    P.noiseLevel = clamp(clean ? 0.05 : soft ? 0.12 : rosin ? 0.42 : bowed ? 0.30 : 0.18, 0, 3);
-    P.attackNoise = clamp(clean ? 0.10 : soft ? 0.22 : rosin ? 0.95 : bowed ? 0.70 : 0.36, 0, 3);
-    P.noiseHpHz = clamp(rosin ? 650 : bowed ? 540 : Math.max(P.noiseHpHz || 20, 420), 20, 3000);
-    P.noiseLpHz = clamp(bright ? 11000 : rosin ? 12000 : bowed ? 9800 : 8400, 500, 18000);
+    P.noiseLevel = 0;
     P.breathAmount = 0;
+    P.attackNoise = clean ? 0 : 0.04;
+    P.noiseHpHz = 80;
+    P.noiseLpHz = 10000;
 
-    P.vibDepthCents = clamp(Math.max(P.vibDepthCents || 0, soft ? 12 : rosin ? 26 : bowed ? 22 : 16), 0, 120);
-    P.vibRateHz = clamp(Math.max(P.vibRateHz || 0, rosin ? 5.9 : bowed ? 5.6 : 5.2), 0.1, 12);
-    P.vibOnsetSec = clamp(Math.max(P.vibOnsetSec || 0, rosin ? 0.08 : bowed ? 0.12 : 0.18), 0, 2);
-    P.vibShape = "sine";
-
-    P.chorusMix = clamp(Math.max(P.chorusMix || 0, soft ? 0.14 : rosin ? 0.24 : bowed ? 0.18 : 0.10), 0, 1);
-    P.chorusRateHz = clamp(rosin ? 0.18 : 0.22, 0.05, 3);
-    P.chorusDepth = clamp(soft ? 0.42 : rosin ? 0.62 : bowed ? 0.52 : 0.34, 0, 1);
-    P.chorusWidth = clamp(rosin ? 0.82 : 0.70, 0, 1);
-    P.reverbMix = clamp(Math.max(P.reverbMix || 0, soft ? 0.16 : rosin ? 0.18 : bowed ? 0.15 : 0.12), 0, 1);
-    P.reverbSizeSec = clamp(Math.max(P.reverbSizeSec || 2.2, 2.4), 0.1, 6);
-    P.reverbDamping = clamp(Math.max(P.reverbDamping == null ? 0.35 : P.reverbDamping, 0.42), 0, 0.98);
-
-    P.driveAmount = clamp(bright ? 0.025 : rosin ? 0.035 : bowed ? 0.022 : 0.01, 0, 1);
-    P.driveToneHz = clamp(bright ? 15000 : rosin ? 14500 : bowed ? 13000 : 11500, 600, 18000);
-    P.eqLowGain = clamp((f0 < 260 ? 1.0 : 0.3) + (soft ? 0.7 : rosin ? 0.45 : bowed ? 0.35 : 0), -15, 15);
-    P.eqMidFreq = clamp(f0 < 330 ? 420 : rosin ? 620 : 540, 150, 6000);
-    P.eqMidGain = clamp(soft ? 1.7 : rosin ? 2.8 : bowed ? 2.4 : 1.4, -15, 15);
-    P.eqMidQ = clamp(rosin ? 1.2 : 1.0, 0.3, 8);
-    P.eqPresGain = clamp(bright ? 2.6 : soft ? 0.7 : rosin ? 3.8 : bowed ? 2.7 : 1.7, -15, 15);
-    P.eqHighGain = clamp(bright ? 1.2 : soft ? -1.0 : rosin ? 0.8 : bowed ? 0.25 : -0.4, -15, 15);
+    P.vibDepthCents = 0;
+    P.tremDepth = 0;
+    P.chorusMix = clamp(church ? 0.12 : thick ? 0.10 : 0.04, 0, 1);
+    P.chorusRateHz = 0.18;
+    P.chorusDepth = clamp(church ? 0.34 : 0.22, 0, 1);
+    P.chorusWidth = 0.75;
+    P.reverbMix = clamp(church ? 0.26 : clean ? 0.04 : 0.12, 0, 1);
+    P.reverbSizeSec = clamp(church ? 3.2 : 2.1, 0.1, 6);
+    P.reverbDamping = clamp(church ? 0.50 : 0.38, 0, 0.98);
+    P.driveAmount = clamp(thick ? 0.025 : 0, 0, 1);
+    P.driveToneHz = 15000;
+    P.eqLowGain = clamp(f0 < 180 ? 0.4 : thick ? 1.2 : 0.2, -15, 15);
+    P.eqMidFreq = clamp(f0 < 220 ? 360 : 720, 150, 6000);
+    P.eqMidGain = clamp(thick ? 1.6 : bright ? 0.2 : 0.8, -15, 15);
+    P.eqMidQ = 1.0;
+    P.eqPresGain = clamp(bright ? 2.2 : clean ? 0.4 : 1.0, -15, 15);
+    P.eqHighGain = clamp(bright ? 1.6 : thick ? -0.2 : 0.4, -15, 15);
     P.filterMode = "off";
     return P;
   }
@@ -657,19 +755,33 @@
     finishPresetCompare(`${lab}向け`);
     setStatus(`${lab} 向けにアタック・胴鳴り・ノイズ包絡を整えました。`);
   }
-  function applyStringQualityPreset() {
-    applyStringPreset("natural");
+  function applyFluteQualityPreset() {
+    applyFlutePreset("natural");
   }
-  function applyStringPreset(kind) {
+  function applyFlutePreset(kind) {
     if (!instrument) return;
     beginPresetCompare();
-    applyStringParams(synth.params, instrument, 1, kind);
+    applyFluteParams(synth.params, instrument, 1, kind);
     syncControlsFromParams();
     if (synth.ctx) synth.applyAll();
     if (synth.drone) synth.setDrone(true, curNote);
-    const labels = { natural: "ヴァイオリン向け", bowed: "弦らしさ強め", rosin: "弓感最大", soft: "やわらかめ", bright: "明るめ", clean: "弓ノイズ控えめ" };
+    const labels = { natural: "フルート向け", breathy: "息を強める", bright: "明るく抜ける", soft: "やわらかめ", clean: "息ノイズ控えめ" };
     finishPresetCompare(labels[kind] || labels.natural);
-    setStatus(`弦楽器調整プリセット「${labels[kind] || labels.natural}」を適用しました。A/Bで前後を比較できます。`);
+    setStatus(`フルート調整プリセット「${labels[kind] || labels.natural}」を適用しました。A/Bで前後を比較できます。`);
+  }
+  function applyOrganQualityPreset() {
+    applyOrganPreset("natural");
+  }
+  function applyOrganPreset(kind) {
+    if (!instrument) return;
+    beginPresetCompare();
+    applyOrganParams(synth.params, instrument, 1, kind);
+    syncControlsFromParams();
+    if (synth.ctx) synth.applyAll();
+    if (synth.drone) synth.setDrone(true, curNote);
+    const labels = { natural: "オルガン向け", thick: "厚くする", bright: "明るくする", church: "教会風", clean: "シンプル" };
+    finishPresetCompare(labels[kind] || labels.natural);
+    setStatus(`オルガン調整プリセット「${labels[kind] || labels.natural}」を適用しました。A/Bで前後を比較できます。`);
   }
   function applyTrumpetPreset(kind) {
     if (!instrument) return;
@@ -1060,7 +1172,8 @@
     // マスター音量(トランスポート側) ↔ perf セクションのスライダーを同期
     $("#tVol").addEventListener("input", () => { const v = +$("#tVol").value; setParam("masterVol", v); });
     $("#qualityBtn").addEventListener("click", async () => { await ensureAudio(); applyMetalQualityPreset(); });
-    $("#stringQualityBtn").addEventListener("click", async () => { await ensureAudio(); applyStringQualityPreset(); });
+    $("#fluteQualityBtn").addEventListener("click", async () => { await ensureAudio(); applyFluteQualityPreset(); });
+    $("#organQualityBtn").addEventListener("click", async () => { await ensureAudio(); applyOrganQualityPreset(); });
     $("#abSaveA").addEventListener("click", () => saveCompareSlot("A"));
     $("#abSaveB").addEventListener("click", () => saveCompareSlot("B"));
     $("#abApplyA").addEventListener("click", () => applyCompareSlot("A"));
@@ -1294,7 +1407,7 @@
 
     const out = {
       format: "sound_lab.instrument/1",
-      name: `${profileSet.length === 1 && profileSet[0] === "violin" ? "violin" : "representative"} average (調整)`,
+      name: `${profileSet.length === 1 ? profileSet[0] : "representative"} average (調整)`,
       source_file: tracks.map((t) => t.file.name).join(" + "),
       created_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
       sample_rate: rootInst.sample_rate || first.sample_rate || 44100,
@@ -1344,7 +1457,7 @@
     const profileSet = Array.from(new Set(sorted.map((t) => t.instrument.instrument_profile || "auto")));
     const pack = {
       format: "sound_lab.multinote_instrument/1",
-      name: `${profileSet.length === 1 && profileSet[0] === "violin" ? "violin" : "multi-note"} pack (調整)`,
+      name: `${profileSet.length === 1 ? profileSet[0] : "multi-note"} pack (調整)`,
       created_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
       instrument_profile: profileSet.length === 1 ? profileSet[0] : "mixed",
       instrument_profile_label: profileSet.length === 1 ? (first.instrument_profile_label || profileSet[0]) : "混合",
