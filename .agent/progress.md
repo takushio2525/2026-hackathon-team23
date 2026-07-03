@@ -37,3 +37,5 @@
 - 2026-07-03: フルートを鳴らし続けると音が途切れる問題に対し、`tone_sample` のループ点選定を安定区間探索へ変更し、保存時/再生時のループ境界補正を追加。`/Users/shota/Downloads/flute.sampled.instrument.json` を再生成し、ループ境界の段差 `jump_abs=0.0`、Python/JS 構文チェック成功を確認。
 - 2026-07-03: フルート長音の途切れがまだ残るため、`tone_sample` のループ選定で内部 RMS 変動を強く評価し、短めの安定ループを選ぶよう変更。ループ内の音量谷を軽くならす処理も追加し、`flute.sampled.instrument.json` を再生成。ループ 1.012381〜1.232154 秒、境界段差 0、RMS 変動 CV 約 0.06、Python/JS 構文チェック成功を確認。
 - 2026-07-03: フルート長音に小さな途切れがまだ残るため、`tone_sample` のループ位置を秒だけでなくサンプル番号でも保存し、ブラウザ再生時はサンプル番号を優先するよう変更。サンプル主導フルートの `harmonicGainTrim` を 0.18 に増やし、安定した合成芯でループの薄さを補う。Python/JS 構文チェック成功。
+- 2026-07-03: week10 の `kaeru_score_week10_adjusted` にフルート/オルガンを適用。フルートは C5〜A5、オルガンは C3〜A3 に設定し、ホルン/チューバ声部を置き換え。Processing 側に `tone_sample` ループ再生 UGen を追加し、`work/saito/week10/kaeru_score_week10_adjusted/data/flute.tweaked.instrument.json` を `tone_sample` 入りで再生成。`processing-java --build` 成功。
+- 2026-07-03: week10 の音量バランスを調整。`DRUM_AMPLITUDE` を 0.095 に下げ、フルートの `FLUTE_SAMPLE_GAIN` を 1.32、声部 `amplitude` を 0.28 に上げた。Processing ビルド成功。

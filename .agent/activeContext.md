@@ -12,5 +12,7 @@
 - 2026-07-03: C5 付近でフルートらしくなった一方、鳴らし続けると途切れる問題が出たため、`tone_sample` のループ点選定を修正。ADSR 由来の開始/終了をそのまま使わず、音量が安定し、先頭/末尾の瞬間値と傾きが近い区間を選ぶ。保存時とブラウザ再生時の両方でループ先頭を短く補正し、`flute.sampled.instrument.json` の境界段差が 0 になることを確認済み。
 - 2026-07-03: まだ長音で途切れるフィードバックを受け、境界だけでなくループ内部の音量変動も評価するよう再修正。短めで安定した区間を優先し、ループ内の大きな音量谷を軽くならす処理を追加。`flute.sampled.instrument.json` はループ 1.012381〜1.232154 秒、境界段差 0、ループ RMS の CV 約 0.06 まで改善。
 - 2026-07-03: さらに小さな途切れが残るため、`tone_sample` に `loop_start_sample` / `loop_end_sample` を保存し、ブラウザ側ではサンプル番号を優先してループ位置を決めるよう変更。フルートのサンプル主導再生では安定した合成芯も少し増やし、ループの薄さを補う。
+- 2026-07-03: week10 の `kaeru_score_week10_adjusted` にフルート/オルガン音色を適用。ホルン/チューバの声部をフルート/オルガンに変更し、フルート C5〜A5、トランペット C5〜A5、トロンボーン C3〜A3、オルガン C3〜A3 で演奏する構成にした。Processing 側に `tone_sample` ループ再生 UGen を追加し、完成版フルート音を使えるようにした。
+- 2026-07-03: week10 の音量バランスを微調整。ドラムを少し下げ、フルートのサンプルゲインと声部音量を少し上げた。
 - 検証: `python3 -m py_compile sound_lab/analyzer/analyzer.py sound_lab/analyzer/app.py`、`.venv/bin/python -m py_compile ...`、`node --check sound_lab/analyzer/static/app.js`、`node --check sound_lab/analyzer/static/engine.js` 成功。Flask `/analyze` で `flute.wav` が `attack_sec=0.055`、`noise.level=0.0281`、`tone_sample` ありとして返ることを確認。
 - 現在 `sound_lab/analyzer/.venv/bin/python sound_lab/analyzer/app.py` を起動中。試用 URL は `http://127.0.0.1:5005/`。

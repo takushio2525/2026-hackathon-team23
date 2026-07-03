@@ -14,6 +14,7 @@ final float MASTER_GAIN = 1.35f;
 // 拍位置は変えず、金管の音の立ち上がりだけを速くしてドラムとの聴感上のズレを減らす。
 final float BRASS_ATTACK_SCALE = 0.45f;
 final float RECORDED_DRUM_GAIN = 2.6f;
+final float FLUTE_SAMPLE_GAIN = 1.32f;
 // week10/kaeru_score_week10_adjusted/data/ に同梱した音色JSONを読む。外部参照は不要。
 final String SOURCE_DATA_DIRECTORY = "data/";
 
@@ -83,12 +84,12 @@ class PartDefinition {
 
 // 4パートともこの同じ譜面を使い、PartDefinition の octaveShift だけで音域を変える。
 final PartDefinition[] MELODY_PARTS = {
-  new PartDefinition("主旋律1 / トランペット", "trumpets.tweaked.instrument.json",  0,  12, 0.24f), // C5〜A5
-  new PartDefinition("主旋律2 / ホルン",       "horns.tweaked.instrument.json",      8,   0, 0.21f), // C4〜A4
+  new PartDefinition("主旋律1 / フルート",     "flute.tweaked.instrument.json",     0,  12, 0.28f), // C5〜A5
+  new PartDefinition("主旋律2 / トランペット", "trumpets.tweaked.instrument.json",  8,  12, 0.22f), // C5〜A5
   new PartDefinition("主旋律3 / トロンボーン", "trombones.tweaked.instrument.json", 16, -12, 0.22f), // C3〜A3
-  new PartDefinition("主旋律4 / チューバ",     "tuba.tweaked.instrument.json",      24, -24, 0.36f)  // C2〜A2（共通譜から2オクターブ下）
+  new PartDefinition("主旋律4 / オルガン",     "organ.tweaked.instrument.json",     24, -12, 0.25f)  // C3〜A3
 };
-final float DRUM_AMPLITUDE = 0.11f;
+final float DRUM_AMPLITUDE = 0.095f;
 
 class TimbreData {
   String name;
@@ -102,6 +103,11 @@ class TimbreData {
   float releaseSec;
   float[] drumSample;
   float drumSampleRate;
+  float[] toneSample;
+  float toneSampleRate;
+  int toneRootMidiNote;
+  int toneLoopStartSample;
+  int toneLoopEndSample;
 
   TimbreData(String filename) {
     JSONObject json = loadJSONObject(sketchPath(SOURCE_DATA_DIRECTORY + filename));
@@ -134,6 +140,24 @@ class TimbreData {
     }
     for (int i = 0; i < harmonicCount; i++) {
       harmonicGains[i] /= gainSum;
+    }
+
+    // フルートなどの持続楽器が持つ原音本体サンプル。倍音合成より原音感を優先して鳴らす。
+    if (json.hasKey("tone_sample")) {
+      JSONObject sourceToneSample = json.getJSONObject("tone_sample");
+      JSONArray sourceValues = sourceToneSample.getJSONArray("values");
+      if (sourceValues != null && sourceValues.size() > 0) {
+        toneSample = new float[sourceValues.size()];
+        for (int i = 0; i < toneSample.length; i++) {
+          toneSample[i] = sourceValues.getFloat(i);
+        }
+        toneSampleRate = sourceToneSample.getFloat("sample_rate", 22050.0f);
+        toneRootMidiNote = sourceToneSample.getInt("root_midi_note", json.getInt("midi_note", 60));
+        toneLoopStartSample = sourceToneSample.getInt("loop_start_sample", max(0, round(sourceToneSample.getFloat("loop_start_sec", 0) * toneSampleRate)));
+        toneLoopEndSample = sourceToneSample.getInt("loop_end_sample", min(toneSample.length, round(sourceToneSample.getFloat("loop_end_sec", toneSample.length / toneSampleRate) * toneSampleRate)));
+        toneLoopStartSample = constrain(toneLoopStartSample, 0, max(0, toneSample.length - 2));
+        toneLoopEndSample = constrain(toneLoopEndSample, toneLoopStartSample + 2, toneSample.length);
+      }
     }
 
     // 打楽器プロファイルが持つ原音1打。クラッシュではこの非周期波形を優先する。
@@ -221,6 +245,66 @@ class BrassNote implements Instrument {
   void noteOff() { envelope.unpatchAfterRelease(out); envelope.noteOff(); }
 }
 
+class ToneSampleUGen extends UGen {
+  float[] sample;
+  float sourceSampleRate;
+  float position;
+  float step;
+  float pitchRatio;
+  float lastOutputSampleRate;
+  int loopStart;
+  int loopEnd;
+
+  ToneSampleUGen(TimbreData timbre, int midiNote) {
+    sample = timbre.toneSample;
+    sourceSampleRate = timbre.toneSampleRate;
+    loopStart = timbre.toneLoopStartSample;
+    loopEnd = timbre.toneLoopEndSample;
+    position = 0;
+    pitchRatio = pow(2.0f, (midiNote - timbre.toneRootMidiNote) / 12.0f);
+    lastOutputSampleRate = 0;
+  }
+
+  protected void uGenerate(float[] channels) {
+    if (sample == null || sample.length == 0) {
+      for (int i = 0; i < channels.length; i++) channels[i] = 0;
+      return;
+    }
+    float outputSampleRate = max(1.0f, sampleRate());
+    if (outputSampleRate != lastOutputSampleRate) {
+      step = pitchRatio * sourceSampleRate / outputSampleRate;
+      lastOutputSampleRate = outputSampleRate;
+    }
+
+    if (position >= loopEnd) {
+      float loopLength = max(1, loopEnd - loopStart);
+      position = loopStart + ((position - loopStart) % loopLength);
+    }
+
+    int i0 = constrain(floor(position), 0, sample.length - 1);
+    int i1 = min(i0 + 1, sample.length - 1);
+    float frac = position - i0;
+    float value = lerp(sample[i0], sample[i1], frac);
+    position += step;
+    for (int i = 0; i < channels.length; i++) channels[i] = value;
+  }
+}
+
+class SampledMelodyNote implements Instrument {
+  ToneSampleUGen tone;
+  ADSR envelope;
+
+  SampledMelodyNote(int midiNote, float amplitude, TimbreData timbre) {
+    tone = new ToneSampleUGen(timbre, midiNote);
+    envelope = new ADSR(constrain(amplitude * FLUTE_SAMPLE_GAIN, 0.0f, 1.0f),
+                        0.004f, 0.04f, 0.92f, max(0.08f, timbre.releaseSec * 0.45f));
+    tone.patch(envelope);
+  }
+
+  void noteOn(float duration) { envelope.noteOn(); envelope.patch(out); }
+  void noteOff() { envelope.unpatchAfterRelease(out); envelope.noteOff(); }
+}
+
 class DrumNote implements Instrument {
   Summer mix;
   Noise noise;
@@ -288,7 +372,7 @@ void draw() {
   background(248, 246, 242);
   fill(34);
   textSize(26);
-  text("かえるのうた 4声輪唱・week10音量調整プレビュー", 28, 42);
+  text("かえるのうた 4声輪唱・week10 フルート/オルガン版", 28, 42);
   textSize(15);
   text("固定テンポ: " + BPM + " BPM   共通主旋律: " + MELODY_SCORE.length + " 拍   ドラム: " + drumScore.length + " 拍   全体音量倍率: x" + nf(MASTER_GAIN, 1, 2), 28, 72);
   text("P: 全パート再生    1-5: 単独再生    再生完了後に次のキーを押してください", 28, 98);
@@ -307,7 +391,7 @@ void draw() {
   fill(34);
   text(currentMode, 28, 368);
   textSize(13);
-  text("共通譜をオクターブ移調: トランペット C5〜A5 / ホルン C4〜A4 / トロンボーン C3〜A3 / チューバ C2〜A2", 28, 410);
+  text("共通譜をオクターブ移調: フルート C5〜A5 / トランペット C5〜A5 / トロンボーン C3〜A3 / オルガン C3〜A3", 28, 410);
   text("ドラム: 56拍の4/4パターン。声部の入りと最後だけクラッシュ+キックで強調", 28, 434);
   text("音色 JSON はこのスケッチの data/ フォルダを参照", 28, 456);
 }
@@ -321,7 +405,7 @@ void playAllParts() {
   out.pauseNotes();
   for (int part = 0; part < MELODY_PARTS.length + 1; part++) schedulePart(part);
   out.resumeNotes();
-  currentMode = "4声の主旋律輪唱（チューバはC2相当）と、音量を上げた4/4ドラムを再生中です。";
+  currentMode = "4声の主旋律輪唱（フルート高音・オルガン低音）と、音量を上げた4/4ドラムを再生中です。";
 }
 
 void playPart(int part) {
@@ -354,6 +438,9 @@ Instrument noteInstrument(int part, int noteNumber, float amplitude) {
     return new DrumNote(noteNumber, amplitude);
   }
   int shiftedNote = noteNumber + MELODY_PARTS[part].octaveShift;
+  if (brassTimbres[part].toneSample != null) {
+    return new SampledMelodyNote(shiftedNote, amplitude, brassTimbres[part]);
+  }
   return new BrassNote(midiToFrequency(shiftedNote), amplitude, brassTimbres[part]);
 }
 
