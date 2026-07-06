@@ -1,4 +1,4 @@
-"""week10の内容理解ノートPDFを生成する。"""
+"""内容理解ノートPDFを生成する。"""
 
 from pathlib import Path
 
@@ -67,7 +67,7 @@ def page_number(canvas, doc):
     canvas.setFillColor(colors.HexColor("#56616A"))
     canvas.setFont(FONT, 8.5)
     canvas.drawString(MARGIN_X, 7.5 * mm, "内容理解ノート | 齋藤 翔太")
-    canvas.drawRightString(PAGE_WIDTH - MARGIN_X, 7.5 * mm, f"{doc.page} / 4")
+    canvas.drawRightString(PAGE_WIDTH - MARGIN_X, 7.5 * mm, f"{doc.page}")
     canvas.restoreState()
 
 
@@ -145,24 +145,26 @@ def build_story():
     story += [
         paragraph("内容理解ノート", STYLES["title"]),
         paragraph("楽譜データ・4声輪唱・ドラム伴奏・音色再現", STYLES["subtitle"]),
-        paragraph("作成者：齋藤 翔太　　作成日：2026年6月24日", STYLES["note"]),
+        paragraph("作成者：齋藤 翔太　　作成日：2026年6月24日　　更新日：2026年7月7日", STYLES["note"]),
         Spacer(1, 3 * mm),
         paragraph("1. この資料の目的", STYLES["h1"]),
         paragraph(
             "これは発表用のスライドではなく、担当したプログラムがどのように音を鳴らしているかを事前に理解するための資料です。"
-            "対象は、week9の「かえるのうた」4声輪唱確認用Processingスケッチです。",
+            "当初はweek9の「かえるのうた」4声輪唱確認用Processingスケッチを対象に作成しました。"
+            "現在は、week10で作成した修正版スケッチと、week11で整理したフルート・オルガン追加後の構成も反映しています。",
             STYLES["body"],
         ),
         paragraph("理解する順番", STYLES["h2"]),
         paragraph("• 楽譜をどの形式で保持しているか", STYLES["bullet"]),
         paragraph("• 同じ楽譜を4つの金管パートでどう使い分けているか", STYLES["bullet"]),
         paragraph("• ドラムがどの拍で、どのように鳴るか", STYLES["bullet"]),
-        paragraph("• 金管とドラムの音色を、どのパラメータから再現しているか", STYLES["bullet"]),
+        paragraph("• 旋律楽器とドラムの音色を、どのパラメータから再現しているか", STYLES["bullet"]),
+        paragraph("• week9版からweek10調整版へ、どこが変わったか", STYLES["bullet"]),
         Spacer(1, 2 * mm),
         paragraph("2. 全体の流れ", STYLES["h1"]),
         paragraph(
             "スケッチは、楽譜データを読み、各イベントを再生時刻に並べ、最後に音色定義を使って音を作ります。"
-            "金管4声とドラムでは、同じ再生スケジュールの仕組みを使いますが、音程の扱いと音色の選び方が異なります。",
+            "旋律4声とドラムでは、同じ再生スケジュールの仕組みを使いますが、音程の扱いと音色の選び方が異なります。",
             STYLES["body"],
         ),
         LineBox("楽譜データ　→　パートごとの開始拍・音域設定　→　再生予約　→　音色JSONを使った発音", CONTENT_WIDTH),
@@ -193,7 +195,7 @@ def build_story():
             STYLES["note"],
         ),
         PageBreak(),
-        paragraph("4. 4声輪唱の仕組み", STYLES["h1"]),
+        paragraph("4. week9版の4声輪唱の仕組み", STYLES["h1"]),
         paragraph(
             "トランペットから順に8拍ずつ遅らせて入ります。チューバは低音伴奏ではなく、"
             "24拍遅れて入る4声目の主旋律として扱っています。",
@@ -210,10 +212,35 @@ def build_story():
         paragraph("再生時には、各イベントの開始時刻にパートの開始拍を足します。金管の音程は、"
                   "「共通譜のnoteNumber + octaveShift」で決まります。これを周波数に変換して、"
                   "金管の合成音を作るため、同じ旋律を高音から低音まで自然に配置できます。", STYLES["body"]),
-        paragraph("5. ドラム伴奏の仕組み", STYLES["h1"]),
+        paragraph("5. 最新版の4声構成", STYLES["h1"]),
+        paragraph(
+            "week10の修正版では、発表前確認で聞き分けやすいように4声の担当楽器を変更しました。"
+            "ホルンとチューバを外し、フルート、トランペット、トロンボーン、オルガンの構成にしています。",
+            STYLES["body"],
+        ),
+        make_table([
+            ["パート", "開始拍", "移調量", "基本音量", "主な音域"],
+            ["フルート", "0", "+12半音", "0.28", "C5からA5"],
+            ["トランペット", "8", "+12半音", "0.22", "C5からA5"],
+            ["トロンボーン", "16", "-12半音", "0.22", "C3からA3"],
+            ["オルガン", "24", "-12半音", "0.25", "C3からA3"],
+        ], [35 * mm, 18 * mm, 28 * mm, 25 * mm, CONTENT_WIDTH - 106 * mm]),
+        Spacer(1, 3 * mm),
+        paragraph(
+            "フルートは倍音合成だけでは質感が弱くなりやすいため、音色JSON内のtone_sampleを使う原音サンプル主導の再生に変更しました。"
+            "フルート用の補正値はFLUTE_SAMPLE_GAIN = 1.32です。全体音量はMASTER_GAIN = 1.35、"
+            "ドラム音量はDRUM_AMPLITUDE = 0.095に調整しています。",
+            STYLES["body"],
+        ),
+        paragraph(
+            "この最新版でも、共通譜MELODY_SCOREを4パートで使い回す考え方は変えていません。"
+            "変わったのは、PartDefinitionで指定する音色JSON、音域、音量です。",
+            STYLES["note"],
+        ),
+        paragraph("6. ドラム伴奏の仕組み", STYLES["h1"]),
         paragraph(
             "ドラム譜はcreateDrumScore()で生成し、曲の最後まで支えられるように56拍分を用意しています。"
-            "基本は4拍単位のパターンです。",
+            "最新版では4分の4拍子として、1・3拍目をキック、2・4拍目をスネアに整理しています。",
             STYLES["body"],
         ),
         make_table([
@@ -224,19 +251,22 @@ def build_story():
             ["4拍目", "スネア。次の小節へつなぐ。", "裏拍にハイハット"],
         ], [18 * mm, 72 * mm, CONTENT_WIDTH - 90 * mm]),
         Spacer(1, 2 * mm),
-        paragraph("特別な処理", STYLES["h2"]),
-        paragraph("• 0、8、16、24拍目：新しい声部が入る位置で、控えめなクラッシュとキックを同時に鳴らす。", STYLES["bullet"]),
-        paragraph("• 52から55拍目：曲の終わりに向け、キック、スネア、スネア、クラッシュのフィルを入れる。", STYLES["bullet"]),
-        paragraph(
-            "ドラムの基本音量はDRUM_AMPLITUDE = 0.075です。各音では、さらにvelocity / 127を掛けます。"
-            "金管より目立ちすぎず、拍を感じられる音量にする意図です。",
-            STYLES["note"],
+        KeepTogether(
+            [
+                paragraph("特別な処理", STYLES["h2"]),
+                paragraph("• 0、8、16、24拍目：新しい声部が入る位置で、控えめなクラッシュとキックを同時に鳴らす。", STYLES["bullet"]),
+                paragraph("• 最後の拍：クラッシュとキックで終止感を出す。", STYLES["bullet"]),
+                paragraph(
+                    "最新版のドラム基本音量はDRUM_AMPLITUDE = 0.095です。各音では、さらにvelocity / 127を掛けます。"
+                    "旋律より目立ちすぎず、拍を感じられる音量にする意図です。",
+                    STYLES["note"],
+                ),
+            ]
         ),
-        PageBreak(),
-        paragraph("6. 音を再現するパラメータ", STYLES["h1"]),
+        paragraph("7. 音を再現するパラメータ", STYLES["h1"]),
         paragraph(
             "金管もドラムも、音色JSONにある倍音、ノイズ、ADSRエンベロープを読み取ります。"
-            "ADSRは、音の立ち上がりから消えるまでの形を表します。",
+            "最新版では、フルートのtone_sampleも読み取ります。ADSRは、音の立ち上がりから消えるまでの形を表します。",
             STYLES["body"],
         ),
         make_table([
@@ -247,6 +277,7 @@ def build_story():
             ["attack_sec", "音が立ち上がるまでの時間。"],
             ["decay_sec / sustain_level", "立ち上がった後の減衰と、保持される音量。"],
             ["release_sec", "音を止めた後に消えるまでの時間。"],
+            ["tone_sample", "フルートなどの原音本体サンプル。倍音合成より自然な質感を優先したい場合に使う。"],
             ["drum_sample", "解析済みの1打分の波形。ある場合は、合成音より優先して再生する。"],
         ], [50 * mm, CONTENT_WIDTH - 50 * mm]),
         Spacer(1, 3 * mm),
@@ -263,46 +294,57 @@ def build_story():
             "演奏中の音の強さを決める値であり、役割が異なります。",
             STYLES["note"],
         ),
-        paragraph("7. ドラムは金管と同じ方法か", STYLES["h1"]),
+        paragraph("8. ドラムは旋律楽器と同じ方法か", STYLES["h1"]),
         paragraph(
             "土台となる処理は共通です。どちらも再生時刻を予約し、音色JSONを読み、音量と音の長さを反映して発音します。"
             "ただし、ドラムには専用の扱いがあります。",
             STYLES["body"],
         ),
         make_table([
-            ["観点", "金管", "ドラム"],
+            ["観点", "旋律楽器", "ドラム"],
             ["音程", "共通譜のノートをパートごとにオクターブ移調する。", "キック等のノート番号から、対応する音色JSONを選ぶ。"],
-            ["音色", "倍音を重ね、ADSRで形を作る。", "drum_sampleがあれば優先再生し、なければ倍音・ノイズ・ADSRで合成する。"],
+            ["音色", "倍音を重ね、ADSRで形を作る。フルートはtone_sampleを優先する。", "drum_sampleがあれば優先再生し、なければ倍音・ノイズ・ADSRで合成する。"],
             ["停止処理", "譜面上の長さでノートオフする。", "原音波形を使う場合は、自然な減衰を残すため途中で止めない。"],
         ], [26 * mm, (CONTENT_WIDTH - 26 * mm) / 2, (CONTENT_WIDTH - 26 * mm) / 2]),
         PageBreak(),
-        paragraph("8. 確認済みのことと、事前に見ておくこと", STYLES["h1"]),
+        paragraph("9. week9版から最新版への変更点", STYLES["h1"]),
+        make_table([
+            ["観点", "week9版", "最新版"],
+            ["旋律4声", "トランペット、ホルン、トロンボーン、チューバ", "フルート、トランペット、トロンボーン、オルガン"],
+            ["フルート", "未使用", "tone_sampleを使い、FLUTE_SAMPLE_GAIN = 1.32で再生"],
+            ["全体音量", "控えめな確認用", "MASTER_GAIN = 1.35で発表前確認向けに調整"],
+            ["ドラム音量", "DRUM_AMPLITUDE = 0.075", "DRUM_AMPLITUDE = 0.095"],
+            ["ドラムパターン", "4拍パターンと終止前フィルを含む", "4分の4拍子として整理し、最後の拍をクラッシュ + キックで強調"],
+            ["音色ファイル", "金管4種類とドラム4種類", "フルート、トランペット、トロンボーン、オルガン、ドラム4種類"],
+        ], [30 * mm, (CONTENT_WIDTH - 30 * mm) / 2, (CONTENT_WIDTH - 30 * mm) / 2]),
+        Spacer(1, 3 * mm),
+        paragraph(
+            "最新版は、Arduino実機用の最終ファームウェアそのものではなく、発表前に旋律・音色・バランスを確認するためのProcessingスケッチです。"
+            "そのため、音色JSONをスケッチ内のdataフォルダに同梱し、外部フォルダ参照なしで再生できるようにしています。",
+            STYLES["note"],
+        ),
+        paragraph("10. 確認済みのことと、事前に見ておくこと", STYLES["h1"]),
         paragraph("確認済み", STYLES["h2"]),
-        paragraph("• 4声の開始拍が0、8、16、24拍であること。", STYLES["bullet"]),
-        paragraph("• チューバがC2からA2の4声目として設定されていること。", STYLES["bullet"]),
-        paragraph("• ドラム譜が56拍あり、声部の入りのクラッシュと終止前フィルを含むこと。", STYLES["bullet"]),
-        paragraph("• 金管4種類とドラム4種類、合計8個の音色JSONを読み込むこと。", STYLES["bullet"]),
+        paragraph("• 最新版の4声の開始拍が0、8、16、24拍であること。", STYLES["bullet"]),
+        paragraph("• フルート、トランペット、トロンボーン、オルガンの4声構成になっていること。", STYLES["bullet"]),
+        paragraph("• フルート音色JSONにtone_sampleがあり、スケッチ側でToneSampleUGenを使うこと。", STYLES["bullet"]),
+        paragraph("• ドラム譜が56拍あり、声部の入りと最後の拍にクラッシュを含むこと。", STYLES["bullet"]),
+        paragraph("• 旋律4種類とドラム4種類、合計8個の音色JSONを読み込むこと。", STYLES["bullet"]),
         paragraph("• Processingスケッチが起動時に例外を出さないこと。", STYLES["bullet"]),
         paragraph("本番前に確認すること", STYLES["h2"]),
-        paragraph("• 実際に全パートを鳴らし、チューバとドラムが他の金管に埋もれていないかを聴く。", STYLES["bullet"]),
-        paragraph("• クラッシュ、ハイハット、終止前フィルが主旋律を邪魔していないかを聴く。", STYLES["bullet"]),
-        paragraph("• 必要ならPartDefinitionのamplitude、DRUM_AMPLITUDE、または譜面のvelocityを小さく調整する。", STYLES["bullet"]),
+        paragraph("• 実際に全パートを鳴らし、フルートとオルガンが他の旋律に埋もれていないかを聴く。", STYLES["bullet"]),
+        paragraph("• クラッシュ、ハイハット、最後の拍の強調が主旋律を邪魔していないかを聴く。", STYLES["bullet"]),
+        paragraph("• 必要ならMASTER_GAIN、PartDefinitionのamplitude、FLUTE_SAMPLE_GAIN、DRUM_AMPLITUDEを調整する。", STYLES["bullet"]),
         Spacer(1, 3 * mm),
-        paragraph("9. ソースの対応箇所", STYLES["h1"]),
+        paragraph("11. ソースの対応箇所", STYLES["h1"]),
         paragraph("実装を読み返すときは、次の順番が分かりやすいです。", STYLES["body"]),
         make_table([
             ["順番", "確認する箇所", "何が分かるか"],
-            ["1", "MELODY_PARTS と MELODY_SCORE", "共通譜と、各金管パートの時間差・音域"],
+            ["1", "MELODY_PARTS と MELODY_SCORE", "共通譜と、各旋律パートの時間差・音域"],
             ["2", "createDrumScore() と schedulePart()", "ドラム譜の作り方と再生時刻の決め方"],
-            ["3", "TimbreData、BrassNote、DrumNote、RecordedDrumNote", "音色JSONをどう使って音を作るか"],
+            ["3", "TimbreData、ToneSampleUGen、BrassNote、DrumNote、RecordedDrumNote", "音色JSONと原音サンプルをどう使って音を作るか"],
             ["4", "data/ の *.tweaked.instrument.json", "各楽器の具体的な音色パラメータ"],
         ], [14 * mm, 73 * mm, CONTENT_WIDTH - 87 * mm]),
-        Spacer(1, 4 * mm),
-        paragraph(
-            "対象ファイル：work/saito/week9/kaeru_score_debug/kaeru_score_debug.pde<br/>"
-            "音色定義：work/saito/week9/kaeru_score_debug/data/",
-            STYLES["note"],
-        ),
     ]
     return story
 
