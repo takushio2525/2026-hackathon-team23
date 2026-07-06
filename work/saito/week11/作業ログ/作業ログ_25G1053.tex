@@ -1,0 +1,191 @@
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage[ipaex]{pxchfon}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+\begin{document}
+
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：齋藤　翔太\\
+報告日：2026年7月7日\\
+プロジェクト名：タクトーン〜IMUジェスチャーで奏でるArduinoオーケストラ〜
+
+\sectionrule
+
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 今回の作業進捗率：100\%
+  \item マイルストーン達成状況：発表前確認用スケッチにフルートとオルガン音色を追加し，4声の担当楽器と音量バランスを再整理した．
+  \item 主要成果：
+    \begin{itemize}
+      \item {}week10の修正版Processingスケッチをもとに，4声の担当をフルート，トランペット，トロンボーン，オルガンへ変更した．
+      \item {}フルートとオルガンの音色JSONを追加し，スケッチ単体で外部参照なしに再生できる構成を維持した．
+      \item {}フルートは\texttt{tone\_sample}を使う原音サンプル主導の再生にし，倍音合成だけでは出しにくい質感を補った．
+      \item {}ドラム音量を\texttt{DRUM\_AMPLITUDE = 0.095}へ微調整し，旋律4声とのバランスを整えた．
+    \end{itemize}
+  \item 重大課題（影響度：高）：なし．ただし，発表環境での最終的な聴感確認は継続する．
+\end{itemize}
+
+\sectionrule
+
+\section{作業ログ（詳細トラッキング）}
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{35mm}>{\raggedright\arraybackslash}p{16mm}>{\raggedright\arraybackslash}p{16mm}>{\raggedright\arraybackslash}p{15mm}>{\raggedright\arraybackslash}p{12mm}X@{}}
+\hline
+作業項目 & 開始日 & 完了日 & 状態 & 進捗率 & コメント \\
+\hline
+追加音色の準備と解析アプリ側の整理
+  & 7/3 & 7/3 & 完了 & 100\%
+  & フルートとオルガンの音色JSONを追加し，音色ライブラリ形式と解析アプリの説明を更新した．\\
+4声担当楽器の見直し
+  & 7/3 & 7/3 & 完了 & 100\%
+  & チューバとホルンを外し，フルート，トランペット，トロンボーン，オルガンの4声構成に変更した．\\
+フルート再生方式と音量バランスの調整
+  & 7/3 & 7/3 & 完了 & 100\%
+  & フルートは\texttt{tone\_sample}を使う再生にし，\texttt{FLUTE\_SAMPLE\_GAIN}とドラム音量を調整した．\\
+\hline
+\end{tabularx}
+}
+
+\sectionrule
+
+\section{担当箇所のGC}
+
+今回の作業内容に対応する簡易GCを図\ref{fig:saito-gc-current}に示す．
+担当範囲は前回と同じく楽譜・音色確認用スケッチであり，今回は発表前の音色差し替えとバランス調整に作業を集中した．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{Figs/GC.png}
+  \caption{今週分の簡易GC}
+  \label{fig:saito-gc-current}
+\end{figure}
+
+\sectionrule
+
+\section{日ごとの作業時間・作業内容}
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{18mm}>{\raggedright\arraybackslash}p{24mm}XX@{}}
+\hline
+日付 & 作業時間 & 作業内容 & 成果・残課題 \\
+\hline
+7/3 & 1時間 & フルート・オルガン音色の追加と解析アプリ側の整理 & 音色JSONを追加し，フルートには原音サンプルを含む形式を使えるようにした．\\
+7/3 & 1時間 & 4声担当楽器とドラム音量の再調整 & フルート，トランペット，トロンボーン，オルガンの4声構成に変更し，ドラム音量を抑えた．\\
+\hline
+\end{tabularx}
+}
+
+\sectionrule
+
+\section{課題管理}
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{30mm}X>{\raggedright\arraybackslash}p{15mm}>{\raggedright\arraybackslash}p{15mm}X@{}}
+\hline
+課題 & 発生原因 & 影響度 & 状態 & 対策 \\
+\hline
+発表環境での最終音量確認
+  & Processing上で音色と音量を調整したが，教室のスピーカーや周囲の環境では聞こえ方が変わる可能性がある．
+  & 中 & 継続
+  & 発表前に全パートを通して再生し，必要に応じて\texttt{MASTER\_GAIN}，各パートの\texttt{amplitude}，\texttt{DRUM\_AMPLITUDE}を微調整する．\\
+フルート原音サンプルのデータ量
+  & \texttt{tone\_sample}をJSON内に保持するため，フルート音色JSONのサイズが大きくなった．
+  & 低 & 継続
+  & 発表用スケッチでは音質を優先して採用し，必要になった場合だけサンプル長や保存形式を見直す．\\
+\hline
+\end{tabularx}
+}
+
+\sectionrule
+
+\section{AI利用状況と検証（再現性重視）}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item 利用目的：フルート・オルガン音色の追加，4声担当楽器の整理，\texttt{tone\_sample}を使った再生処理，READMEと作業ログの作成補助．
+  \item 入力（プロンプト要旨）：
+    \begin{itemize}
+      \item {}week10の確認用スケッチに，フルートとオルガンを追加して4声構成を作り直すよう依頼した．
+      \item {}フルートの音が倍音合成だけでは不自然になりやすいため，原音サンプルを使う再生方法を相談した．
+      \item {}楽器差し替え後に，ドラムが前に出すぎないよう音量バランスの調整を依頼した．
+      \item {}変更点が第三者にも分かるよう，READMEと作業ログに反映する項目を整理するよう依頼した．
+    \end{itemize}
+  \item 出力概要：4声の担当楽器，\texttt{FLUTE\_SAMPLE\_GAIN}，\texttt{DRUM\_AMPLITUDE}，\texttt{tone\_sample}の読み込み・ループ再生処理，README更新案が提示された．
+\end{itemize}
+
+\sectionrule
+
+\subsection{検証方法}
+
+\begin{itemize}
+  \item 検証手法：AIの出力をそのまま採用せず，リポジトリ内のスケッチ，README，音色JSON，Git履歴を照合した．
+  \item 検証手順：
+    \begin{enumerate}
+      \item {}\texttt{MELODY\_PARTS}がフルート，トランペット，トロンボーン，オルガンの4声構成になっていることを確認した．
+      \item {}4声の開始拍が0，8，16，24拍であり，共通の\texttt{MELODY\_SCORE}を使っていることを確認した．
+      \item {}\texttt{flute.tweaked.instrument.json}と\texttt{organ.tweaked.instrument.json}が\texttt{data/}に追加されていることを確認した．
+      \item {}フルート音色JSONに\texttt{tone\_sample}があり，スケッチ側で\texttt{ToneSampleUGen}を使う処理があることを確認した．
+      \item {}READMEに4声担当，音域，音量調整値，実行方法が整理されていることを確認した．
+    \end{enumerate}
+\end{itemize}
+
+\sectionrule
+
+\subsection{ファクトチェック結果}
+
+\begin{itemize}
+  \item 一致点：\texttt{MELODY\_PARTS}にはフルート，トランペット，トロンボーン，オルガンが設定され，ドラム音量は\texttt{DRUM\_AMPLITUDE = 0.095}に変更されていた．
+  \item 未実施項目：Processingの実行環境での長時間再生確認と，発表会場のスピーカーを使った最終確認は未実施である．
+  \item 最終判断：フルート・オルガンを含む4声確認用スケッチを今回の成果として記載し，環境依存の聴感確認は次回の課題として扱う．
+\end{itemize}
+
+\sectionrule
+
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：発表前にフルート・トランペット・トロンボーン・オルガン・ドラムを通しで再生し，発表環境での聞こえ方を確認する．
+  \item 達成基準：旋律4声とドラムが極端に埋もれたり音割れしたりせず，声部の入りが分かることを確認する．
+  \item 次の作業：必要に応じて，\texttt{MASTER\_GAIN}，各パートの\texttt{amplitude}，\texttt{FLUTE\_SAMPLE\_GAIN}，\texttt{DRUM\_AMPLITUDE}を微調整する．
+  \item 将来の作業：Arduino側の楽譜データへ反映する必要が生じた場合は，実機での動作確認を行う．
+\end{itemize}
+
+\sectionrule
+
+\section{付録}
+
+\begin{itemize}
+  \item 成果物：\texttt{work/saito/week10/kaeru\_score\_week10\_adjusted/}以下のProcessingスケッチ，音色JSON，README．
+  \item リポジトリ：\texttt{https://github.com/takushio2525/2026-hackathon-team23}
+\end{itemize}
+
+\end{document}
