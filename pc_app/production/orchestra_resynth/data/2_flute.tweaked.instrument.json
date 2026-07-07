@@ -1237,7 +1237,7 @@
    "ratio": 7
   },
   {
-   "amp": 0.00008,
+   "amp": 8e-05,
    "amp_db": -81.95,
    "env": [
     0.0736,
@@ -1319,7 +1319,7 @@
    "ratio": 9
   },
   {
-   "amp": 0.00002,
+   "amp": 2e-05,
    "amp_db": -96.14,
    "env": [
     0.1751,
@@ -1975,16 +1975,16 @@
    "ratio": 30
   }
  ],
- "inharmonicity_b": 0.0000486,
+ "inharmonicity_b": 4.86e-05,
  "instrument_profile": "auto",
  "instrument_profile_label": "自動",
  "midi_note": 72,
  "modulation": {
   "vibrato": {
    "rate_hz": 5.7,
-   "depth_cents": 9,
-   "depth": 0.09,
-   "onset_sec": 0.2,
+   "depth_cents": 20,
+   "depth": 0.2,
+   "onset_sec": 0.35,
    "shape": "sine",
    "regularity": 0,
    "detected": true
@@ -2948,7 +2948,7 @@
    0.0134,
    0.0145
   ],
-  "level": 0.0028,
+  "level": 0.022,
   "rate_hz": 200
  },
  "note_name": "C5",

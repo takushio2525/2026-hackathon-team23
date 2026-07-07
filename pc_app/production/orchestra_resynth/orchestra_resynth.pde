@@ -30,7 +30,7 @@ import java.io.File;
 final int MAX_POLYPHONY = 24;
 
 float   masterVolume  = 0.55f;
-boolean useSimpleADSR = true;
+boolean useSimpleADSR = false;
 
 // ── オーディオ (共通タブの AudioManager/DrumEngine が参照) ──
 Minim       minim;

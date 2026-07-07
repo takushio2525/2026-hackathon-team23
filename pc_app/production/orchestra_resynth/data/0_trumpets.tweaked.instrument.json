@@ -3979,12 +3979,12 @@
  "created_at": "2026-06-16T06:13:34Z",
  "duration_sec": 15.3994,
  "envelope": {
-  "attack_sec": 0.33,
+  "attack_sec": 0.02,
   "decay_sec": 0.075,
   "loop_end_sec": 10.095,
   "loop_start_sec": 4.515,
   "rate_hz": 77.925,
-  "release_sec": 1,
+  "release_sec": 0.15,
   "sustain_level": 0.6756,
   "values": [
    0.1341,
@@ -5195,7 +5195,7 @@
   "source_duration_sec": 16.344,
   "spectral_bandwidth_hz": 1160.5,
   "spectral_centroid_hz": 1534.7,
-  "spectral_flatness": 0.00001,
+  "spectral_flatness": 1e-05,
   "spectral_rolloff_hz": 2164.7,
   "trimmed_lead_sec": 0,
   "trimmed_trail_sec": 0.944,
@@ -6148,7 +6148,7 @@
    "ratio": 22.9844
   },
   {
-   "amp": 0.00007,
+   "amp": 7e-05,
    "amp_db": -83.56,
    "env": [
     0.2045,
@@ -6189,7 +6189,7 @@
    "ratio": 23.9578
   },
   {
-   "amp": 0.00007,
+   "amp": 7e-05,
    "amp_db": -83.37,
    "env": [
     0.1256,
@@ -6230,7 +6230,7 @@
    "ratio": 25.0161
   },
   {
-   "amp": 0.00007,
+   "amp": 7e-05,
    "amp_db": -83.19,
    "env": [
     0.0545,
@@ -6271,7 +6271,7 @@
    "ratio": 25.9588
   },
   {
-   "amp": 0.00007,
+   "amp": 7e-05,
    "amp_db": -83,
    "env": [
     0.1563,
@@ -6353,7 +6353,7 @@
    "ratio": 27.9523
   },
   {
-   "amp": 0.00007,
+   "amp": 7e-05,
    "amp_db": -82.64,
    "env": [
     0.2474,
@@ -6394,7 +6394,7 @@
    "ratio": 28.952
   },
   {
-   "amp": 0.00008,
+   "amp": 8e-05,
    "amp_db": -82.47,
    "env": [
     0.2215,
@@ -6442,12 +6442,12 @@
  "modulation": {
   "vibrato": {
    "rate_hz": 5.5,
-   "depth_cents": 0,
-   "depth": 0,
-   "onset_sec": 0,
+   "depth_cents": 5,
+   "depth": 0.05,
+   "onset_sec": 0.5,
    "shape": "sine",
    "regularity": 0,
-   "detected": false
+   "detected": true
   },
   "tremolo": {
    "rate_hz": 5,

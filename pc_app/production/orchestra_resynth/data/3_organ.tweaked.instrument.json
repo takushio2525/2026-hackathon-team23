@@ -2426,7 +2426,7 @@
   "source_duration_sec": 4.455,
   "spectral_bandwidth_hz": 1303.1,
   "spectral_centroid_hz": 969.7,
-  "spectral_flatness": 0.00003,
+  "spectral_flatness": 3e-05,
   "spectral_rolloff_hz": 1697.9,
   "trimmed_lead_sec": 0,
   "trimmed_trail_sec": 1.287,
@@ -3256,7 +3256,7 @@
    "ratio": 20
   },
   {
-   "amp": 0.00009,
+   "amp": 9e-05,
    "amp_db": -80.54,
    "env": [
     0.9868,
@@ -3297,7 +3297,7 @@
    "ratio": 21
   },
   {
-   "amp": 0.00003,
+   "amp": 3e-05,
    "amp_db": -89.58,
    "env": [
     0.999,
@@ -3338,7 +3338,7 @@
    "ratio": 22
   },
   {
-   "amp": 0.00004,
+   "amp": 4e-05,
    "amp_db": -87.71,
    "env": [
     0.992,
@@ -3379,7 +3379,7 @@
    "ratio": 23
   },
   {
-   "amp": 0.00002,
+   "amp": 2e-05,
    "amp_db": -96.06,
    "env": [
     0.9783,
@@ -3420,7 +3420,7 @@
    "ratio": 24
   },
   {
-   "amp": 0.00001,
+   "amp": 1e-05,
    "amp_db": -97.71,
    "env": [
     0.9596,
@@ -3502,7 +3502,7 @@
    "ratio": 26
   },
   {
-   "amp": 0.00001,
+   "amp": 1e-05,
    "amp_db": -104.19,
    "env": [
     0.9936,
@@ -3584,7 +3584,7 @@
    "ratio": 28
   },
   {
-   "amp": 0.00001,
+   "amp": 1e-05,
    "amp_db": -104.65,
    "env": [
     0.9919,
@@ -3666,7 +3666,7 @@
    "ratio": 32
   },
   {
-   "amp": 0.00001,
+   "amp": 1e-05,
    "amp_db": -105.58,
    "env": [
     0.9872,
@@ -3707,7 +3707,7 @@
    "ratio": 33
   }
  ],
- "inharmonicity_b": 0.0000932,
+ "inharmonicity_b": 9.32e-05,
  "instrument_profile": "organ",
  "instrument_profile_label": "オルガン",
  "midi_note": 60,
@@ -3722,13 +3722,13 @@
    "detected": false
   },
   "tremolo": {
-   "rate_hz": 5,
-   "depth": 0,
+   "rate_hz": 6.0,
+   "depth": 0.06,
    "depth_cents": 0,
-   "onset_sec": 0,
+   "onset_sec": 0.3,
    "shape": "sine",
    "regularity": 0,
-   "detected": false
+   "detected": true
   }
  },
  "name": "organ (調整)",

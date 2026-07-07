@@ -2,12 +2,12 @@
  "created_at": "2026-06-16T06:16:28Z",
  "duration_sec": 16.6358,
  "envelope": {
-  "attack_sec": 0.405,
+  "attack_sec": 0.08,
   "decay_sec": 0.37,
   "loop_end_sec": 10.675,
   "loop_start_sec": 4.815,
   "rate_hz": 72.133,
-  "release_sec": 1,
+  "release_sec": 0.3,
   "sustain_level": 0.7249,
   "values": [
    0.0708,
