@@ -92,7 +92,7 @@ int brassOctaveShift(int instrumentId){
   switch (instrumentId){
     case 0: return  12;   // トランペット → C5
     case 1: return   0;   // ホルン → C4
-    case 2: return   0;   // フルート → C4
+    case 2: return  12;   // フルート → C5
     case 3: return -12;   // オルガン → C3
     default: return  0;
   }
