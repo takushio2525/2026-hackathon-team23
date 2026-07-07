@@ -34,12 +34,25 @@ void refreshPorts(){
   try {
     availablePorts = Serial.list();
   } catch (Exception e){
-    // macOS で Bluetooth 等の仮想ポートが原因で StringIndexOutOfBoundsException が発生する
-    println("[警告] Serial.list() 失敗: " + e.getMessage());
-    availablePorts = new String[0];
+    println("[警告] Serial.list() 失敗 (" + e.getClass().getSimpleName() + "): " + e.getMessage());
+    availablePorts = listPortsFallback();
+    println("[情報] フォールバック: /dev/cu.* から " + availablePorts.length + " ポート検出");
   }
   rebuildDisplayPorts();
   println("Serial ports (usbOnly=" + usbOnly + "): " + availablePorts.length + " 個");
+}
+
+// Serial.list() が JSSC 内部で例外を投げる場合のフォールバック
+String[] listPortsFallback(){
+  File dev = new File("/dev");
+  File[] files = dev.listFiles(new java.io.FilenameFilter(){
+    public boolean accept(File dir, String name){ return name.startsWith("cu."); }
+  });
+  if (files == null) return new String[0];
+  String[] result = new String[files.length];
+  for (int i = 0; i < files.length; i++) result[i] = files[i].getAbsolutePath();
+  java.util.Arrays.sort(result);
+  return result;
 }
 
 void rebuildDisplayPorts(){
