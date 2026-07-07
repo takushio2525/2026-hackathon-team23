@@ -31,7 +31,13 @@ boolean isUsbSerialName(String name){
 }
 
 void refreshPorts(){
-  availablePorts = Serial.list();
+  try {
+    availablePorts = Serial.list();
+  } catch (Exception e){
+    // macOS で Bluetooth 等の仮想ポートが原因で StringIndexOutOfBoundsException が発生する
+    println("[警告] Serial.list() 失敗: " + e.getMessage());
+    availablePorts = new String[0];
+  }
   rebuildDisplayPorts();
   println("Serial ports (usbOnly=" + usbOnly + "): " + availablePorts.length + " 個");
 }
