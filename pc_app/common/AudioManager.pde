@@ -87,13 +87,13 @@ AudioSample createRecordedDrumSample(DrumTimbreData timbre){
   return minim.createSample(timbre.drumSample, format, 512);
 }
 
-// 齋藤版と同じオクターブ移調
+// パート別オクターブ移調
 int brassOctaveShift(int instrumentId){
   switch (instrumentId){
     case 0: return  12;   // トランペット → C5
     case 1: return   0;   // ホルン → C4
-    case 2: return -12;   // トロンボーン → C3
-    case 3: return -12;   // チューバ → C3
+    case 2: return   0;   // フルート → C4
+    case 3: return -12;   // オルガン → C3
     default: return  0;
   }
 }
@@ -102,8 +102,8 @@ float brassPartAmplitude(int instrumentId){
   switch (instrumentId){
     case 0: return 0.20f;  // トランペット
     case 1: return 0.17f;  // ホルン
-    case 2: return 0.18f;  // トロンボーン
-    case 3: return 0.25f;  // チューバ
+    case 2: return 0.18f;  // フルート
+    case 3: return 0.25f;  // オルガン
     default: return 0.18f;
   }
 }

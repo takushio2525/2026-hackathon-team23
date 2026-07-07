@@ -54,14 +54,14 @@ ConcurrentLinkedQueue<byte[]> packetQueue = new ConcurrentLinkedQueue<byte[]>();
 
 // ── ノード別状態 ─────────────────────────────────────────
 final int NODE_COUNT = 6;  // node_01〜06
-final String[] NODE_NAMES = {"指揮者", "Trumpet", "Horn", "Trombone", "Tuba", "Drum"};
+final String[] NODE_NAMES = {"指揮者", "Trumpet", "Horn", "Flute", "Organ", "Drum"};
 final int[] NODE_PART_IDS  = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 final int[] NODE_COLORS    = {
   0xFF3C8FFF,  // 指揮者: 青
   0xFFFF6B4A,  // Trumpet: 赤
   0xFF4CAF50,  // Horn: 緑
-  0xFFFF9800,  // Trombone: オレンジ
-  0xFF9C27B0,  // Tuba: 紫
+  0xFFFF9800,  // Flute: オレンジ
+  0xFF9C27B0,  // Organ: 紫
   0xFF795548   // Drum: 茶
 };
 
