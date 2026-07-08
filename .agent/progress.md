@@ -454,3 +454,5 @@
 - 2026-06-27: `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` を `main` の同じ場所に取り込み。最新調整（チューバ0.36、ドラム0.11、金管attack短縮）込みで Processing ビルド成功。
 - 2026-07-01: `umezawa_work` の docs 更新だけを `main` に取り込み、旧ページ削除と新しい system/implementation/history 構成への再編を反映。
   `main` 側の延期日程（7/8 成果発表・7/15 振り返り）を競合解消時に継承し、`npm run build` で84ページの生成成功を確認。
+
+- 2026-07-08: `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` からフルート・オルガン版 Processing スケッチを `main` の同じ場所へ反映。`jq empty` と `processing-java --build` が成功。

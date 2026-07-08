@@ -5,23 +5,24 @@
 
 ## 現在の対象
 
-- MOP 検証システムの品質保証レビュー（MOP 別に順次実施中）
-- MOP7（起動時間）レビュー完了・コミット・プッシュ済み
+- `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` を `main` の同じ場所へ反映
+- フルート・オルガン音色を含む Processing スケッチのコミット・プッシュ
 
 ## 直近の観点
 
-MOP7 レビューで修正した 4 点:
-1. 指揮者 READY 条件: `beatNo>0`（ユーザー操作後）→ Calibrating 完了で Conducting/Menu 遷移（純粋な起動時間）
-2. 楽器ノードに SYNC マイルストーン追加（時刻同期完了の計測が欠落していた）
-3. Python が device_ms を優先して起動時間を算出するよう改善
-4. evaluation.md に検証方法の妥当性評価を記載
+- `saitou-work` から該当フォルダだけを `main` に `git restore --source=saitou-work` で取り込み。
+- 反映対象:
+  - `work/saito/week10/kaeru_score_week10_adjusted/kaeru_score_week10_adjusted.pde`
+  - `work/saito/week10/kaeru_score_week10_adjusted/README.md`
+  - `work/saito/week10/kaeru_score_week10_adjusted/data/flute.tweaked.instrument.json`
+  - `work/saito/week10/kaeru_score_week10_adjusted/data/organ.tweaked.instrument.json`
+- JSON 検証: `jq empty` 成功。
+- Processing 検証: `processing-java --build` 成功。
 
 ## 次の一手
 
-- 残りの MOP レビュー（MOP6, MOP9 等）を順次実施
-- 実機テストで MOP7 の READY millis 値を確認し evaluation.md に記録
+- 実機・発表環境では Processing 4 で `work/saito/week10/kaeru_score_week10_adjusted/kaeru_score_week10_adjusted.pde` を開いて聴感確認する。
 
 ## 現フェーズで Read すべき設計書
 
-- MOP 検証方法: `.agent/api.md` の MOP 定義
-- ファーム構造: `.agent/architecture.md`
+- 音色・Processing 作業確認: `work/saito/week10/kaeru_score_week10_adjusted/README.md`
