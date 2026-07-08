@@ -103,7 +103,7 @@ float brassPartAmplitude(int instrumentId){
     case 0: return 0.20f;  // トランペット
     case 1: return 0.17f;  // ホルン
     case 2: return 0.15f;  // フルート（C5移調後、高域が目立つため抑え目に）
-    case 3: return 0.25f;  // オルガン
+    case 3: return 0.50f;  // オルガン
     default: return 0.18f;
   }
 }
