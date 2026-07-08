@@ -453,3 +453,17 @@
 - 2026-06-26: main に残っていた `1093f04` 由来の説明を対象ファイルを絞って修正。`pc_app/production/README.md` から C2/1.40 の説明を削除し、`firmware/production/README.md` と node_06 のヘッダコメントを現行ドラム譜に合わせた。実行コード本体は変更していない。
 - 2026-06-27: `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` を `main` の同じ場所に取り込み。最新調整（チューバ0.36、ドラム0.11、金管attack短縮）込みで Processing ビルド成功。
 - 2026-06-30: `umezawa_work` に梅澤week9作業ログを作成。6月29日のdocs更新（1時間30分）を記録し、TeXと3ページのPDFを生成・目視確認した。
+- 2026-07-04: 梅澤版sound_labにtest_multi互換モードを追加。固定倍音＋線形ADSR試聴、ホルン専用解析、音域試聴、番号付き互換JSON出力に対応。
+  トランペットC5/523.444Hz・ホルンC4/261.722Hzの実解析と、互換JSONを使ったtest_multi Processingビルド成功を確認。
+- 2026-07-06: `instrument_player` に旧 `pc_app/test_multi` 互換再生を追加。同じ新仕様JSONを固定倍音＋線形ADSRで再生し、倍音env・ノイズ・変調・body FXを一括無効化するボタン／`l` キーを実装。Processing CLI build SUCCESS。
+- 2026-07-07: 改善版と旧版で聴感差が無かったため、`instrument_player/data` のトランペット／ホルンJSONから倍音env・noise・fx・test_multi互換メタデータを削除し、旧test_multiが使う固定倍音＋線形ADSR中心へ簡素化。JSON検証・Processing build・実ロード成功。
+- 2026-07-08: `instrument_player` を現行 `sound_lab.instrument/1` 音響仕様へ完全同期。原音サンプル3種、全fx、ノイズ方式、4種LFO、glide、reverb、balance volumeを実装し、仕様書とエクスポータ注記も更新。
+  Processing CLI build、全JSON構文、JS構文、最新`0708_2trumpets`の実起動ロードを確認。
+- 2026-07-08: `sound_lab/local_canon_check` に通信なし輪唱チェッカーを追加。production同等の金管4声＋56拍ドラムをPC内の単一タイムラインで再生し、単独再生・停止・音量調整に対応。
+  共通合成コード／production音色JSONを参照し、Processing CLI build成功・通信依存なしを確認。
+- 2026-07-08: Processing IDEで共通タブのシンボリックリンクが別スケッチ扱いになる問題を修正。4つの共通PDEタブを実体ファイル化し、CLI buildを再確認。
+- 2026-07-08: `work/umezawa/hck/week10/` に第10週作業ログを作成。7月4日〜8日のsound_lab開発を記録し、upLaTeXで4ページのPDFを生成した。
+  全ページを画像化して表・図・改ページを確認し、LaTeX警告なしを確認。作業時間は根拠がないため「未記録」とした。
+- 2026-07-08: week10作業ログの主題をトランペットとホルンの音色改善へ変更。輪唱チェッカーは補助成果へ整理し、PDF再生成・全4ページ目視確認・LaTeX警告なしを確認。
+- 2026-07-08: `sound_lab/analyzer` の単一楽器JSON書き出しを監査・修正。欠落していたmaster volumeを保存し、全60 UI値を`fx.studio_state`へ記録、ProcessingもFX後段で音量反映。
+  Node書き出し回帰テスト（60/60項目）、JS構文、Processing CLI build、diff check成功。
