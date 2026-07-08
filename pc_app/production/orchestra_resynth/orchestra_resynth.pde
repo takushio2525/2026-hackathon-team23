@@ -29,7 +29,7 @@ import java.io.File;
 // ── production 固有設定 ──────────────────────────────────
 final int MAX_POLYPHONY = 24;
 
-float   masterVolume  = 0.85f;
+float   masterVolume  = 2.0f;
 boolean useSimpleADSR = false;
 
 // ── オーディオ (共通タブの AudioManager/DrumEngine が参照) ──
@@ -657,8 +657,8 @@ void keyPressed(){
   if (c=='i'){ rescanInstruments(); return; }
   if (c=='t'){ playTestChord(); return; }
   if (c=='a'){ useSimpleADSR = !useSimpleADSR; println("包絡: " + (useSimpleADSR ? "ADSR4値" : "実エンベロープ")); return; }
-  if (c=='+' || c=='='){ masterVolume = constrain(masterVolume + 0.05f, 0.05f, 2.0f); return; }
-  if (c=='-' || c=='_'){ masterVolume = constrain(masterVolume - 0.05f, 0.05f, 2.0f); return; }
+  if (c=='+' || c=='='){ masterVolume = constrain(masterVolume + 0.05f, 0.05f, 4.0f); return; }
+  if (c=='-' || c=='_'){ masterVolume = constrain(masterVolume - 0.05f, 0.05f, 4.0f); return; }
   if (c==' '){ stopAll(); return; }
   if (c>='0' && c<='3'){ playTestNoteOnInstrument(c - '0'); return; }
   if (c=='f'){

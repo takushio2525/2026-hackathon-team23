@@ -25,7 +25,7 @@ class ResynthVoice extends UGen {
   ResynthVoice(InstrModel model, int midi, float velocity, boolean simple){
     this.m = model; this.midiNote = midi;
     this.targetF0 = 440f * pow(2, (midi-69)/12.0f);
-    this.gain = constrain(velocity, 0, 1.5f);
+    this.gain = constrain(velocity, 0, 4.0f);
     this.simpleADSR = simple;
     phase = new float[m.N];
     for (int i=0;i<m.N;i++) phase[i] = m.harmPhase[i];
