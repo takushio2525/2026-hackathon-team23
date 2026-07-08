@@ -1,0 +1,285 @@
+%================================================================
+% 作業ログ 2026-07-07（発表会前日・最終調整）
+%   音源差し替え，Processing バグ修正，ゲームモード修正，
+%   音質改善，MOP 検証．
+%
+%   ビルド:
+%     cd work/shiozawa/work-0707/作業ログ0707
+%     docker run --rm -v "$(pwd):/workspace" -w /workspace \
+%       ghcr.io/paperist/texlive-ja:debian latexmk 作業ログ0707.tex
+%================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+
+% --- 余白 ---
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+
+% --- 表・箇条書き・図・色 ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[table]{xcolor}
+\usepackage{amssymb}
+
+% --- 段落間隔（Wordのような見た目に寄せる）---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+% --- セクション見出しを「番号. 太字」+ 章末に水平線を入れる ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.0em}{0.4em}
+
+% --- 章末水平線（手で \sectionrule と書いて区切る）---
+\newcommand{\sectionrule}{\par\medskip\noindent\rule{\linewidth}{0.6pt}\par\medskip}
+
+% --- 箇条書きの記号を Word 風（・→○→数字）に揃える ---
+\renewcommand{\labelitemi}{\textbullet}
+\renewcommand{\labelitemii}{\textopenbullet}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.1em,topsep=0.2em}
+\setlist[enumerate]{leftmargin=2.0em,itemsep=0.1em,topsep=0.2em}
+
+% \textopenbullet が無い環境向けのフォールバック
+\providecommand{\textopenbullet}{\ensuremath{\circ}}
+
+% --- 進捗ガントチャート用（グリッド表）---
+\definecolor{barDone}{gray}{0.55} % 完了
+\definecolor{barProg}{gray}{0.78} % 進行中
+\definecolor{barPlan}{gray}{0.90} % 予定
+\definecolor{nowCol}{gray}{0.30}  % 今週の見出し
+\newcolumntype{G}{>{\centering\arraybackslash}p{2.0em}}
+\newcommand{\bD}{\cellcolor{barDone}}
+\newcommand{\bP}{\cellcolor{barProg}}
+\newcommand{\bQ}{\cellcolor{barPlan}}
+
+\begin{document}
+
+%================================================================
+% ヘッダ
+%================================================================
+{\LARGE\bfseries 作業ログ}\par\bigskip
+
+報告者：塩澤 匠生
+
+報告日：2026年7月7日
+
+プロジェクト名：タクトーン~ IMUジェスチャーで奏でるArduinoオーケストラ~ \\
+
+\sectionrule
+
+%================================================================
+% 1. 進捗サマリー
+%================================================================
+\section{進捗サマリー（要約）}
+
+\begin{itemize}
+  \item 全体進捗率：95\%（先週 90\% → 95\%．発表会前日の最終調整として
+        音源差し替え・バグ修正・音質改善・MOP 検証を実施）
+  \item 進捗状況（今週の変化）：
+    \begin{itemize}
+      \item 本番音源をチューバ/トロンボーンからフルート/オルガンに差し替え
+      \item Processing の画面描画バグ（Serial.list() 例外）を修正
+      \item 横振りによるゲームモード選択が 2 回目以降動作しないバグを修正
+      \item 音色の ADSR・倍音エンベロープ・エフェクトを改善し，フルートを 1 オクターブ上げ
+      \item MOP 検証を実施（検証プログラムによる評価）
+    \end{itemize}
+  \item 今週の主要成果：
+    \begin{itemize}
+      \item 発表会デモに向けた音源・音質の最終調整が完了
+      \item 実機で発生していたクラッシュ・動作不良を解消
+      \item MOP 検証で品質指標の達成状況を確認
+    \end{itemize}
+  \item 重大課題（影響度：なし）：
+    \begin{itemize}
+      \item {}[明日 7/8 の発表会に向け，準備完了]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 2. 進捗ガントチャート（計画と現在地）
+%================================================================
+\section{進捗ガントチャート（計画と現在地）}
+
+チームのガントチャート（\texttt{meetings/ガントチャーver1ト.xlsx}）のフェーズ区分（110 基本設計／
+120 詳細設計／200 実装／300 テスト／400 ストレッチ）に，現在の進み具合を重ねたもの．
+「今」の縦位置は本報告時点（7/7＝発表会前日）．
+
+\medskip
+{\footnotesize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}p{8.5em}|*{12}{G}@{}}
+ & & & & & & & & & & & & \multicolumn{1}{c}{$\downarrow$今} \\
+作業項目（フェーズ）
+ & \cellcolor{barPlan}\tiny 4/15 & \cellcolor{barPlan}\tiny 4/22 & \cellcolor{barPlan}\tiny 4/29
+ & \cellcolor{barPlan}\tiny 5/6 & \cellcolor{barPlan}\tiny 5/13 & \cellcolor{barPlan}\tiny 5/20
+ & \cellcolor{barPlan}\tiny 5/27 & \cellcolor{barPlan}\tiny 6/3 & \cellcolor{barPlan}\tiny 6/10
+ & \cellcolor{barPlan}\tiny 6/17 & \cellcolor{barPlan}\tiny 6/24 & \cellcolor{nowCol}\tiny\textcolor{white}{7/8} \\
+\midrule
+企画・テーマ決定        & \bD & \bD &     &     &     &     &     &     &     &     &     &     \\
+110 基本設計            &     &     & \bD & \bD &     &     &     &     &     &     &     &     \\
+120 詳細設計            &     &     &     &     & \bD &     &     &     &     &     &     &     \\
+\textbf{200 実装}       &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad test\_v2 輪唱・同期 &     &     &     & \bD & \bD & \bD & \bD &     &     &     &     &     \\
+\quad test\_v3 ゲーム(firmware) &  &     &     &     &     & \bD & \bD & \bD & \bD &     &     &     \\
+\quad test\_v3 Processing &   &     &     &     &     &     & \bD & \bD & \bD &     &     &     \\
+\quad production 構築    &     &     &     &     &     &     &     &     &     &     & \bD & \bD \\
+\textbf{300 テスト}     &     &     &     &     &     &     &     &     &     &     &     &     \\
+\quad 単体・結合・システム &   &     &     &     &     &     &     &     & \bD & \bD & \bD &     \\
+\quad 評価（精度・遅延） &     &     &     &     &     &     &     &     &     &     & \bD & \bD \\
+400 ストレッチ（強弱ほか） &  &     &     &     &     &     &     & \bQ & \bQ &     &     &     \\
+発表会                  &     &     &     &     &     &     &     &     &     &     &     & \multicolumn{1}{c}{$\bigstar$} \\
+\bottomrule
+\end{tabular}
+}
+
+\medskip
+凡例：\colorbox{barDone}{~~}~完了 \quad \colorbox{barProg}{~~}~進行中 \quad
+\colorbox{barPlan}{~~}~予定 \quad $\bigstar$~発表会（7/8）
+
+\medskip
+※ 今週は発表会前日の最終調整として，音源差し替え・バグ修正・音質改善・MOP 検証を実施．
+明日 7/8 の発表会に向けて準備完了の状態．
+
+\sectionrule
+
+%================================================================
+% 3. 作業ログ（詳細トラッキング）
+%================================================================
+\section{作業ログ（詳細トラッキング）}
+
+\begin{tabularx}{\linewidth}{@{}p{10em}p{6em}p{4em}p{3em}X@{}}
+\toprule
+作業項目 & 実施日 & 作業時間 & 進捗 & コメント \\
+\midrule
+音源差し替え & 2026-07-07 & 20 分 & 100\% & チューバ/トロンボーンの音源をフルート/オルガンに差し替え．音色 JSON の入替と AudioManager の読込パス修正 \\
+Processing バグ修正 & 2026-07-07 & 40 分 & 100\% & 本番用 Processing の画面が描画されない問題を修正．Serial.list() の例外保護とポート検出のフォールバック処理を追加 \\
+ゲームモード選択修正 & 2026-07-07 & 20 分 & 100\% & 横振りによるゲームモード選択が 2 回目以降動作しないバグを修正（applyPattern.cpp のナビゲート状態リセット） \\
+音質改善 & 2026-07-07 & 40 分 & 100\% & 音色の ADSR・倍音エンベロープ・エフェクトを改善．フルートを 1 オクターブ上げて C5 に変更し，音域の分離を改善 \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{ソフトウェア 小計}} & \textbf{120 分} & & \\
+\midrule
+MOP 検証 & 2026-07-07 & 120 分 & 100\% & 検証プログラム（serial\_logger.py, analyze.py）を用いて MOP 項目の達成状況を評価．実機ログを収集し PASS/FAIL を判定 \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{合計}} & \textbf{240 分} & & \\
+\bottomrule
+\end{tabularx}
+
+\sectionrule
+
+%================================================================
+% 4. 課題管理
+%================================================================
+\section{課題管理}
+
+\begin{tabularx}{\linewidth}{@{}p{8em}Xp{2.5em}p{2.5em}Xp{3em}@{}}
+\toprule
+課題 & 発生原因 & 影響度 & 優先度 & 対策 & 状態 \\
+\midrule
+Processing 画面描画不可 & Serial.list() が環境依存で例外を投げる & 高 & 高 & 例外保護＋ポート検出フォールバックを追加 & 解決済 \\
+ゲームモード 2 回目不可 & ナビゲート発火後の状態リセット漏れ & 中 & 高 & applyPattern.cpp で発火後に強制 Idle 復帰 & 解決済 \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+※影響度＝プロジェクトへのインパクト，優先度＝対応の緊急性
+
+\sectionrule
+
+%================================================================
+% 5. AI利用状況と検証
+%================================================================
+\section{AI利用状況と検証(再現性重視)}
+
+\subsection{利用内容}
+
+\begin{itemize}
+  \item Claude Code を用いて Processing のバグ修正・音源差し替え・音質改善・
+        ゲームモード選択のバグ修正を実施
+  \item 具体的には SerialCore.pde の例外保護，AudioManager.pde の音色パラメータ調整，
+        applyPattern.cpp のナビゲート状態リセット処理の生成を支援
+  \item 生成コードは \texttt{pio run} でビルド成功を確認し，実機テストで動作検証済み
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 6. 次回計画
+%================================================================
+\section{次回計画}
+
+\begin{itemize}
+  \item 目標：
+    \begin{itemize}
+      \item {}[7/8 発表会でデモを成功させる]
+      \item {}[振り返りレポートの準備を開始する]
+    \end{itemize}
+  \item 達成基準：
+    \begin{itemize}
+      \item {}[発表会で指揮→楽器→PC の一連の流れが正常に動作する]
+      \item {}[ゲームモードの選択・採点が正しく機能する]
+    \end{itemize}
+  \item 期限：
+    \begin{itemize}
+      \item {}[7/8 発表会当日]
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 7. その他
+%================================================================
+\section{その他}
+
+\begin{itemize}
+  \item {}[今週は発表会前日の最終調整に集中した．
+        音源をチューバ/トロンボーンからフルート/オルガンに差し替えたのは，
+        実機テストでの聴感評価を踏まえた判断]
+  \item {}[Processing の Serial.list() が環境依存で例外を投げ，
+        画面が描画されないクリティカルなバグを発見・修正した．
+        ポート検出のフォールバック処理も追加し，異なる PC 環境でも
+        安定して起動するようにした]
+  \item {}[音色の ADSR・倍音エンベロープ・エフェクトを改善し，
+        フルートを 1 オクターブ上げて C5 に変更することで，
+        金管との音域分離を改善した]
+  \item {}[MOP 検証を 2 時間かけて実施し，検証プログラムで
+        各項目の達成状況を評価した]
+  \item {}[明日 7/8 が発表会．本番環境は全バグ修正済みで，
+        デモ可能な状態]
+\end{itemize}
+
+\sectionrule
+
+%================================================================
+% 8. 付録
+%================================================================
+\section{付録}
+
+\begin{itemize}
+  \item 添付資料：
+    \begin{itemize}
+      \item GitHub リポジトリ：\url{https://github.com/takushio2525/2026-hackathon-team23}
+    \end{itemize}
+  \item 主要コミット（塩澤担当分）：
+    \begin{itemize}
+      \item \texttt{f2c0757} --- チューバ・トロンボーンの音源をフルート・オルガンに差し替え
+      \item \texttt{e7924ab} --- 本番用 Processing の画面が描画されない問題を修正
+      \item \texttt{3e674c7} --- Processing のシリアルポート検出が動作しない問題を修正
+      \item \texttt{63f9044} --- 横振りによるゲームモード選択が 2 回目以降動作しない問題を修正
+      \item \texttt{f88a4ab} --- フルートを 1 オクターブ上げて C5 に変更
+      \item \texttt{c84327a} --- 音色の ADSR・倍音エンベロープ・エフェクトを改善
+    \end{itemize}
+\end{itemize}
+
+\sectionrule
+
+\end{document}
