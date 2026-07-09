@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-MOP5: 指揮→楽器 通信遅延
-指揮者の BEAT 送信時刻と楽器側の受信時刻 (ahead 値) から通信遅延を計測する。
+MOP5: スレーブ間の発音同期 (≤ 30 ms)
+NOTE_ON の PC 受信タイムスタンプで、スレーブ間の発音タイミング差を計測する。
 
-ahead = playAtMs - localMasterMs (受信時点)。
-通信遅延 ≈ beatLookaheadMs - ahead (ahead が小さいほど遅延が大きい)。
+MOP4 が「拍ごとの全ノード最大差」を見るのに対し、MOP5 は
+「各ノードペア間の遅延分布」に焦点を当てる。
 
-MOP_TEST=5:
-  指揮者: M5C,<beatNo>,<sendMs>
-  楽器:   M5I,<partId>,<beatNo>,<recvMs>,<ahead>
+計測原理:
+  各楽器は拍ごとに NOTE_ON をシリアル出力する。PC 側で各ポートの受信
+  タイムスタンプ (time.time()) を記録し、同一拍に属する NOTE_ON の
+  全ノードペア間の時間差を計測して分布を示す。
 
 SERIAL_DEBUG=1:
-  [N1 EVT BEAT] no=<beatNo> t=<ms> playAt=<ms> bpm=<bpm>
-  [NX EVT BEAT] no=<beatNo> playAt=<ms> ahead=<ahead> seq=<seq>
+  [NX EVT BEAT] no=<beatNo> playAt=<ms> ahead=<ms>
+  [NX NOTE_ON ] part=0x0X instr=N note=N vel=N dur=N seq=N t=N
 """
 
 import argparse
+import itertools
 import re
 import signal
 import statistics
@@ -25,23 +27,41 @@ from collections import defaultdict
 
 import common
 
-RE_M5C = re.compile(r'^M5C,(\d+),(\d+)')
-RE_M5I = re.compile(r'^M5I,(\d+),(\d+),(\d+),(-?\d+)')
-RE_BEAT_N1 = re.compile(
-    r'\[N1 EVT BEAT\] no=(\d+) t=(\d+) playAt=(\d+)')
-RE_BEAT_NX = re.compile(
-    r'\[N(\d) EVT BEAT\] no=(\d+) playAt=(\d+) ahead=(-?\d+)')
+THRESHOLD_MS = 30
 
-BEAT_LOOKAHEAD_MS = 45  # ProjectConfig.h の beatLookaheadMs
-THRESHOLD_MS = 10       # MOP-2 目標: ≤ 10 ms (MOPと参考文献メモ.md)
+RE_BEAT_NX = re.compile(
+    r'\[N(\d) EVT BEAT\] no=(\d+)')
+RE_NOTE_ON = re.compile(
+    r'\[N(\d) NOTE_ON\s*\] part=0x(\w+) instr=(\d+) note=(\d+) '
+    r'vel=(\d+) dur=(\d+) seq=(\d+) t=(\d+)')
+
+
+def percentile(data, p):
+    """ソート済みリストから第 p パーセンタイルを線形補間で返す。"""
+    if not data:
+        return 0.0
+    s = sorted(data)
+    k = (len(s) - 1) * p / 100.0
+    f = int(k)
+    c = f + 1 if f + 1 < len(s) else f
+    return s[f] + (s[c] - s[f]) * (k - f)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='MOP5: 指揮→楽器 通信遅延')
-    parser.add_argument('--duration', type=float, default=60)
-    parser.add_argument('--ports', nargs='*')
+    parser = argparse.ArgumentParser(
+        description='MOP5: スレーブ間発音同期 — NOTE_ON ベース')
+    parser.add_argument('--duration', type=float, default=60,
+                        help='計測時間（秒）')
+    parser.add_argument('--ports', nargs='*',
+                        help='シリアルポート（省略で自動検出）')
     parser.add_argument('--baud', type=int, default=115200)
+    parser.add_argument('--log', type=str, default=None,
+                        help='既存ログファイルから解析（リアルタイム計測を省略）')
     args = parser.parse_args()
+
+    if args.log:
+        analyze_log(args.log)
+        return
 
     ports = args.ports or common.find_usb_serial_ports()
     if not ports:
@@ -55,14 +75,16 @@ def main():
         if ser:
             serials.append((p, ser))
 
-    print(f"通信遅延を {args.duration:.0f} 秒間計測します。")
+    print(f"スレーブ間発音同期を {args.duration:.0f} 秒間計測します（NOTE_ON ベース）。")
     print("指揮棒を振って演奏を開始してください。Ctrl+C でも停止できます。")
     print()
 
-    # ahead 値を収集 (楽器側基準: ahead が大きい = 余裕あり = 遅延少ない)
-    ahead_by_node = defaultdict(list)  # nodeId -> [ahead_ms]
+    last_beat = {}  # port -> beatNo
+    # beatNo -> {partId -> pc_timestamp}
+    beat_notes = defaultdict(dict)
+
     ts = common.make_timestamp()
-    csv_fields = ['source', 'beatNo', 'partId', 'ahead_ms', 'est_delay_ms']
+    csv_fields = ['beatNo', 'partId', 'noteNumber', 'device_t', 'pc_timestamp']
     csv_writer, csv_fh, csv_path = common.open_csv(5, csv_fields, ts)
 
     stop = False
@@ -79,80 +101,154 @@ def main():
                 if not text:
                     continue
                 node_mapper.try_detect(p, text)
+                pc_ts = time.time()
 
-                # MOP_TEST=5 楽器側
-                m = RE_M5I.match(text)
+                m = RE_BEAT_NX.search(text)
                 if m:
-                    part_id = int(m.group(1))
-                    beatNo = int(m.group(2))
-                    ahead = int(m.group(4))
-                    delay = BEAT_LOOKAHEAD_MS - ahead
-                    ahead_by_node[part_id].append(ahead)
-                    csv_writer.writerow({
-                        'source': 'instrument',
-                        'beatNo': beatNo,
-                        'partId': f'0x{part_id:02X}',
-                        'ahead_ms': ahead,
-                        'est_delay_ms': delay,
-                    })
-                    csv_fh.flush()
+                    node = int(m.group(1))
+                    if node >= 2:
+                        last_beat[p] = int(m.group(2))
                     continue
 
-                # SERIAL_DEBUG 楽器側
-                m = RE_BEAT_NX.search(text)
+                m = RE_NOTE_ON.search(text)
                 if m:
                     node = int(m.group(1))
                     if node == 1:
                         continue
-                    beatNo = int(m.group(2))
-                    ahead = int(m.group(4))
-                    delay = BEAT_LOOKAHEAD_MS - ahead
-                    ahead_by_node[node].append(ahead)
-                    csv_writer.writerow({
-                        'source': 'instrument',
-                        'beatNo': beatNo,
-                        'partId': f'0x{node:02X}',
-                        'ahead_ms': ahead,
-                        'est_delay_ms': delay,
-                    })
-                    csv_fh.flush()
+                    part_id = int(m.group(2), 16)
+                    note_num = int(m.group(4))
+                    device_t = int(m.group(8))
+                    beat_no = last_beat.get(p)
+                    if beat_no is None:
+                        continue
+                    if part_id not in beat_notes[beat_no]:
+                        beat_notes[beat_no][part_id] = pc_ts
+                        csv_writer.writerow({
+                            'beatNo': beat_no,
+                            'partId': f'0x{part_id:02X}',
+                            'noteNumber': note_num,
+                            'device_t': device_t,
+                            'pc_timestamp': f'{pc_ts:.6f}',
+                        })
+                        csv_fh.flush()
     finally:
         csv_fh.close()
         for _, ser in serials:
             ser.close()
 
-    # ── 結果 ──
-    common.print_header(f'MOP5: 指揮→楽器 通信遅延 (<= {THRESHOLD_MS} ms)')
+    report_results(beat_notes, ts)
+
+
+def analyze_log(log_path):
+    """既存ログファイルから MOP5 を解析する。"""
+    last_beat = {}  # node_id -> beatNo
+    beat_notes = defaultdict(dict)
+
+    with open(log_path) as f:
+        for line in f:
+            line = line.rstrip()
+            parts = line.split('\t', 1)
+            if len(parts) == 2:
+                try:
+                    pc_ts = float(parts[0])
+                except ValueError:
+                    pc_ts = None
+                text = parts[1]
+            else:
+                pc_ts = None
+                text = line
+
+            m = RE_BEAT_NX.search(text)
+            if m:
+                node = int(m.group(1))
+                if node >= 2:
+                    last_beat[node] = int(m.group(2))
+                continue
+
+            m = RE_NOTE_ON.search(text)
+            if m:
+                node = int(m.group(1))
+                if node == 1 or pc_ts is None:
+                    continue
+                part_id = int(m.group(2), 16)
+                beat_no = last_beat.get(node)
+                if beat_no is None:
+                    continue
+                if part_id not in beat_notes[beat_no]:
+                    beat_notes[beat_no][part_id] = pc_ts
+
+    ts = common.make_timestamp()
+    report_results(beat_notes, ts)
+
+
+def report_results(beat_notes, ts):
+    """計測結果を集計・表示する。ノードペアごとの遅延分布を分析する。"""
+    common.print_header(f'MOP5: スレーブ間発音同期 (<= {THRESHOLD_MS} ms)')
     stats_lines = []
 
-    if not ahead_by_node:
-        stats_lines.append('楽器の BEAT 受信データなし。')
+    # ペアごとの遅延を収集
+    pair_diffs = defaultdict(list)  # (min_pid, max_pid) -> [diff_ms]
+    all_max_diffs = []  # 拍ごとの最大ペア差
+
+    for beat_no, parts in sorted(beat_notes.items()):
+        if len(parts) < 2:
+            continue
+        pids = sorted(parts.keys())
+        max_diff = 0.0
+        for a, b in itertools.combinations(pids, 2):
+            diff_ms = abs(parts[a] - parts[b]) * 1000.0
+            pair_diffs[(a, b)].append(diff_ms)
+            max_diff = max(max_diff, diff_ms)
+        all_max_diffs.append(max_diff)
+
+    observed_nodes = set()
+    for parts in beat_notes.values():
+        observed_nodes.update(parts.keys())
+
+    if not all_max_diffs:
+        stats_lines.append('複数ノード同時発音が見つかりません。')
         passed = None
     else:
-        all_delays = []
-        for node_id in sorted(ahead_by_node):
-            aheads = ahead_by_node[node_id]
-            delays = [BEAT_LOOKAHEAD_MS - a for a in aheads]
-            all_delays.extend(delays)
-            p95 = sorted(delays)[int(len(delays) * 0.95)] if len(delays) >= 2 else max(delays)
-            stats_lines.append(
-                f'node_0{node_id}: ahead 平均={statistics.mean(aheads):.1f}ms '
-                f'推定遅延 平均={statistics.mean(delays):.1f}ms '
-                f'p95={p95:.1f}ms 最大={max(delays):.1f}ms (n={len(delays)})')
+        stats_lines.append(f'検出ノード数:     {len(observed_nodes)}')
+        stats_lines.append(f'同時発音拍数:     {len(all_max_diffs)}')
+        stats_lines.append(f'ノードペア数:     {len(pair_diffs)}')
+        stats_lines.append('')
 
-        all_p95 = sorted(all_delays)[int(len(all_delays) * 0.95)] if len(all_delays) >= 2 else max(all_delays)
-        max_delay = max(all_delays)
-        stats_lines.append(f'全体: p95={all_p95:.1f}ms 最大={max_delay:.1f} ms')
-        passed = max_delay <= THRESHOLD_MS
-        stats_lines.append(f'判定: {"PASS" if passed else "FAIL"} (閾値 {THRESHOLD_MS} ms)')
+        stats_lines.append('--- 全ペア合算 ---')
+        all_diffs = []
+        for diffs in pair_diffs.values():
+            all_diffs.extend(diffs)
+        stats_lines.append(f'  平均:   {statistics.mean(all_diffs):.1f} ms')
+        stats_lines.append(f'  p50:    {percentile(all_diffs, 50):.1f} ms')
+        stats_lines.append(f'  p95:    {percentile(all_diffs, 95):.1f} ms')
+        stats_lines.append(f'  最大:   {max(all_diffs):.1f} ms')
+        stats_lines.append('')
+
+        stats_lines.append('--- ノードペア別 ---')
+        max_pair_delay = 0.0
+        for (a, b), diffs in sorted(pair_diffs.items()):
+            mean_d = statistics.mean(diffs)
+            max_d = max(diffs)
+            p95_d = percentile(diffs, 95)
+            max_pair_delay = max(max_pair_delay, max_d)
+            stats_lines.append(
+                f'  node_0{a} - node_0{b}: '
+                f'平均={mean_d:.1f}ms p95={p95_d:.1f}ms '
+                f'最大={max_d:.1f}ms (n={len(diffs)})')
+
+        passed = max_pair_delay <= THRESHOLD_MS
+        stats_lines.append('')
+        stats_lines.append(
+            f'判定: {"PASS" if passed else "FAIL"} '
+            f'(最大ペア遅延 {max_pair_delay:.1f}ms, 閾値 {THRESHOLD_MS} ms)')
 
     for line in stats_lines:
         print(f'  {line}')
 
-    summary_path = common.write_summary(5, ts, passed if passed is not None else False,
-                                        '\n'.join(stats_lines))
-    print(f'\n  CSV:     {csv_path}')
-    print(f'  Summary: {summary_path}')
+    summary_path = common.write_summary(
+        5, ts, passed if passed is not None else False,
+        '\n'.join(stats_lines))
+    print(f'\n  Summary: {summary_path}')
 
 
 if __name__ == '__main__':

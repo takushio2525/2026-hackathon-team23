@@ -7,11 +7,18 @@
 ```
 tools/verification/
 ├── README.md              ← このファイル
-├── requirements.txt       ← Python 依存 (pyserial)
+├── requirements.txt       ← Python 依存 (pyserial, matplotlib, numpy)
+├── .gitignore             ← .venv/ 等を除外
 ├── logs/                  ← ログ保存先
+├── results/               ← 計測 CSV + グラフ
+│   ├── mop1〜9/           ← 各 MOP の計測結果 CSV
+│   └── graphs/            ← mop_graphs.py が生成する PNG
 ├── scripts/
 │   ├── serial_logger.py   ← 複数ポート同時ログ収集
-│   └── analyze.py         ← 全 9 項目 PASS/FAIL 判定
+│   ├── analyze.py         ← 全 9 項目 PASS/FAIL 判定
+│   ├── mop1〜9_*.py       ← 各 MOP の個別計測スクリプト
+│   ├── common.py          ← 計測スクリプト共通処理
+│   └── mop_graphs.py      ← 計測結果のグラフ生成（発表用）
 └── firmware/
     ├── README.md           ← 検証ファームの説明
     ├── main_conductor_perf.cpp   ← MOP8 用 指揮者
@@ -29,6 +36,8 @@ tools/verification/
 
 ```bash
 cd tools/verification
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -228,6 +237,25 @@ MOP1: 拍検出の正確性 (正解率 >= 90%)
 
   PASS=7  FAIL=0  N/A=2
 ```
+
+## グラフ生成（発表用）
+
+計測済み CSV からグラフを生成する:
+
+```bash
+cd tools/verification
+source .venv/bin/activate
+# または .venv/bin/python scripts/mop_graphs.py で直接実行
+
+# 全 MOP のグラフを生成
+python scripts/mop_graphs.py
+
+# 個別指定
+python scripts/mop_graphs.py --mop 1 4 8
+```
+
+`results/graphs/` に各 MOP の PNG が出力される。
+各グラフには目標値ライン（赤破線）と PASS/FAIL 判定がタイトルに表示される。
 
 ## 制約・注意事項
 

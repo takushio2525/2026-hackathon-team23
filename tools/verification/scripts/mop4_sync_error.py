@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-MOP4: 楽器間同期誤差
-各楽器ノードの発音タイミング（マスタクロック同期済み localMasterMs）を比較し、
-同一拍に対する楽器間の発音時刻差を計測する。
+MOP4: 楽器間同期誤差 (≤ 20 ms)
+NOTE_ON の PC 受信タイムスタンプで同一拍のスレーブ間最大差を計測する。
+EMA + lookahead 補正込みの「実際の発音ズレ」を直接測る。
 
 計測原理:
-  各楽器は localMasterMs >= playAtMasterMs で発音する。playAtMasterMs は全ノード
-  共通（指揮者が決める）なので、同一拍の localMasterMs の楽器間最大差が
-  そのまま発音タイミング差（= 同期誤差）になる。
+  各楽器は拍ごとに NOTE_ON をシリアル出力する。PC 側で各ポートの受信
+  タイムスタンプ (time.time()) を記録し、同一拍に属する NOTE_ON 間の
+  最大時間差を同期誤差とする。
 
-MOP_TEST=4: M4,<partId>,<beatNo>,<localMasterMs>,<playAtMasterMs>
-SERIAL_DEBUG=1: [NX EVT BEAT] no=<beatNo> playAt=<ms> ahead=<ms>
-  ※ ahead = playAtMasterMs - localMasterMs → localMasterMs = playAt - ahead
+  beatNo の対応付け: 各ポートで直前の EVT BEAT の beatNo を追跡し、
+  NOTE_ON に紐付ける。
+
+SERIAL_DEBUG=1:
+  [NX EVT BEAT] no=<beatNo> playAt=<ms> ahead=<ms>
+  [NX NOTE_ON ] part=0x0X instr=N note=N vel=N dur=N seq=N t=N
 """
 
 import argparse
@@ -24,27 +27,13 @@ from collections import defaultdict
 
 import common
 
-RE_MOP4 = re.compile(r'^M4,(\d+),(\d+),(\d+),(\d+)')
+THRESHOLD_MS = 20
+
 RE_BEAT_NX = re.compile(
-    r'\[N(\d) EVT BEAT\] no=(\d+) playAt=(\d+) ahead=(-?\d+)')
-
-
-def parse_sync(text):
-    """同期行をパースして (partId, beatNo, localMasterMs, playAtMasterMs) を返す。"""
-    m = RE_MOP4.match(text)
-    if m:
-        return int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
-    m = RE_BEAT_NX.search(text)
-    if m:
-        node = int(m.group(1))
-        if node == 1:
-            return None
-        beatNo = int(m.group(2))
-        playAt = int(m.group(3))
-        ahead = int(m.group(4))
-        localMasterMs = playAt - ahead
-        return node, beatNo, localMasterMs, playAt
-    return None
+    r'\[N(\d) EVT BEAT\] no=(\d+)')
+RE_NOTE_ON = re.compile(
+    r'\[N(\d) NOTE_ON\s*\] part=0x(\w+) instr=(\d+) note=(\d+) '
+    r'vel=(\d+) dur=(\d+) seq=(\d+) t=(\d+)')
 
 
 def percentile(data, p):
@@ -59,11 +48,20 @@ def percentile(data, p):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='MOP4: 楽器間同期誤差')
-    parser.add_argument('--duration', type=float, default=60)
-    parser.add_argument('--ports', nargs='*')
+    parser = argparse.ArgumentParser(
+        description='MOP4: 楽器間同期誤差 — NOTE_ON ベース')
+    parser.add_argument('--duration', type=float, default=60,
+                        help='計測時間（秒）')
+    parser.add_argument('--ports', nargs='*',
+                        help='シリアルポート（省略で自動検出）')
     parser.add_argument('--baud', type=int, default=115200)
+    parser.add_argument('--log', type=str, default=None,
+                        help='既存ログファイルから解析（リアルタイム計測を省略）')
     args = parser.parse_args()
+
+    if args.log:
+        analyze_log(args.log)
+        return
 
     ports = args.ports or common.find_usb_serial_ports()
     if not ports:
@@ -77,14 +75,17 @@ def main():
         if ser:
             serials.append((p, ser))
 
-    print(f"楽器間同期誤差を {args.duration:.0f} 秒間計測します。")
+    print(f"楽器間同期誤差を {args.duration:.0f} 秒間計測します（NOTE_ON ベース）。")
     print("指揮棒を振って演奏を開始してください。Ctrl+C でも停止できます。")
     print()
 
-    # beatNo -> {partId -> localMasterMs}
-    beat_times = defaultdict(dict)
+    # 各ポートの最新 beatNo を追跡
+    last_beat = {}  # port -> beatNo
+    # beatNo -> {partId -> pc_timestamp} (NOTE_ON 初到着のみ)
+    beat_notes = defaultdict(dict)
+
     ts = common.make_timestamp()
-    csv_fields = ['beatNo', 'partId', 'localMasterMs', 'playAtMasterMs']
+    csv_fields = ['beatNo', 'partId', 'noteNumber', 'device_t', 'pc_timestamp']
     csv_writer, csv_fh, csv_path = common.open_csv(4, csv_fields, ts)
 
     stop = False
@@ -101,44 +102,110 @@ def main():
                 if not text:
                     continue
                 node_mapper.try_detect(p, text)
-                result = parse_sync(text)
-                if result is None:
+                pc_ts = time.time()
+
+                m = RE_BEAT_NX.search(text)
+                if m:
+                    node = int(m.group(1))
+                    if node >= 2:
+                        last_beat[p] = int(m.group(2))
                     continue
-                part_id, beatNo, localMasterMs, playAtMasterMs = result
-                beat_times[beatNo][part_id] = localMasterMs
-                csv_writer.writerow({
-                    'beatNo': beatNo,
-                    'partId': f'0x{part_id:02X}',
-                    'localMasterMs': localMasterMs,
-                    'playAtMasterMs': playAtMasterMs,
-                })
-                csv_fh.flush()
+
+                m = RE_NOTE_ON.search(text)
+                if m:
+                    node = int(m.group(1))
+                    if node == 1:
+                        continue
+                    part_id = int(m.group(2), 16)
+                    note_num = int(m.group(4))
+                    device_t = int(m.group(8))
+                    beat_no = last_beat.get(p)
+                    if beat_no is None:
+                        continue
+
+                    # 同一拍・同一ノードの初到着のみ記録
+                    if part_id not in beat_notes[beat_no]:
+                        beat_notes[beat_no][part_id] = pc_ts
+                        csv_writer.writerow({
+                            'beatNo': beat_no,
+                            'partId': f'0x{part_id:02X}',
+                            'noteNumber': note_num,
+                            'device_t': device_t,
+                            'pc_timestamp': f'{pc_ts:.6f}',
+                        })
+                        csv_fh.flush()
     finally:
         csv_fh.close()
         for _, ser in serials:
             ser.close()
 
-    # ── 結果 ──
-    common.print_header('MOP4: 楽器間同期誤差 (<= 20 ms)')
+    report_results(beat_notes, ts)
+
+
+def analyze_log(log_path):
+    """既存ログファイルから MOP4 を解析する。"""
+    last_beat = {}  # node_id -> beatNo
+    beat_notes = defaultdict(dict)
+
+    with open(log_path) as f:
+        for line in f:
+            line = line.rstrip()
+            # pc_timestamp がタブ区切りで先頭にあるログ形式を想定
+            parts = line.split('\t', 1)
+            if len(parts) == 2:
+                try:
+                    pc_ts = float(parts[0])
+                except ValueError:
+                    pc_ts = None
+                text = parts[1]
+            else:
+                pc_ts = None
+                text = line
+
+            m = RE_BEAT_NX.search(text)
+            if m:
+                node = int(m.group(1))
+                if node >= 2:
+                    last_beat[node] = int(m.group(2))
+                continue
+
+            m = RE_NOTE_ON.search(text)
+            if m:
+                node = int(m.group(1))
+                if node == 1 or pc_ts is None:
+                    continue
+                part_id = int(m.group(2), 16)
+                beat_no = last_beat.get(node)
+                if beat_no is None:
+                    continue
+                if part_id not in beat_notes[beat_no]:
+                    beat_notes[beat_no][part_id] = pc_ts
+
+    ts = common.make_timestamp()
+    report_results(beat_notes, ts)
+
+
+def report_results(beat_notes, ts):
+    """計測結果を集計・表示する。"""
+    common.print_header(f'MOP4: 楽器間同期誤差 (<= {THRESHOLD_MS} ms)')
     stats_lines = []
 
-    # 2台以上の楽器が同一拍で発音した beatNo を対象に最大差を計算
     diffs_ms = []
     node_deviations = defaultdict(list)
 
-    for beatNo, parts in sorted(beat_times.items()):
+    for beat_no, parts in sorted(beat_notes.items()):
         if len(parts) < 2:
             continue
         times = list(parts.values())
-        diff = max(times) - min(times)
-        diffs_ms.append(diff)
+        diff_ms = (max(times) - min(times)) * 1000.0
+        diffs_ms.append(diff_ms)
 
         group_mean = statistics.mean(times)
         for pid, t in parts.items():
-            node_deviations[pid].append(t - group_mean)
+            node_deviations[pid].append((t - group_mean) * 1000.0)
 
     observed_nodes = set()
-    for parts in beat_times.values():
+    for parts in beat_notes.values():
         observed_nodes.update(parts.keys())
 
     if not diffs_ms:
@@ -159,8 +226,8 @@ def main():
         stats_lines.append(f'p99:           {percentile(diffs_ms, 99):.1f} ms')
         if len(diffs_ms) >= 2:
             stats_lines.append(f'誤差 SD:       {statistics.stdev(diffs_ms):.1f} ms')
-        passed = max(diffs_ms) <= 20
-        stats_lines.append(f'判定: {"PASS" if passed else "FAIL"}')
+        passed = max(diffs_ms) <= THRESHOLD_MS
+        stats_lines.append(f'判定: {"PASS" if passed else "FAIL"} (閾値 {THRESHOLD_MS} ms)')
 
         stats_lines.append('')
         stats_lines.append('--- ノード別偏差（正=先行, 負=遅延）---')
@@ -174,10 +241,10 @@ def main():
     for line in stats_lines:
         print(f'  {line}')
 
-    summary_path = common.write_summary(4, ts, passed if passed is not None else False,
-                                        '\n'.join(stats_lines))
-    print(f'\n  CSV:     {csv_path}')
-    print(f'  Summary: {summary_path}')
+    summary_path = common.write_summary(
+        4, ts, passed if passed is not None else False,
+        '\n'.join(stats_lines))
+    print(f'\n  Summary: {summary_path}')
 
 
 if __name__ == '__main__':
