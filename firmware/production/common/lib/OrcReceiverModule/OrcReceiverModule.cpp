@@ -9,39 +9,6 @@
 
 namespace {
 
-// 返り値: スナップ (大ジャンプの即時追従) が起きたか。
-// 指揮者がリセットされるとマスタ時計 millis() が 0 付近へ巻き戻り、offset サンプルが
-// 一気に数十秒〜数分ぶん飛ぶ。EMA (α=0.20) だけだと新 offset への収束に約 1 秒かかり、
-// その間は playAtMasterMs の発火判定が壊れる (過去扱いの即発火 or 遠未来扱いの無音)。
-// |sample − 現 offset| が snapThresholdMs を超えたら EMA をやめて即時採用する。
-// SoftAP 直結 LAN の正常遅延は数十 ms 以下なので、閾値 1000ms に正常系は届かない。
-bool updateClockOffset(SystemData& data, uint32_t timestampMs, float alpha,
-                       uint8_t minSamples, uint16_t snapThresholdMs) {
-    const int32_t sample = (int32_t)(timestampMs - millis());
-    bool snapped = false;
-    if (data.sync.sampleCount == 0) {
-        data.sync.offsetMs = sample;
-    } else {
-        const int32_t jump = sample - data.sync.offsetMs;
-        if (jump > (int32_t)snapThresholdMs || jump < -(int32_t)snapThresholdMs) {
-            // スナップ: 巻き戻った (または大きく飛んだ) マスタ時計に即追従し、
-            // 収束カウントもやり直す。
-            data.sync.offsetMs    = sample;
-            data.sync.sampleCount = 0;
-            data.sync.converged   = false;
-            snapped = true;
-        } else {
-            // EMA (浮動小数で計算してから整数に丸める)
-            const float prev = (float)data.sync.offsetMs;
-            const float next = (1.0f - alpha) * prev + alpha * (float)sample;
-            data.sync.offsetMs = (int32_t)next;
-        }
-    }
-    if (data.sync.sampleCount < 0xFFFF) data.sync.sampleCount++;
-    if (data.sync.sampleCount >= minSamples) data.sync.converged = true;
-    return snapped;
-}
-
 // マスターリセット (offset スナップ) 検知時の後始末。
 // pending.playAtMasterMs は旧マスタ時計の値で、新 offset では発火判定が壊れるため破棄。
 // lastBeatNo は新しい連番 (1 から再開) と偶然一致して初拍を重複扱いで飲む事故を
@@ -56,14 +23,73 @@ void resetAfterMasterReset(SystemData& data) {
 
 }  // namespace
 
+// 時計同期: min フィルタ (窓内最大 offset サンプル追従、NTP 系の定石)。
+// 返り値: スナップ (大ジャンプの即時追従) が起きたか。
+//
+// 設計意図 (tools/verification/results/MOP5_systematic_shift_analysis_20260710.md §4/§8 案4):
+//   SoftAP のマルチキャストは DTIM バッファリングで 204.8ms 周期のバースト配送になり、
+//   サンプル (= timestampMs − millis() = 真のオフセット θ − 配送遅延 D) は
+//   「θ から 0〜205ms 下に散らばる」。旧 EMA (α=0.20) は新鮮な CTRL と ~102ms 古い
+//   BEAT の平均的な位置に落ち着き、推定マスタ時計が真値より 40〜55ms 遅れていた。
+//   min フィルタは配送遅延が最小のサンプル (= 最大 sample) だけを信じるため、
+//   推定時計が最小遅延線に張り付き、この系統遅れがほぼ消える。
+//
+// 実装:
+//   - sample > 現 offset なら即採用 (より遅延の小さいサンプル。UNO R4 の millis() が
+//     指揮者比で遅い個体 = sample が上昇トレンドの場合の追従もこの経路で即時)。
+//   - 同時に窓 (clockSyncWindowMs) 内の最大 sample を記録し、窓満了で offset を
+//     窓内最大値へ引き直す。offset が上振れノイズや下降トレンド (楽器側時計が
+//     速い個体) で古くなっても、窓長ぶんの遅れで必ず追従し直せる。
+//   - スナップ: 指揮者リセットでマスタ時計 millis() が 0 付近へ巻き戻ると sample が
+//     数十秒〜数分ぶん飛ぶ。|sample − 現 offset| が snapThresholdMs を超えたら
+//     フィルタをやめて即時採用し、収束カウントと窓をやり直す (旧 EMA 実装と同じ
+//     1 パケット追従を維持)。SoftAP 直結 LAN の正常遅延 (バースト待ち含め ~205ms)
+//     では閾値 1000ms に届かない。
+bool OrcReceiverModule::updateClockOffset(SystemData& data, uint32_t timestampMs) {
+    const int32_t sample = (int32_t)(timestampMs - millis());
+    bool snapped = false;
+    if (data.sync.sampleCount == 0) {
+        data.sync.offsetMs = sample;
+        winValid_ = false;
+    } else {
+        const int32_t jump = sample - data.sync.offsetMs;
+        if (jump > (int32_t)cfg_.clockSyncSnapThresholdMs ||
+            jump < -(int32_t)cfg_.clockSyncSnapThresholdMs) {
+            // スナップ: 巻き戻った (または大きく飛んだ) マスタ時計に即追従し、
+            // 収束カウントもやり直す。
+            data.sync.offsetMs    = sample;
+            data.sync.sampleCount = 0;
+            data.sync.converged   = false;
+            winValid_ = false;
+            snapped = true;
+        } else {
+            if (sample > data.sync.offsetMs) {
+                data.sync.offsetMs = sample;
+            }
+            const uint32_t nowMs = millis();
+            if (!winValid_) {
+                winValid_     = true;
+                winStartMs_   = nowMs;
+                winMaxSample_ = sample;
+            } else {
+                if (sample > winMaxSample_) winMaxSample_ = sample;
+                if (nowMs - winStartMs_ >= cfg_.clockSyncWindowMs) {
+                    // 窓満了: 窓内最大サンプルへ引き直し (下方向の再追従)、次の窓を開く
+                    data.sync.offsetMs = winMaxSample_;
+                    winValid_ = false;
+                }
+            }
+        }
+    }
+    if (data.sync.sampleCount < 0xFFFF) data.sync.sampleCount++;
+    if (data.sync.sampleCount >= cfg_.clockSyncMinSamples) data.sync.converged = true;
+    return snapped;
+}
+
 void OrcReceiverModule::updateInput(SystemData& data) {
     // 1. CTRL を受信していれば時計同期 + 状態取り込み
     if (data.orcNet.hasNewCtrl) {
-        if (updateClockOffset(data,
-                              data.orcNet.lastCtrl.header.timestampMs,
-                              cfg_.clockSyncEmaAlpha,
-                              cfg_.clockSyncMinSamples,
-                              cfg_.clockSyncSnapThresholdMs)) {
+        if (updateClockOffset(data, data.orcNet.lastCtrl.header.timestampMs)) {
             resetAfterMasterReset(data);
         }
 
@@ -84,20 +110,15 @@ void OrcReceiverModule::updateInput(SystemData& data) {
     //     違うのは header.timestampMs (各送信時刻) と header.seq。
     //   - pending (発音予約) は初到着の 1 個だけ採用。同 beatNo の発火後に
     //     後着が再キューされて「同じ拍を二度発音」する事故を避ける。
-    //   - clock sync は連送 4 個ぶん全部サンプルとして使う。ただし重複は数 ms
-    //     以内の強相関なので α を小さくし、初回サンプルが過剰反映されないようにする
-    //     (旧実装は全 4 個を α=0.10 で吸って同じサンプルに 4 回追従していた)。
+    //   - clock sync は連送 4 個ぶん全部サンプルとして使う。min フィルタでは重複は
+    //     自然に無害: 同一 timestampMs で millis() が経過ぶん進むため sample は
+    //     初回以下になり、窓内最大値を押し上げない (旧 EMA の重複用 α は不要になった)。
     if (data.orcNet.hasNewBeat) {
         const uint16_t bn = data.orcNet.lastBeat.payload.beatNo;
         bool isDuplicate = data.receiver.hasFirstBeat &&
                            (bn == data.receiver.lastBeatNo);
 
-        if (updateClockOffset(data,
-                              data.orcNet.lastBeat.header.timestampMs,
-                              isDuplicate ? cfg_.clockSyncEmaAlphaDup
-                                          : cfg_.clockSyncEmaAlpha,
-                              cfg_.clockSyncMinSamples,
-                              cfg_.clockSyncSnapThresholdMs)) {
+        if (updateClockOffset(data, data.orcNet.lastBeat.header.timestampMs)) {
             // この BEAT 自体は新マスタ時計の正しい playAtMasterMs を持つので、
             // 重複扱いを解いて「新時計の最初の BEAT」として受理し直す。
             resetAfterMasterReset(data);

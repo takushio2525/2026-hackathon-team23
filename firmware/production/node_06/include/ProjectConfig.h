@@ -35,8 +35,9 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
 inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
     /*partId=*/                0x06,    // ドラム
     /*headRestBeats=*/         0,       // 先頭から入る (サイクル全体を担当)
-    /*clockSyncEmaAlpha=*/     0.20f,
-    /*clockSyncEmaAlphaDup=*/  0.05f,
+    /*clockSyncWindowMs=*/     2000,    // min フィルタ窓長: バースト配送 (204.8ms 周期) ~10 回ぶん。
+                                        // 旧 EMA は推定時計が真値より 40〜55ms 遅れていた
+                                        // (MOP5_systematic_shift_analysis_20260710.md §4/§8 案4)
     /*clockSyncMinSamples=*/   5,
     /*clockSyncSnapThresholdMs=*/ 1000,
     /*loopIntervalMs=*/        2,

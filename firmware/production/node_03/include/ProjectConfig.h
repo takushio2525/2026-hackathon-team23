@@ -32,8 +32,9 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
 inline const OrcReceiverConfig ORC_RECEIVER_CONFIG = {
     /*partId=*/                0x03,    // 輪唱 声部 2
     /*headRestBeats=*/         8,       // 8 拍ぶん頭に休符を入れてから入る
-    /*clockSyncEmaAlpha=*/     0.20f,   // 初回サンプル: 旧 0.10 → 0.20 で応答性向上 (時定数 ≈0.25 s)
-    /*clockSyncEmaAlphaDup=*/  0.05f,   // 連送 2 個目以降: 過剰反映を避けて軽く補正
+    /*clockSyncWindowMs=*/     2000,    // min フィルタ窓長: バースト配送 (204.8ms 周期) ~10 回ぶん。
+                                        // 旧 EMA は推定時計が真値より 40〜55ms 遅れていた
+                                        // (MOP5_systematic_shift_analysis_20260710.md §4/§8 案4)
     /*clockSyncMinSamples=*/   5,
     /*clockSyncSnapThresholdMs=*/ 1000,  // 指揮者リセット (マスタ時計巻き戻り) を 1 パケットで追従。正常遅延 (数十 ms) では届かない
     /*loopIntervalMs=*/        2,       // 旧 5 ms → 2 ms (発音判定ジッタ最大 5 ms → 2 ms)
