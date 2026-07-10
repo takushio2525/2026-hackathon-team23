@@ -168,34 +168,6 @@ void loop() {
     for (auto* m : gOutputs) {
         if (m->enabled) m->updateOutput(gData);
     }
-#if MOP_TEST == 4
-    static uint16_t sPrevBeatNo_m4 = 0;
-    if (gData.orcNet.hasNewBeat && gData.receiver.lastBeatNo != sPrevBeatNo_m4) {
-        const uint32_t localMasterMs = millis() + (uint32_t)gData.sync.offsetMs;
-        mop_test::mprintf("M4,%u,%u,%lu,%lu\n",
-                          (unsigned)ORC_RECEIVER_CONFIG.partId,
-                          (unsigned)gData.receiver.lastBeatNo,
-                          (unsigned long)localMasterMs,
-                          (unsigned long)gData.orcNet.lastBeat.payload.playAtMasterMs);
-        sPrevBeatNo_m4 = gData.receiver.lastBeatNo;
-    }
-#endif
-
-#if MOP_TEST == 5
-    static uint16_t sPrevBeatNo_m5 = 0;
-    if (gData.orcNet.hasNewBeat && gData.receiver.lastBeatNo != sPrevBeatNo_m5) {
-        const int32_t ahead =
-            (int32_t)gData.orcNet.lastBeat.payload.playAtMasterMs -
-            (int32_t)(millis() + (uint32_t)gData.sync.offsetMs);
-        mop_test::mprintf("M5I,%u,%u,%lu,%ld\n",
-                          (unsigned)ORC_RECEIVER_CONFIG.partId,
-                          (unsigned)gData.receiver.lastBeatNo,
-                          (unsigned long)millis(),
-                          (long)ahead);
-        sPrevBeatNo_m5 = gData.receiver.lastBeatNo;
-    }
-#endif
-
 #if MOP_TEST == 6
     {
         static uint16_t sPrevBeatNo_m6 = 0;

@@ -113,23 +113,22 @@ void OrcReceiverModule::updateInput(SystemData& data) {
             data.receiver.lastBeatNo = bn;
             data.receiver.hasFirstBeat = true;
 
-#if MOP_TEST == 4
+#if MOP_TEST == 4 || MOP_TEST == 5
+            // MOP4/MOP5 共通の BEAT 受信記録 (受理した初回のみ = 1 beat 1 record)。
+            // 旧実装は main.cpp 側にも M5I 出力があり同一拍が二重記録されていたため、
+            // 計測出力はこの 1 箇所に統一した (発火時の M45F は applyPattern.cpp)。
+            // localMasterMs = 受信処理時点の推定マスタ時刻。集計側が
+            // lateMs = max(0, localMasterMs - playAtMasterMs) を計算し、
+            // beatLookahead の発音予約が受信時点で間に合っているかを判定する。
             {
-                const uint32_t localMasterMs = millis() + (uint32_t)data.sync.offsetMs;
-                mop_test::mprintf("M4,%u,%u,%lu,%lu\n",
+                const uint32_t tLocal = millis();
+                const uint32_t localMasterMs = tLocal + (uint32_t)data.sync.offsetMs;
+                mop_test::mprintf("M45R,%u,%u,%lu,%lu,%ld,%lu\n",
                                   (unsigned)cfg_.partId, (unsigned)bn,
-                                  (unsigned long)localMasterMs,
-                                  (unsigned long)data.orcNet.lastBeat.payload.playAtMasterMs);
-            }
-#endif
-#if MOP_TEST == 5
-            {
-                const int32_t ahead =
-                    (int32_t)data.orcNet.lastBeat.payload.playAtMasterMs -
-                    (int32_t)(millis() + (uint32_t)data.sync.offsetMs);
-                mop_test::mprintf("M5I,%u,%u,%lu,%ld\n",
-                                  (unsigned)cfg_.partId, (unsigned)bn,
-                                  (unsigned long)millis(), (long)ahead);
+                                  (unsigned long)data.orcNet.lastBeat.payload.playAtMasterMs,
+                                  (unsigned long)tLocal,
+                                  (long)data.sync.offsetMs,
+                                  (unsigned long)localMasterMs);
             }
 #endif
 #if MOP_TEST == 9

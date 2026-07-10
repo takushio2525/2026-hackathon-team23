@@ -23,6 +23,7 @@
 #include "SystemData.h"
 #include "ProjectConfig.h"
 #include "SerialDebug.h"
+#include "MopTest.h"
 #include "score_data.h"
 
 namespace {
@@ -168,6 +169,24 @@ void applyPattern(SystemData& data) {
         if (waitMs <= 0) {
             fired       = true;
             firedBeatNo = data.receiver.pending.beatNo;
+#if MOP_TEST == 4 || MOP_TEST == 5
+            // MOP4/MOP5: 発火時記録 (発音予約が実際に発火した瞬間のデバイス側計測)。
+            // localMasterMs = 発火時点の推定マスタ時刻。同一 beatNo の localMasterMs の
+            // ノード間レンジが MOP4 (楽器間同期誤差)、playAtMasterMs に対する遅刻
+            // lateMs = max(0, localMasterMs - playAtMasterMs) が MOP5 (予約遅刻)。
+            // USB 受信時刻に依存しない。集計は tools/verification/scripts/ の
+            // mop4_sync_error.py / mop5_comm_delay.py。
+            {
+                const uint32_t localMasterMs = now + (uint32_t)data.sync.offsetMs;
+                mop_test::mprintf("M45F,%u,%u,%lu,%lu,%ld,%lu\n",
+                                  (unsigned)ORC_RECEIVER_CONFIG.partId,
+                                  (unsigned)firedBeatNo,
+                                  (unsigned long)data.receiver.pending.playAtMasterMs,
+                                  (unsigned long)now,
+                                  (long)data.sync.offsetMs,
+                                  (unsigned long)localMasterMs);
+            }
+#endif
             data.receiver.pending.valid = false;
             sLastBeatRecvMs = now;
         }
