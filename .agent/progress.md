@@ -3,6 +3,11 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-10: **MOP5 系統シフト −42.8ms の原因を特定**（`results/MOP5_systematic_shift_analysis_20260710.md`）。
+  SoftAP マルチキャストが省電力バッファで 204.8ms（2 ビーコン）周期のバースト配送になっており 45ms lookahead が
+  構造的に不足。シフト自体は EMA の CTRL/BEAT 鮮度非対称の産物（モデル閉合 ±6ms）。lateMs は真の遅刻を
+  ~45ms 過小評価（真 p95≈145ms）。スクリプトにバグなし・コード変更なし。
+
 - 2026-07-10: **MOP4/MOP5 計測パイプラインを書き直し**（`b23c3e6` ファーム / `7bac5ef` スクリプト+README）。
   受信 M45R + 発火 M45F のデバイス側 1 行ログに統一（二重記録解消）、MOP4 = 発火時 localMaster レンジ、
   MOP5 = lateMs（lookahead 45ms 遅刻）に再定義。全ノード 3 種ビルド SUCCESS・通常ビルドはバイナリ一致・

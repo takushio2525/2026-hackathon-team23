@@ -5,31 +5,26 @@
 
 ## 現在の対象
 
-- MOP4/MOP5 計測パイプラインの書き直しが完了（`b23c3e6` ファーム / `7bac5ef` スクリプト+README）。
-  **実機未検証** — ユーザーが書き込んで再計測すればすぐテストできる状態。
-- 新方式: 楽器ファームが BEAT 受理時に `M45R`、発火時に `M45F` を各 1 行出力
-  （`partId,beatNo,playAtMasterMs,deviceMs,offsetMs,localMasterMs`、MOP_TEST=4/5 共通出力）。
-  MOP4 = M45F の localMasterMs ノード間レンジ、MOP5 = 受信/発火 lateMs（lookahead 45ms 遅刻）に再定義。
-  旧欠陥（M5I 二重記録・EVT BEAT 誤紐付け・ライブ計測の逐次ポーリング破綻・タブ/スペース不一致）は全て解消。
-- 通常ビルドはバイナリ md5 一致を確認済み（#if MOP_TEST 完全隔離）。全ノード pio run SUCCESS
-  （通常 + MOP_TEST=4 + MOP_TEST=5）。集計スクリプトはダミーログのセルフテストで期待値一致。
-
-## 再計測の手順（ユーザー作業）
-
-- `tools/verification/README.md` の「MOP4/MOP5 の再計測手順」に一連のコマンドあり。
-  要点: `PLATFORMIO_BUILD_FLAGS="-DMOP_TEST=4"` で node_02〜06 に書き込み →
-  `serial_logger.py` でログ収集 → `mop4_sync_error.py` / `mop5_comm_delay.py` に同じログを渡す。
-- MOP5 の受信マージン統計は §4.3 の未解明の系統シフト（約 45〜55ms）の解明データにもなる。
+- 7/10 の MOP4/MOP5 再計測（204 拍 × 5 ノード）で出た **系統シフト −42.8ms / 発火 p95=78ms 遅刻の原因分析が完了**。
+  レポート: `tools/verification/results/MOP5_systematic_shift_analysis_20260710.md`。
+- **根本原因**: SoftAP のマルチキャストが省電力バッファリングで **204.8ms（2 ビーコン）周期のバースト配送**
+  になっており、45ms lookahead が構造的に不足。シフト −42.8ms 自体は「EMA が 20Hz CTRL の新鮮な
+  サンプルに支配され、BEAT だけ平均 ≈102ms 古い」という鮮度非対称の産物（定常モデルで ±6ms 閉合）。
+- 重要な含意: **M45 の lateMs は推定時計基準で真の遅刻を ~40-55ms 過小評価**。真の発火遅刻は
+  平均 ≈+80 / p95 ≈+145ms（下限推定）。MOP4 が良好なのは遅延が完全共通モードのため（矛盾ではない）。
+- 集計スクリプト（mop5_comm_delay.py）にバグなし → 修正・再集計は不要だった。ファーム変更もなし。
 
 ## 次の一手
 
-1. ユーザーの実機再計測（上記手順）。
-2. 最終レポート・振り返り（7/15）で MOP_REPORT_20260709.md の方式・出典記載を訂正
-   （根拠: `results/MOP45_latency_investigation_20260710.md` §3.3/§5-A）。再計測できれば新数値で置き換え。
-3. 絶対片道遅延の実測（GPIO+ロジアナ / ping-ACK 同期）は将来課題として記載に留める。
-4. 未コミットの node_02〜06 `platformio.ini`（SERIAL_DEBUG=1）はユーザーの変更として維持。触らない。
+1. 最終レポート・振り返り（7/15）で MOP5 の数値に「真の遅刻は p95≈145ms」併記 + 原因（バースト配送）を記載。
+   MOP_REPORT_20260709.md の方式・出典記載の訂正も従来どおり必要（`MOP45_latency_investigation_20260710.md` §3.3）。
+2. 対処（ファーム修正・実装未着手、ユーザー判断待ち）: 案1 = beatLookaheadMs 45→220ms（1 定数・即効）、
+   案2 = 指揮者で esp_wifi_set_config により beacon_interval 100→50TU + dtim_period=1（根治寄り・要実機）。
+   詳細はレポート §8。
+3. 未コミットの node_02〜06 `platformio.ini`（SERIAL_DEBUG=1）はユーザーの変更として維持。触らない。
 
 ## 現フェーズで Read すべき設計書
 
-- MOP4/5 の議論を続ける場合: `tools/verification/README.md`（新手順）、
-  `tools/verification/results/MOP45_latency_investigation_20260710.md`（欠陥の経緯）を先に Read。
+- MOP4/5 の議論を続ける場合: `tools/verification/results/MOP5_systematic_shift_analysis_20260710.md`（原因分析・最新）、
+  `tools/verification/results/MOP45_latency_investigation_20260710.md`（計測欠陥の経緯）、
+  `tools/verification/README.md`（計測手順）を先に Read。
