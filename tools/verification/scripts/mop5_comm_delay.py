@@ -1,246 +1,175 @@
 #!/usr/bin/env python3
 """
-MOP5: スレーブ間の発音同期 (≤ 30 ms)
-NOTE_ON の PC 受信タイムスタンプで、スレーブ間の発音タイミング差を計測する。
+MOP5: 発音予約の遅刻計測 (lateMs) — beatLookahead 45ms に間に合っているか
 
-MOP4 が「拍ごとの全ノード最大差」を見るのに対し、MOP5 は
-「各ノードペア間の遅延分布」に焦点を当てる。
+指標の再定義について:
+  計画書の MOP5「指揮から楽器への通信遅延 ≤30ms」(絶対片道遅延) は、
+  片方向の時計同期 (EMA が平均遅延を吸収する) では原理的に計測できない
+  (詳細: results/MOP45_latency_investigation_20260710.md §4.1/§5-C)。
+  絶対片道遅延の実測 (GPIO トグル + ロジックアナライザ / 往復同期) は将来課題とし、
+  本スクリプトは「BEAT が beatLookahead (45ms) の発音予約に間に合っているか」を
+  検証可能な形で定量化する:
 
-計測原理:
-  各楽器は拍ごとに NOTE_ON をシリアル出力する。PC 側で各ポートの受信
-  タイムスタンプ (time.time()) を記録し、同一拍に属する NOTE_ON の
-  全ノードペア間の時間差を計測して分布を示す。
+    lateMs = max(0, localMasterMs - playAtMasterMs)
+      - 受信時 (M45R): 受信時点で既に発音予定時刻を過ぎていた遅れ。
+        0 なら予約が機能し、>0 なら到着即発火 (予約破綻) だった拍。
+      - 発火時 (M45F): 実際の発音が予定時刻からどれだけ遅れたか。
 
-SERIAL_DEBUG=1:
-  [NX EVT BEAT] no=<beatNo> playAt=<ms> ahead=<ms>
-  [NX NOTE_ON ] part=0x0X instr=N note=N vel=N dur=N seq=N t=N
+  判定は「発火 lateMs の p95 ≤ 閾値 (デフォルト 30ms = 計画書 MOP5 の目標値を
+  発音予定時刻に対する遅刻の許容として流用)」とする。
+
+入力: serial_logger.py が保存したログファイル (行形式 "pc_ts port text")。
+      MOP_TEST=5 (または 4) でビルドした楽器ノードのログ。
+      行中の M45R/M45F を正規表現で拾うため pio device monitor の生ログでも解析できる。
+
+ファーム側ログ形式 (MOP_TEST=4/5 共通):
+  M45R,<partId>,<beatNo>,<playAtMasterMs>,<deviceMs>,<offsetMs>,<localMasterMs>
+    - BEAT を受理 (連送の初回のみ = 1 拍 1 行) した時点の記録 (OrcReceiverModule.cpp)
+  M45F,<partId>,<beatNo>,<playAtMasterMs>,<deviceMs>,<offsetMs>,<localMasterMs>
+    - 発音予約が発火した時点の記録 (applyPattern.cpp)
+
+使い方:
+  python3 scripts/mop5_comm_delay.py logs/test_YYYYMMDD_HHMMSS.log
 """
 
 import argparse
-import itertools
 import re
-import signal
 import statistics
 import sys
-import time
 from collections import defaultdict
 
 import common
 
-THRESHOLD_MS = 30
+THRESHOLD_MS = 30      # 発火 lateMs p95 の許容値 (計画書 MOP5 の 30ms を流用)
+NOMINAL_LOOKAHEAD_MS = 45  # 指揮者 ProjectConfig.h beatLookaheadMs の名目値
 
-RE_BEAT_NX = re.compile(
-    r'\[N(\d) EVT BEAT\] no=(\d+)')
-RE_NOTE_ON = re.compile(
-    r'\[N(\d) NOTE_ON\s*\] part=0x(\w+) instr=(\d+) note=(\d+) '
-    r'vel=(\d+) dur=(\d+) seq=(\d+) t=(\d+)')
-
-
-def percentile(data, p):
-    """ソート済みリストから第 p パーセンタイルを線形補間で返す。"""
-    if not data:
-        return 0.0
-    s = sorted(data)
-    k = (len(s) - 1) * p / 100.0
-    f = int(k)
-    c = f + 1 if f + 1 < len(s) else f
-    return s[f] + (s[c] - s[f]) * (k - f)
+# M45R / M45F 共通:
+#   M45<kind>,<partId>,<beatNo>,<playAtMasterMs>,<deviceMs>,<offsetMs>,<localMasterMs>
+RE_M45 = re.compile(
+    r'\bM45([RF]),(\d+),(\d+),(\d+),(\d+),(-?\d+),(\d+)\b')
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='MOP5: スレーブ間発音同期 — NOTE_ON ベース')
-    parser.add_argument('--duration', type=float, default=60,
-                        help='計測時間（秒）')
-    parser.add_argument('--ports', nargs='*',
-                        help='シリアルポート（省略で自動検出）')
-    parser.add_argument('--baud', type=int, default=115200)
-    parser.add_argument('--log', type=str, default=None,
-                        help='既存ログファイルから解析（リアルタイム計測を省略）')
-    args = parser.parse_args()
+def parse_log(log_path):
+    """ログから M45R/M45F を読む。
 
-    if args.log:
-        analyze_log(args.log)
-        return
-
-    ports = args.ports or common.find_usb_serial_ports()
-    if not ports:
-        print("USB シリアルポートが見つかりません。", file=sys.stderr)
-        sys.exit(1)
-
-    node_mapper = common.NodeMapper()
-    serials = []
-    for p in ports:
-        ser = common.open_serial(p, args.baud)
-        if ser:
-            serials.append((p, ser))
-
-    print(f"スレーブ間発音同期を {args.duration:.0f} 秒間計測します（NOTE_ON ベース）。")
-    print("指揮棒を振って演奏を開始してください。Ctrl+C でも停止できます。")
-    print()
-
-    last_beat = {}  # port -> beatNo
-    # beatNo -> {partId -> pc_timestamp}
-    beat_notes = defaultdict(dict)
-
-    ts = common.make_timestamp()
-    csv_fields = ['beatNo', 'partId', 'noteNumber', 'device_t', 'pc_timestamp']
-    csv_writer, csv_fh, csv_path = common.open_csv(5, csv_fields, ts)
-
-    stop = False
-    def on_sigint(s, f):
-        nonlocal stop
-        stop = True
-    signal.signal(signal.SIGINT, on_sigint)
-
-    start = time.time()
-    try:
-        while not stop and (time.time() - start) < args.duration:
-            for p, ser in serials:
-                text = common.read_line(ser)
-                if not text:
-                    continue
-                node_mapper.try_detect(p, text)
-                pc_ts = time.time()
-
-                m = RE_BEAT_NX.search(text)
-                if m:
-                    node = int(m.group(1))
-                    if node >= 2:
-                        last_beat[p] = int(m.group(2))
-                    continue
-
-                m = RE_NOTE_ON.search(text)
-                if m:
-                    node = int(m.group(1))
-                    if node == 1:
-                        continue
-                    part_id = int(m.group(2), 16)
-                    note_num = int(m.group(4))
-                    device_t = int(m.group(8))
-                    beat_no = last_beat.get(p)
-                    if beat_no is None:
-                        continue
-                    if part_id not in beat_notes[beat_no]:
-                        beat_notes[beat_no][part_id] = pc_ts
-                        csv_writer.writerow({
-                            'beatNo': beat_no,
-                            'partId': f'0x{part_id:02X}',
-                            'noteNumber': note_num,
-                            'device_t': device_t,
-                            'pc_timestamp': f'{pc_ts:.6f}',
-                        })
-                        csv_fh.flush()
-    finally:
-        csv_fh.close()
-        for _, ser in serials:
-            ser.close()
-
-    report_results(beat_notes, ts)
-
-
-def analyze_log(log_path):
-    """既存ログファイルから MOP5 を解析する。"""
-    last_beat = {}  # node_id -> beatNo
-    beat_notes = defaultdict(dict)
-
-    with open(log_path) as f:
+    返り値: {kind: {(beatNo, playAtMasterMs): {partId: record}}}, 重複件数
+      kind は 'R' (受信) / 'F' (発火)。同一拍はマスタ時刻 playAtMasterMs が
+      全ノード共通なので (beatNo, playAt) キーで指揮者リセットにも頑健。
+      同一 (種別, 拍, ノード) の重複行は初出のみ採用する。
+    """
+    records = {'R': defaultdict(dict), 'F': defaultdict(dict)}
+    duplicates = 0
+    with open(log_path, errors='replace') as f:
         for line in f:
-            line = line.rstrip()
-            parts = line.split('\t', 1)
-            if len(parts) == 2:
-                try:
-                    pc_ts = float(parts[0])
-                except ValueError:
-                    pc_ts = None
-                text = parts[1]
-            else:
-                pc_ts = None
-                text = line
-
-            m = RE_BEAT_NX.search(text)
-            if m:
-                node = int(m.group(1))
-                if node >= 2:
-                    last_beat[node] = int(m.group(2))
+            m = RE_M45.search(line)
+            if not m:
                 continue
+            kind = m.group(1)
+            part = int(m.group(2))
+            play_at = int(m.group(4))
+            local_master = int(m.group(7))
+            rec = {
+                'beatNo': int(m.group(3)),
+                'playAtMasterMs': play_at,
+                'deviceMs': int(m.group(5)),
+                'offsetMs': int(m.group(6)),
+                'localMasterMs': local_master,
+                # marginMs > 0 = 予定時刻より手前 (余裕あり) / < 0 = 遅刻
+                'marginMs': play_at - local_master,
+                'lateMs': max(0, local_master - play_at),
+            }
+            key = (rec['beatNo'], play_at)
+            if part in records[kind][key]:
+                duplicates += 1
+                continue
+            records[kind][key][part] = rec
+    return records, duplicates
 
-            m = RE_NOTE_ON.search(text)
-            if m:
-                node = int(m.group(1))
-                if node == 1 or pc_ts is None:
-                    continue
-                part_id = int(m.group(2), 16)
-                beat_no = last_beat.get(node)
-                if beat_no is None:
-                    continue
-                if part_id not in beat_notes[beat_no]:
-                    beat_notes[beat_no][part_id] = pc_ts
 
-    ts = common.make_timestamp()
-    report_results(beat_notes, ts)
+def flatten(kind_records):
+    """{key: {part: rec}} → [rec] (partId を付与)。"""
+    out = []
+    for key in sorted(kind_records.keys()):
+        for pid in sorted(kind_records[key].keys()):
+            rec = dict(kind_records[key][pid])
+            rec['partId'] = pid
+            out.append(rec)
+    return out
 
 
-def report_results(beat_notes, ts):
-    """計測結果を集計・表示する。ノードペアごとの遅延分布を分析する。"""
-    common.print_header(f'MOP5: スレーブ間発音同期 (<= {THRESHOLD_MS} ms)')
+def describe(label, recs, stats_lines):
+    """受信/発火それぞれの lateMs・marginMs 統計を stats_lines に追記する。"""
+    lates = [r['lateMs'] for r in recs]
+    margins = [r['marginMs'] for r in recs]
+    n_late = sum(1 for v in lates if v > 0)
+    stats_lines.append(f'--- {label} (n={len(recs)}) ---')
+    stats_lines.append(
+        f'  遅刻 (lateMs>0): {n_late} / {len(recs)} 件'
+        f' ({100.0 * n_late / len(recs):.1f}%)')
+    stats_lines.append(
+        f'  lateMs:   平均={statistics.mean(lates):.1f}'
+        f' p50={common.percentile(lates, 50):.1f}'
+        f' p95={common.percentile(lates, 95):.1f}'
+        f' 最大={max(lates):.1f} ms')
+    stats_lines.append(
+        f'  marginMs: 平均={statistics.mean(margins):+.1f}'
+        f' p50={common.percentile(margins, 50):+.1f}'
+        f' 最小={min(margins):+.1f} 最大={max(margins):+.1f} ms'
+        f' (正=予定時刻より手前)')
+
+
+def report_results(records, duplicates, threshold_ms, lookahead_ms, ts):
+    common.print_header(
+        f'MOP5: 発音予約の遅刻計測 (発火 lateMs p95 <= {threshold_ms} ms)')
     stats_lines = []
 
-    # ペアごとの遅延を収集
-    pair_diffs = defaultdict(list)  # (min_pid, max_pid) -> [diff_ms]
-    all_max_diffs = []  # 拍ごとの最大ペア差
+    recv = flatten(records['R'])
+    fire = flatten(records['F'])
 
-    for beat_no, parts in sorted(beat_notes.items()):
-        if len(parts) < 2:
-            continue
-        pids = sorted(parts.keys())
-        max_diff = 0.0
-        for a, b in itertools.combinations(pids, 2):
-            diff_ms = abs(parts[a] - parts[b]) * 1000.0
-            pair_diffs[(a, b)].append(diff_ms)
-            max_diff = max(max_diff, diff_ms)
-        all_max_diffs.append(max_diff)
+    if duplicates:
+        stats_lines.append(f'注意: 同一 (種別, 拍, ノード) の重複記録 {duplicates} 件を初出のみ採用')
 
-    observed_nodes = set()
-    for parts in beat_notes.values():
-        observed_nodes.update(parts.keys())
+    stats_lines.append('指標: 計画書の「通信遅延 ≤30ms」(絶対片道遅延) は片方向同期では')
+    stats_lines.append('計測不能のため、「発音予定時刻に対する遅刻 lateMs」で再定義 (ヘッダ参照)。')
+    stats_lines.append('')
 
-    if not all_max_diffs:
-        stats_lines.append('複数ノード同時発音が見つかりません。')
-        passed = None
+    if recv:
+        describe('BEAT 受信時', recv, stats_lines)
+        recv_margins = [r['marginMs'] for r in recv]
+        mean_margin = statistics.mean(recv_margins)
+        stats_lines.append(
+            f'  名目 lookahead {lookahead_ms}ms に対する受信マージン平均: '
+            f'{mean_margin:+.1f} ms (系統シフト {mean_margin - lookahead_ms:+.1f} ms)')
+        stats_lines.append('')
     else:
-        stats_lines.append(f'検出ノード数:     {len(observed_nodes)}')
-        stats_lines.append(f'同時発音拍数:     {len(all_max_diffs)}')
-        stats_lines.append(f'ノードペア数:     {len(pair_diffs)}')
+        stats_lines.append('M45R (受信記録) なし。')
         stats_lines.append('')
 
-        stats_lines.append('--- 全ペア合算 ---')
-        all_diffs = []
-        for diffs in pair_diffs.values():
-            all_diffs.extend(diffs)
-        stats_lines.append(f'  平均:   {statistics.mean(all_diffs):.1f} ms')
-        stats_lines.append(f'  p50:    {percentile(all_diffs, 50):.1f} ms')
-        stats_lines.append(f'  p95:    {percentile(all_diffs, 95):.1f} ms')
-        stats_lines.append(f'  最大:   {max(all_diffs):.1f} ms')
+    passed = None
+    if fire:
+        describe('発火時', fire, stats_lines)
         stats_lines.append('')
-
-        stats_lines.append('--- ノードペア別 ---')
-        max_pair_delay = 0.0
-        for (a, b), diffs in sorted(pair_diffs.items()):
-            mean_d = statistics.mean(diffs)
-            max_d = max(diffs)
-            p95_d = percentile(diffs, 95)
-            max_pair_delay = max(max_pair_delay, max_d)
+        stats_lines.append('--- ノード別 発火 lateMs ---')
+        by_node = defaultdict(list)
+        for r in fire:
+            by_node[r['partId']].append(r['lateMs'])
+        for pid in sorted(by_node.keys()):
+            vals = by_node[pid]
+            n_late = sum(1 for v in vals if v > 0)
             stats_lines.append(
-                f'  node_0{a} - node_0{b}: '
-                f'平均={mean_d:.1f}ms p95={p95_d:.1f}ms '
-                f'最大={max_d:.1f}ms (n={len(diffs)})')
+                f'  node_0{pid}: 遅刻 {n_late}/{len(vals)} 件'
+                f' p95={common.percentile(vals, 95):.1f}'
+                f' 最大={max(vals):.1f} ms')
 
-        passed = max_pair_delay <= THRESHOLD_MS
+        fire_lates = [r['lateMs'] for r in fire]
+        p95 = common.percentile(fire_lates, 95)
+        passed = p95 <= threshold_ms
         stats_lines.append('')
         stats_lines.append(
             f'判定: {"PASS" if passed else "FAIL"} '
-            f'(最大ペア遅延 {max_pair_delay:.1f}ms, 閾値 {THRESHOLD_MS} ms)')
+            f'(発火 lateMs p95 = {p95:.1f} ms, 閾値 {threshold_ms} ms)')
+    else:
+        stats_lines.append('M45F (発火記録) なし。判定不能。')
 
     for line in stats_lines:
         print(f'  {line}')
@@ -249,6 +178,47 @@ def report_results(beat_notes, ts):
         5, ts, passed if passed is not None else False,
         '\n'.join(stats_lines))
     print(f'\n  Summary: {summary_path}')
+    return passed
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='MOP5: 発音予約の遅刻計測 (M45R/M45F の lateMs) ')
+    parser.add_argument('log', help='serial_logger.py のログファイル')
+    parser.add_argument('--threshold', type=float, default=THRESHOLD_MS,
+                        help=f'発火 lateMs p95 の許容値 ms (デフォルト {THRESHOLD_MS})')
+    parser.add_argument('--lookahead', type=float, default=NOMINAL_LOOKAHEAD_MS,
+                        help=f'指揮者 beatLookaheadMs の名目値 (デフォルト {NOMINAL_LOOKAHEAD_MS})')
+    args = parser.parse_args()
+
+    records, duplicates = parse_log(args.log)
+    if not records['R'] and not records['F']:
+        print('M45R/M45F 行が見つかりません。MOP_TEST=5 (または 4) でビルドした'
+              '楽器ノードのログか確認してください。', file=sys.stderr)
+        sys.exit(1)
+
+    ts = common.make_timestamp()
+    csv_fields = ['type', 'beatNo', 'partId', 'playAtMasterMs',
+                  'deviceMs', 'offsetMs', 'localMasterMs', 'lateMs']
+    csv_writer, csv_fh, csv_path = common.open_csv(5, csv_fields, ts)
+    try:
+        for kind in ('R', 'F'):
+            for rec in flatten(records[kind]):
+                csv_writer.writerow({
+                    'type': kind,
+                    'beatNo': rec['beatNo'],
+                    'partId': rec['partId'],
+                    'playAtMasterMs': rec['playAtMasterMs'],
+                    'deviceMs': rec['deviceMs'],
+                    'offsetMs': rec['offsetMs'],
+                    'localMasterMs': rec['localMasterMs'],
+                    'lateMs': rec['lateMs'],
+                })
+    finally:
+        csv_fh.close()
+    print(f'CSV: {csv_path}')
+
+    report_results(records, duplicates, args.threshold, args.lookahead, ts)
 
 
 if __name__ == '__main__':

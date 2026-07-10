@@ -175,6 +175,8 @@ def mop3(entries):
 # ── MOP4: 楽器間同期誤差 ──
 def mop4(entries):
     _header('MOP4: 楽器間同期誤差 (<= 20 ms)')
+    print('  参考値: USB 受信時刻ベースの近似 (到着ジッタ ~20ms が乗る)。')
+    print('  正式判定は MOP_TEST=4 ビルド + mop4_sync_error.py を使う。')
     evts = []
     for e in entries:
         m = RE_NOTE_ON.search(e.text)
@@ -219,6 +221,8 @@ def mop4(entries):
 # ── MOP5: 指揮→楽器 通信遅延 ──
 def mop5(entries):
     _header('MOP5: 指揮→楽器 通信遅延 (<= 30 ms)')
+    print('  参考値: USB 受信時刻の差で絶対片道遅延は測れない。')
+    print('  正式判定は MOP_TEST=5 ビルド + mop5_comm_delay.py (lateMs 方式) を使う。')
     cond = {}
     for e in entries:
         m = RE_BEAT_N1.search(e.text)

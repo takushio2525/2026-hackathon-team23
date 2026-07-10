@@ -143,11 +143,18 @@ def graph_mop4(csv_path):
         return
 
     headers = list(rows[0].keys())
-    is_new_format = 'noteNumber' in headers and 'device_t' in headers
+    # 廃止済みの NOTE_ON PC タイムスタンプ方式 CSV (秒単位)。過去データ用に残す
+    is_pc_ts_format = 'noteNumber' in headers and 'device_t' in headers
 
     beat_groups = defaultdict(list)
 
-    if is_new_format:
+    if 'localMasterMs' in headers and 'playAtMasterMs' in headers:
+        # 現行 M45F 方式 (mop4_sync_error.py): 発火時の推定マスタ時刻 (ms)。
+        # 指揮者リセットで beatNo が 1 から再開しても混ざらないよう playAt もキーに含める
+        for r in rows:
+            beat_groups[(int(r['beatNo']), int(r['playAtMasterMs']))].append(
+                float(r['localMasterMs']))
+    elif is_pc_ts_format:
         for r in rows:
             beat_groups[int(r['beatNo'])].append(float(r['pc_timestamp']))
     elif 'localMs' in headers or 'localMasterMs' in headers:
@@ -163,14 +170,12 @@ def graph_mop4(csv_path):
     errors = []
     for b in beats_sorted:
         times = beat_groups[b]
-        if len(times) >= 2:
-            if is_new_format:
-                diff = (max(times) - min(times)) * 1000
-            else:
-                diff = max(times) - min(times)
-            errors.append(diff)
-        else:
-            errors.append(0)
+        if len(times) < 2:
+            continue  # 1 台しか揃わない拍を誤差 0 で混ぜると平均が実態より下がる
+        diff = max(times) - min(times)
+        if is_pc_ts_format:
+            diff *= 1000
+        errors.append(diff)
 
     errors = np.array(errors)
     max_error = float(np.max(errors)) if len(errors) > 0 else 0
@@ -197,7 +202,7 @@ def graph_mop4(csv_path):
             fontsize=11,
             bbox=dict(boxstyle='round,pad=0.5', facecolor='#F3F4F6', alpha=0.9))
 
-    ax.set_xlabel('拍番号')
+    ax.set_xlabel('集計拍 (時系列順)')
     ax.set_ylabel('同期誤差 (ms)')
     ax.set_title(make_title('MOP4: 楽器間同期誤差 (≤ 20 ms)', passed),
                  fontsize=14, fontweight='bold',
@@ -219,12 +224,18 @@ def graph_mop5(csv_path):
         return
 
     headers = list(rows[0].keys())
-    is_new_format = 'noteNumber' in headers and 'device_t' in headers
+    is_pc_ts_format = 'noteNumber' in headers and 'device_t' in headers
 
     threshold_ms = 30
     pairwise_delays = []
+    is_late_format = 'lateMs' in headers  # 現行 M45R/M45F 方式 (mop5_comm_delay.py)
 
-    if is_new_format:
+    if is_late_format:
+        # 発火時の遅刻 lateMs のヒストグラム。判定は p95 <= 閾値 (スクリプトと同基準)
+        for r in rows:
+            if r.get('type', '') == 'F':
+                pairwise_delays.append(float(r['lateMs']))
+    elif is_pc_ts_format:
         beat_groups = defaultdict(list)
         for r in rows:
             beat_groups[int(r['beatNo'])].append(float(r['pc_timestamp']))
@@ -253,7 +264,7 @@ def graph_mop5(csv_path):
     max_delay = float(np.max(delays))
     mean_delay = float(np.mean(delays))
     p95 = float(np.percentile(delays, 95))
-    passed = max_delay <= threshold_ms
+    passed = (p95 <= threshold_ms) if is_late_format else (max_delay <= threshold_ms)
 
     fig, ax = plt.subplots(figsize=FIGSIZE)
     ax.hist(delays, bins=40, color=COLOR_DATA_ALT, alpha=0.8, edgecolor='white')
@@ -271,9 +282,12 @@ def graph_mop5(csv_path):
             fontsize=11,
             bbox=dict(boxstyle='round,pad=0.5', facecolor='#F3F4F6', alpha=0.9))
 
-    ax.set_xlabel('ノードペア間遅延 (ms)')
+    ax.set_xlabel('発火遅刻 lateMs (ms)' if is_late_format
+                  else 'ノードペア間遅延 (ms)')
     ax.set_ylabel('頻度')
-    ax.set_title(make_title('MOP5: スレーブ間発音同期 (≤ 30 ms)', passed),
+    ax.set_title(make_title('MOP5: 発音予約の遅刻 (発火 lateMs p95 ≤ 30 ms)'
+                            if is_late_format
+                            else 'MOP5: スレーブ間発音同期 (≤ 30 ms)', passed),
                  fontsize=14, fontweight='bold',
                  color=COLOR_PASS if passed else COLOR_FAIL)
     ax.legend(loc='upper left')

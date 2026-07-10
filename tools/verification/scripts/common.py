@@ -149,6 +149,19 @@ def read_line(ser):
         return None
 
 
+# ── 統計ヘルパー ──
+
+def percentile(data, p):
+    """リストから第 p パーセンタイルを線形補間で返す (numpy 不要版)。"""
+    if not data:
+        return 0.0
+    s = sorted(data)
+    k = (len(s) - 1) * p / 100.0
+    f = int(k)
+    c = f + 1 if f + 1 < len(s) else f
+    return s[f] + (s[c] - s[f]) * (k - f)
+
+
 # ── 表示ヘルパー ──
 
 def print_header(title):

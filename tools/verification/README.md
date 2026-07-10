@@ -140,25 +140,75 @@ python3 scripts/analyze.py logs/test_XXXXXXXX_XXXXXX.log \
 | ログ | `[N2 NOTE_ON ] part=... note=... vel=... dur=...` |
 | 判定 | 送出された noteNumber が期待値と一致すれば PASS |
 
-### MOP4: 楽器間同期誤差 (<= 20 ms)
+### MOP4: 楽器間同期誤差 (<= 20 ms) — MOP_TEST ビルド + 専用スクリプト
 
 | 項目 | 内容 |
 |---|---|
-| 方法 | 複数楽器の NOTE_ON の PC 側タイムスタンプ差を比較 |
-| 必要機材 | 楽器ノード 2 台以上 (SERIAL_DEBUG=1) + 指揮者 |
-| ログ | `[N? NOTE_ON ] ... t=...` |
-| 判定 | 同時発音クラスタの最大時間差 <= 20ms |
-| 注意 | USB シリアル遅延 (~1-3ms) を含む近似値 |
+| 方法 | 楽器の**発火箇所**が出すデバイス側計測ログ `M45F` の localMasterMs (発火時点の推定マスタ時刻) を beatNo で突合し、ノード間レンジ (max−min) を同期誤差とする |
+| 必要機材 | 楽器ノード 2 台以上 (**MOP_TEST=4 ビルド**) + 指揮者 (通常ビルドのまま) |
+| ログ | `M45F,<partId>,<beatNo>,<playAtMasterMs>,<deviceMs>,<offsetMs>,<localMasterMs>` |
+| 集計 | `python3 scripts/mop4_sync_error.py logs/test_XXXX.log` → 平均/p50/p95/最大と 20ms 超過率 |
+| 判定 | 最大レンジ <= 20ms |
+| 注意 | USB 受信時刻は判定に**使わない** (旧 NOTE_ON PC タイムスタンプ方式は到着ジッタ ~20ms で廃止。経緯: `results/MOP45_latency_investigation_20260710.md`) |
 
-### MOP5: 指揮→楽器 通信遅延 (<= 30 ms)
+具体的な再計測手順は後述「MOP4/MOP5 の再計測手順」を参照。
+
+### MOP5: 発音予約の遅刻 lateMs (発火 p95 <= 30 ms) — MOP_TEST ビルド + 専用スクリプト
+
+計画書の MOP5「指揮→楽器 通信遅延 ≤30ms」(絶対片道遅延) は片方向の時計同期
+(EMA が平均遅延を吸収) では原理的に計測できないため、検証可能な指標
+「BEAT が beatLookahead (45ms) の発音予約に間に合っているか」に再定義した。
+絶対片道遅延の実測 (GPIO トグル + ロジックアナライザ / 往復 ping-ACK 同期) は将来課題。
 
 | 項目 | 内容 |
 |---|---|
-| 方法 | 同一 beatNo の EVT BEAT の PC 受信時刻差 (指揮者 vs 楽器) |
-| 必要機材 | 指揮者 + 楽器 1 台以上 |
-| ログ | `[N1 EVT BEAT] no=...` / `[N2 EVT BEAT] no=...` |
-| 判定 | 最大遅延 <= 30ms |
-| 注意 | USB シリアル遅延の差分 (~1-3ms) を含む近似値 |
+| 方法 | BEAT 受信時 (`M45R`) と発火時 (`M45F`) の `lateMs = max(0, localMasterMs − playAtMasterMs)` を集計 |
+| 必要機材 | 楽器ノード 1 台以上 (**MOP_TEST=5 ビルド**。=4 と同一ログなのでどちらでも可) + 指揮者 |
+| ログ | `M45R,...` (受信時) / `M45F,...` (発火時)。1 拍 1 行ずつ (旧 M5I の二重記録は解消済み) |
+| 集計 | `python3 scripts/mop5_comm_delay.py logs/test_XXXX.log` → 受信/発火の遅刻率・lateMs 分布・lookahead 45ms に対する系統シフト |
+| 判定 | 発火 lateMs の p95 <= 30ms (`--threshold` で変更可) |
+
+### MOP4/MOP5 の再計測手順（MOP_TEST ビルド）
+
+MOP4/MOP5 は SERIAL_DEBUG ログではなく **MOP_TEST ビルドの専用ログ (M45R/M45F)** で計測する。
+MOP_TEST=4 と =5 は同一のログを出すため、**1 回の計測で MOP4/MOP5 の両方を集計できる**。
+
+```bash
+# 1. ビルドフラグを付けて楽器ノード (node_02〜06) を書き込み
+#    platformio.ini は編集不要 (環境変数が build_flags に追記される)。
+#    SERIAL_DEBUG の値はどちらでもよい (集計は行中の M45 行だけを正規表現で拾う)。
+#    指揮者 node_01 は通常ビルドのまま書き換え不要。
+for n in 02 03 04 05 06; do
+  PLATFORMIO_BUILD_FLAGS="-DMOP_TEST=4" pio run -d firmware/production/node_$n -t upload
+done
+
+# 2. 楽器ノードを全部 PC に USB 接続してログ収集を開始
+cd tools/verification
+python3 scripts/serial_logger.py     # Ctrl+C で停止
+
+# 3. 指揮者を振って 60 秒以上演奏する (定常テンポ。例: メトロノーム 120 BPM)
+
+# 4. 集計 (同じログから両方出せる)
+python3 scripts/mop4_sync_error.py logs/test_YYYYMMDD_HHMMSS.log
+python3 scripts/mop5_comm_delay.py logs/test_YYYYMMDD_HHMMSS.log
+
+# 5. グラフ生成 (results/mopN/ の最新 CSV を読む)
+python3 scripts/mop_graphs.py --mop 4 5
+
+# 6. 計測が終わったらフラグなしで再ビルド・書き込みして通常動作に戻す
+for n in 02 03 04 05 06; do
+  pio run -d firmware/production/node_$n -t upload
+done
+```
+
+補足:
+- ログ形式: 受信時 `M45R,<partId>,<beatNo>,<playAtMasterMs>,<deviceMs>,<offsetMs>,<localMasterMs>`、
+  発火時 `M45F,...` (同一フィールド)。localMasterMs = deviceMs + offsetMs。
+- 出力レート: 1 拍あたり 2 行 × 約 55 バイト (120 BPM で ~220 B/s/ノード)。
+  115200 bps に対し十分小さく、シリアル帯域は圧迫しない。
+- MOP_TEST > 0 では NOTE バイナリ送出が止まるため Processing 連携 (発音) は不可。
+- 集計スクリプトはライブ計測を持たない (旧ライブ計測は逐次ポーリングで
+  タイムスタンプが破綻していたため廃止)。必ず serial_logger.py のログを渡す。
 
 ### MOP6: テンポ追従の遅延 (<= 2 拍)
 
@@ -260,9 +310,12 @@ python scripts/mop_graphs.py --mop 1 4 8
 ## 制約・注意事項
 
 - `SERIAL_DEBUG=1` と `SERIAL_DEBUG=0` は排他。NOTE バイナリ送出と
-  テキストログは同時に出せない
-- MOP4/MOP5 の計測値には USB シリアル遅延 (~1-3ms) が含まれる。
-  WiFi 遅延のみを厳密に測るにはオシロスコープ等の外部計測が必要
+  テキストログは同時に出せない (`MOP_TEST>0` でも NOTE バイナリは止まる)
+- MOP4/MOP5 はデバイス側計測 (M45R/M45F) なので USB シリアル遅延は乗らない。
+  ただし推定マスタ時刻は EMA オフセット依存であり、絶対片道遅延
+  (計画書 MOP5 の本来の定義) は片方向同期では測れない。GPIO トグル +
+  ロジックアナライザ等の外部計測が将来課題。
+  analyze.py の MOP4/MOP5 は USB 受信時刻ベースの参考値で、正式判定には使わない
 - 楽譜突合 (MOP3) は production の「かえるのうた」(32 拍) をハードコード。
   楽譜を変えた場合は `analyze.py` の `EXPECTED_SCORE` を更新する
 - ドラムノード (node_06) は MOP3 の楽譜突合対象外
