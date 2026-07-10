@@ -5,24 +5,36 @@
 
 ## 現在の対象
 
-- `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` を `main` の同じ場所へ反映
-- フルート・オルガン音色を含む Processing スケッチのコミット・プッシュ
+- MOP4/MOP5（通信遅延系）の計測妥当性調査が完了。調査レポート
+  `tools/verification/results/MOP45_latency_investigation_20260710.md` にコミット済み。
+  コード（.ino/.cpp/.pde/検証スクリプト）は一切変更していない。
 
-## 直近の観点
+## 判明したこと（Codex メモの検算結果込み・詳細はレポート参照）
 
-- `saitou-work` から該当フォルダだけを `main` に `git restore --source=saitou-work` で取り込み。
-- 反映対象:
-  - `work/saito/week10/kaeru_score_week10_adjusted/kaeru_score_week10_adjusted.pde`
-  - `work/saito/week10/kaeru_score_week10_adjusted/README.md`
-  - `work/saito/week10/kaeru_score_week10_adjusted/data/flute.tweaked.instrument.json`
-  - `work/saito/week10/kaeru_score_week10_adjusted/data/organ.tweaked.instrument.json`
-- JSON 検証: `jq empty` 成功。
-- Processing 検証: `processing-java --build` 成功。
+- Codex の指摘 5 件は全件正しいと確認（CSV 再集計 平均 2586.3ms/最大 5263.3ms は完全一致、
+  M5I 二重記録 239行/120拍も一致、device_t+offset の発火差推定 p50=8/p95≈30/最大61ms も再現）。
+- **7/9 レポートの MOP4/MOP5 公表値の出所を完全特定**: `logs/test_20260709_234302.log` の
+  EVT BEAT `ahead` 値（MOP4=ノード間レンジ、MOP5=ペア差）で全統計量が一致。
+  レポートの「NOTE_ON PC タイムスタンプベース」「データ: mop4/20260709_233957.csv」という
+  記載は両方誤り。7973294 で改修した NOTE_ON ベーススクリプトの実出力は破綻値で未使用。
+- 現行スクリプトの欠陥: ライブ計測の逐次ブロッキングポーリング（timeout=0.1×6ポート）、
+  `--log` モードのタブ/スペース区切り不一致、NOTE_ON プレフィックス全ノード `[N2` 固定、
+  直前 EVT BEAT 紐付けの誤対応（101 件確認）。
+- **新発見**: beatLookahead=45ms は 53% の拍で間に合っていない（lateMs p95=91/最大116ms）。
+  到着ジッタは全ノード共通（±100ms、マルチキャスト単一フレーム）なので同期は保たれる。
+  ahead の平均が理論値 45ms でなく ≈0 になる約 45〜55ms の系統シフトは**未解明**。
+- 計画書の MOP5「指揮→楽器 通信遅延 ≤30ms」は依然未検証（絶対片道遅延は片方向同期では測れない）。
+- 未コミットの node_02〜06 `platformio.ini`（SERIAL_DEBUG=1）はユーザーの変更として維持。触らない。
 
 ## 次の一手
 
-- 実機・発表環境では Processing 4 で `work/saito/week10/kaeru_score_week10_adjusted/kaeru_score_week10_adjusted.pde` を開いて聴感確認する。
+1. 最終レポート・振り返り（7/15）で MOP_REPORT_20260709.md の方式・出典記載を訂正
+   （調査レポートの §3.3/§5-A が根拠。文章修正のみで実施可能）。
+2. 時間があれば再計測 B 案: 発火箇所 1 行ログ（localMasterAtFire）+ lateMs 専用モード +
+   M5I 出力一元化 + analyze_log の区切り文字修正（ユーザー主導・実機必要）。
+3. 絶対片道遅延の実測（GPIO+ロジアナ / ping-ACK 同期）は将来課題として記載に留める。
 
 ## 現フェーズで Read すべき設計書
 
-- 音色・Processing 作業確認: `work/saito/week10/kaeru_score_week10_adjusted/README.md`
+- MOP4/5 の議論を続ける場合: `tools/verification/results/MOP45_latency_investigation_20260710.md`
+  と `tools/verification/results/MOP_REPORT_20260709.md` を先に Read。

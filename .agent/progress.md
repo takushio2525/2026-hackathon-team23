@@ -3,6 +3,12 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-10: **MOP4/MOP5 調査レポートを作成**（`results/MOP45_latency_investigation_20260710.md`）。
+  Codex 指摘 5 件を全件検算で確認、7/9 レポート公表値の出所を EVT BEAT `ahead` レンジ/ペア差と完全特定
+  （記載の NOTE_ON 方式・出典 CSV は誤り）、lookahead 45ms が 53% の拍で不足という新事実も発見。コード変更なし。
+
+- 2026-07-10: **通信系 MOP4/MOP5 の計測妥当性を調査**。MOP5 が通信遅延でなく USB 到着差へすり替わっていること、NOTE_ON と EVT BEAT の紐付け不整合、7/9 MOP4 CSV とレポート値の非再現、MOP_TEST=5 の二重出力を確認。発火時刻ログによる MOP4 再計測と、MOP5 の期限超過/物理片道遅延の分離を推奨（コード変更なし）。
+
 ## 2026-06 — 本番プログラム構築フェーズ
 
 - 2026-06-25: **MOE/MOP 全9項目の検証プログラムを新規作成**（`f3fddc6`）。
@@ -454,5 +460,7 @@
 - 2026-06-27: `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` を `main` の同じ場所に取り込み。最新調整（チューバ0.36、ドラム0.11、金管attack短縮）込みで Processing ビルド成功。
 - 2026-07-01: `umezawa_work` の docs 更新だけを `main` に取り込み、旧ページ削除と新しい system/implementation/history 構成への再編を反映。
   `main` 側の延期日程（7/8 成果発表・7/15 振り返り）を競合解消時に継承し、`npm run build` で84ページの生成成功を確認。
+
+- 2026-07-09: **MOP グラフ生成スクリプト新規作成 + MOP4/MOP5 NOTE_ON 改修コミット**（`7973294`）。`mop_graphs.py` で MOP1/4/5/6/7/8/9 のグラフを PNG 出力（目標値赤破線・PASS/FAIL 表示）。MOP4/MOP5 を EVT BEAT+ahead → NOTE_ON PC タイムスタンプベースに改修。
 
 - 2026-07-08: `saitou-work` の `work/saito/week10/kaeru_score_week10_adjusted/` からフルート・オルガン版 Processing スケッチを `main` の同じ場所へ反映。`jq empty` と `processing-java --build` が成功。
