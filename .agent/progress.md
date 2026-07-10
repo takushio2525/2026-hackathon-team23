@@ -3,6 +3,11 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-10: **MOP4/MOP5 計測パイプラインを書き直し**（`b23c3e6` ファーム / `7bac5ef` スクリプト+README）。
+  受信 M45R + 発火 M45F のデバイス側 1 行ログに統一（二重記録解消）、MOP4 = 発火時 localMaster レンジ、
+  MOP5 = lateMs（lookahead 45ms 遅刻）に再定義。全ノード 3 種ビルド SUCCESS・通常ビルドはバイナリ一致・
+  セルフテスト PASS。実機再計測はユーザー（README に手順）。
+
 - 2026-07-10: **MOP4/MOP5 調査レポートを作成**（`results/MOP45_latency_investigation_20260710.md`）。
   Codex 指摘 5 件を全件検算で確認、7/9 レポート公表値の出所を EVT BEAT `ahead` レンジ/ペア差と完全特定
   （記載の NOTE_ON 方式・出典 CSV は誤り）、lookahead 45ms が 53% の拍で不足という新事実も発見。コード変更なし。
