@@ -39,7 +39,15 @@ inline const OrcNetConfig ORC_NET_CONFIG = {
 inline const OrcSenderConfig ORC_SENDER_CONFIG = {
     /*ctrlIntervalMs=*/  50,   // 20 Hz
     /*beatRedundancy=*/  4,    // 同一 BEAT を 4 連送 (旧 2 だが ESP32-S3 SoftAP の radio ロス対策。連送間隔は OrcNetModule の beatGapMs で設定)
-    /*beatLookaheadMs=*/ 45,   // playAtMasterMs = masterNow + 45 ms (連送 ~8ms + WiFi ジッタ余裕)
+    /*beatLookaheadMs=*/ 220,  // playAtMasterMs = masterNow + 220 ms。
+                               // SoftAP のマルチキャストが STA 省電力の DTIM バッファリングで
+                               // 204.8ms (ビーコン 102.4ms × 2) 周期のバースト配送になり、
+                               // BEAT が最大 ~205ms 遅れて届く実測に基づく暫定値
+                               // (tools/verification/results/MOP5_systematic_shift_analysis_20260710.md §3/§8 案1)。
+                               // 旧 45ms では 発火遅刻 真値 p95 ≈145ms と構造的に不足していた。
+                               // 代償: 指揮→発音の固定遅延が ~220ms (120BPM で約半拍)。
+                               // OrcNetModule の SoftAP ビーコン間隔短縮 (バースト周期 ~51ms 化) の
+                               // 効果を実測で確認できたら 70ms 程度まで短縮可。
 };
 
 inline const StatusLedConfig STATUS_LED_CONFIG = {
