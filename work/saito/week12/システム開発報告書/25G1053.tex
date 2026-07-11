@@ -1,0 +1,280 @@
+\documentclass[uplatex,dvipdfmx]{jlreq}
+
+\input{pckgs.sty}
+
+\begin{document}
+
+\begin{titlepage}
+\vspace*{1cm}
+\centering
+\Huge\textsf{システム開発報告書}\\[8mm]
+\LARGE\textsf{タクトーン}\\[3mm]
+\Large\textsf{IMUジェスチャで奏でるArduinoオーケストラ}\\[2cm]
+\Large\textsf{情報工学科 2年}\\
+\Large\textsf{25G1053}\\[5pt]
+\huge\textsf{齋藤 翔太}
+
+\vspace*{1cm}
+\Large\sffamily
+\begin{itembox}[c]{チーム23}
+\centering
+\begin{tabular}{ll}
+片岡 聖（24G1038）&
+地曳 賢人（24G1075）\\
+御代川 稜（24G1131）&
+梅澤 颯太（25G1021）\\
+塩澤 匠生（25G1065）&\\
+\end{tabular}
+\end{itembox}
+
+\vspace*{1cm}
+\Large\textsf{\today}
+\end{titlepage}
+\clearpage
+
+\section{はじめに}
+本報告書では，チーム23が制作した「タクトーン」について，システム全体の構成と筆者の担当範囲を述べる．
+本システムは，Arduino UNO R4 WiFiを用いて，指揮者役のマイコンと複数の楽器役マイコンを連携させ，PC上のProcessingで音を合成して演奏するシステムである．
+
+授業資料では，同期信号の受信精度，タイミング誤差，エンターテインメント性，楽器音らしさなどが評価観点として示された．
+そこで本チームでは，単に決められたテンポで音を鳴らすのではなく，指揮者役マイコンのIMUから得られる動きを演奏制御に使う方針を採用した．
+この方針により，音楽経験が少ない人でも，指揮を振るという直感的な動作によって演奏へ参加できることを目指した．
+
+筆者の主な担当は，楽譜データの作成，音階生成ロジックの検討，およびProcessing上での4声輪唱確認用スケッチの作成である．
+本報告書は，現時点でリポジトリ内に存在する設計資料，作業ログ，Processingスケッチ，Arduino向け楽譜データをもとにした初稿である．
+今後，発表時の実測値やチーム内での最終確認結果を加えて完成版にする．
+
+\section{要求と設計方針}
+本プロジェクトの目的は，外的要因に作用されず，機器さえあれば音楽未経験者でも演奏できる体験を実現することである．
+チーム内では，ユーザが指揮を振るテンポを変えたときに演奏速度も変わることを中心的なゴールとした．
+また，同期の成否を判断する指標として，楽器間の同期誤差20 ms以内を目安にした．
+
+表\ref{tab:requirements}に，本システムで重視した要求と対応方針を示す．
+
+\begin{table}[tb]
+\centering
+\caption{主な要求と対応方針}
+\label{tab:requirements}
+\small
+\begin{tabular}{p{32mm}p{55mm}p{55mm}}
+\hline
+要求 & 内容 & 対応方針 \\
+\hline
+同期演奏 & 5台構成で演奏タイミングを合わせる & 指揮者ノードから楽器ノードへUDPで拍情報を送る \\
+可変テンポ & 指揮の速さに演奏を追従させる & IMUの動きから拍とテンポを推定する \\
+輪唱 & 複数パートがずれて同じ主旋律を演奏する & 各パートに開始拍を設定し，同じ楽譜を時間差で使う \\
+楽器音らしさ & 目的の楽器に聞こえる音を鳴らす & Processingで倍音構造，ADSR，原音サンプルを用いて音色を作る \\
+エンターテインメント性 & 見て分かる演奏体験にする & 指揮を振る動作そのものを演奏体験の中心に置く \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{システム全体構成}
+システムは，指揮者ノード，4台の楽器ノード，PC上のProcessingアプリから構成される．
+指揮者ノードはArduino UNO R4 WiFiの内蔵IMUで動きを読み取り，拍，テンポ，強弱などに対応する制御情報を生成する．
+楽器ノードはそれぞれ自分の楽譜データを持ち，受信した拍情報に合わせて発音情報をPCへ送る．
+PC側ではProcessingとMinimを用いて，受け取った発音情報または確認用スケッチ内の楽譜データから音を再生する．
+
+チームの設計資料では，通信方式としてUDPを採用している．
+UDPは到達保証を持たない一方で，低遅延で1対多の配信に向いている．
+本システムでは演奏タイミングが重要であるため，多少の欠損よりも遅延を小さくすることを優先した．
+また，Arduino側の実装では，入力，ロジック，出力を分ける構成を採用し，将来的に5台のノードで共通化しやすい構造にする方針である．
+
+\section{個人担当範囲}
+筆者は，主に楽譜データと音色確認用Processingスケッチを担当した．
+具体的には，「かえるのうた」を題材に，4声の輪唱として成立するように開始拍，音域，音色，音量バランスを調整した．
+初期段階では金管4声を想定していたが，発表前確認用のスケッチでは，フルート，トランペット，トロンボーン，オルガンの4声構成に変更した．
+これにより，高音域の旋律，金管らしい中音域，低音域の支えを分けて確認できるようにした．
+
+表\ref{tab:parts}に，最終確認用Processingスケッチにおける主旋律パートの構成を示す．
+4パートは同じ基準譜面を使い，開始拍とオクターブ移調を変えることで輪唱を構成している．
+
+\begin{table}[tb]
+\centering
+\caption{Processing確認用スケッチの主旋律パート}
+\label{tab:parts}
+\small
+\begin{tabular}{p{38mm}p{30mm}p{25mm}p{45mm}}
+\hline
+パート & 音色 & 開始拍 & 音域設定 \\
+\hline
+主旋律1 & フルート & 0拍 & C5〜A5 \\
+主旋律2 & トランペット & 8拍 & C5〜A5 \\
+主旋律3 & トロンボーン & 16拍 & C3〜A3 \\
+主旋律4 & オルガン & 24拍 & C3〜A3 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{実装内容}
+\subsection{楽譜データ}
+楽譜データは，1拍を1要素として扱う構造にした．
+Arduino側では\texttt{ScoreEvent}構造体を用意し，拍番号，MIDIノート番号，ベロシティ，発音長，休符フラグを保持する．
+また，終盤の半拍音符を表現するために，\texttt{subNote}，\texttt{subOffsetQ8}，\texttt{subDurationQ8}などの補助フィールドを用意している．
+
+この設計により，1拍単位の単純な旋律だけでなく，拍の途中に入る短い音も同じ配列内で扱える．
+「かえるのうた」の主旋律は32拍で構成し，Processing確認用スケッチでは同じ\texttt{MELODY\_SCORE}を4パートで共用した．
+開始拍を0，8，16，24拍にずらすことで，輪唱として聞こえるようにした．
+
+\subsection{音色と再生確認}
+Processing確認用スケッチでは，音色JSONを読み込み，倍音比，倍音振幅，エンベロープをもとに音を合成する．
+金管系の音色では複数の正弦波を重ね，ADSRで音の立ち上がりと減衰を制御した．
+ドラムはキック，スネア，ハイハット，クラッシュを用意し，4分の4拍子として1・3拍目にキック，2・4拍目にスネアを配置した．
+各声部の入りでクラッシュとキックを重ねることで，輪唱の開始位置を聞き取りやすくした．
+
+フルートについては，倍音合成だけでは自然な質感を出しにくかったため，\texttt{tone\_sample}を含む音色JSONを用いた．
+スケッチ側では\texttt{ToneSampleUGen}を実装し，原音サンプルをループ再生することで，倍音合成よりもフルートらしい音を得る方針にした．
+また，金管の立ち上がりがドラムに比べて遅く聞こえる問題に対し，拍位置は変えずに\texttt{BRASS\_ATTACK\_SCALE = 0.45}としてエンベロープのattackを短縮した．
+
+\section{評価と考察}
+現時点で確認できていることは，Processing上で4声輪唱とドラム伴奏を再生できることである．
+4声は0，8，16，24拍で順に入り，ドラムは56拍ぶん用意されているため，最後のパートが終わるまで伴奏を維持できる．
+また，\texttt{MASTER\_GAIN = 1.35}，\texttt{DRUM\_AMPLITUDE = 0.095}，\texttt{FLUTE\_SAMPLE\_GAIN = 1.32}などを調整し，旋律とドラムの音量バランスを改善した．
+
+一方で，システム全体としての同期誤差20 ms以内を満たしたかどうかは，本稿執筆時点では十分に記述できていない．
+これは，Processing確認用スケッチが音色と楽譜の妥当性確認を目的としており，Arduino 5台とPCを結合した実測評価とは役割が異なるためである．
+完成版の報告書では，実機での同期誤差，テンポ追従，発表環境での聴感確認の結果を追加する必要がある．
+
+筆者の担当範囲に限ると，主な成果は，楽譜を共通化しながら開始拍と音域を変える構成にしたことである．
+この構成は，楽譜の修正箇所を減らし，4声の入り方を比較しやすくする利点がある．
+また，音色JSONをスケッチ内の\texttt{data/}フォルダに同梱したため，外部フォルダに依存せず再生確認できる．
+今後の課題は，Processing上で調整した音色と音量を，実際の発表会場やスピーカ環境で確認し，必要に応じて再調整することである．
+
+\section{開発支援ツールの利用}
+本プロジェクトでは，設計資料の整理，Processingスケッチの修正方針検討，作業ログ作成の補助に生成AIを利用した．
+筆者の担当では，4声輪唱の開始拍，音域設定，ドラム伴奏，音量バランス，READMEや作業ログの記述整理に利用した．
+
+ただし，生成AIの出力をそのまま採用したわけではない．
+Processingスケッチの定数，\texttt{MELODY\_PARTS}，音色JSONの配置，READMEの記述を照合し，実際にリポジトリ内に存在する内容と一致していることを確認した．
+また，作業ログでは，AIの提案内容，検証手順，未実施項目を分けて記録した．
+これにより，AIを使った部分と，人間が確認して判断した部分を区別できるようにした．
+
+\section{おわりに}
+本報告書では，チーム23の「タクトーン」について，システム全体の構成と筆者の担当した楽譜データ・Processing確認用スケッチを中心に述べた．
+本システムは，指揮者ノードのIMUジェスチャを使って演奏を制御し，複数の楽器ノードとPC上の音色合成を組み合わせることで，指揮を振る体験を演奏に結び付けることを目指したものである．
+
+筆者は，「かえるのうた」を4声輪唱として確認できるProcessingスケッチを作成し，開始拍，音域，音色，ドラム伴奏，音量バランスを調整した．
+この成果により，Arduino側へ反映する楽譜データと，発表時に聞こえる音色の確認を進めやすくなった．
+今後は，チーム内で実機の評価結果を整理し，同期誤差やテンポ追従の定量的な結果を追記することで，完成版の報告書に仕上げる．
+
+\section*{参考文献}
+\begin{enumerate}
+\item ハッカソン1授業資料，\texttt{Hackathon1-260408版.pdf}，2026年．
+\item ハッカソン1報告書評価資料，\texttt{Hackathon1-Ruburic2026.pdf}，2026年．
+\item チーム23リポジトリ，プロジェクト概要，システム構成，通信方針に関する設計資料，2026年．
+\item チーム23リポジトリ，齋藤翔太のweek9〜week11作業ログおよびProcessingスケッチ，2026年．
+\end{enumerate}
+
+\appendix
+\renewcommand{\thefigure}{A.\arabic{figure}}
+\renewcommand{\thetable}{A.\arabic{table}}
+\renewcommand{\theequation}{\Alph{section}.\arabic{equation}}
+
+\section{役割分担とスケジュール}
+表\ref{tab:roles}に，設計資料に基づく主な役割分担を示す．
+
+\begin{table}[tb]
+\centering
+\caption{主な役割分担}
+\label{tab:roles}
+\small
+\begin{tabular}{p{32mm}p{105mm}}
+\hline
+メンバー & 主な担当 \\
+\hline
+塩澤 匠生 & Arduino系プログラム全般，指揮者ノード，楽器ノード，共通層 \\
+齋藤 翔太 & 楽譜データ作成，音階生成ロジック検討，Processing確認用スケッチ \\
+梅澤 颯太 & Processingによる音色合成，演奏再生 \\
+御代川 稜 & 議事録，実機検証，発表準備補助 \\
+地曳 賢人 & 議事録，実機検証，発表準備補助 \\
+片岡 聖 & 議事録，実機検証，発表準備補助 \\
+\hline
+\end{tabular}
+\end{table}
+
+図\ref{gantt1}に，授業スケジュールをもとにした概略スケジュールを示す．
+\begin{figure}[tb]
+    \begin{center}
+    \begin{ganttchart}[y unit title=0.4cm,
+    y unit chart=0.5cm,
+    vgrid,hgrid,
+    title label anchor/.style={below=-1.6ex},
+    title left shift=.05,
+    title right shift=-.05,
+    title height=1,
+	title/.append style={fill=yellow!10},
+    progress label text={},
+	bar height=0.7,
+    group right shift=0,
+    group top shift=.6,
+    group height=.3]{1}{24}
+    \gantttitle{8 Weeks}{24} \\
+    \gantttitle{W1}{3}
+    \gantttitle{W2}{3}
+    \gantttitle{W3}{3}
+    \gantttitle{W4}{3}
+    \gantttitle{W5}{3}
+    \gantttitle{W6}{3}
+	\gantttitle{W7}{3}
+	\gantttitle{W8}{3}\\
+    \ganttbar[bar/.append style={fill=orange!40}]{目的・構成決定}{1}{6} \\
+    \ganttbar[bar/.append style={fill=green!40}]{基本設計・詳細設計}{4}{12} \\
+    \ganttbar[bar/.append style={fill=blue!40}]{楽譜・音色試作}{7}{18} \\
+    \ganttbar[bar/.append style={fill=red!30}]{実装・結合確認}{13}{21} \\
+    \ganttbar[bar/.append style={fill=purple!30}]{発表・報告書作成}{21}{24}
+    \end{ganttchart}
+    \end{center}
+    \caption{概略スケジュール}
+	\label{gantt1}
+\end{figure}
+
+\section{プログラムソース}
+以下に，Processing確認用スケッチにおけるパート定義の抜粋を示す．
+この定義により，同じ楽譜を開始拍とオクターブ移調だけ変えて4声輪唱として再生する．
+
+\begin{lstlisting}
+class PartDefinition {
+  String name;
+  String instrumentFile;
+  int startBeat;
+  int octaveShift;
+  float amplitude;
+
+  PartDefinition(String name, String instrumentFile,
+                 int startBeat, int octaveShift, float amplitude) {
+    this.name = name;
+    this.instrumentFile = instrumentFile;
+    this.startBeat = startBeat;
+    this.octaveShift = octaveShift;
+    this.amplitude = amplitude;
+  }
+}
+
+final PartDefinition[] MELODY_PARTS = {
+  new PartDefinition("主旋律1 / フルート",
+      "flute.tweaked.instrument.json", 0, 12, 0.28f),
+  new PartDefinition("主旋律2 / トランペット",
+      "trumpets.tweaked.instrument.json", 8, 12, 0.22f),
+  new PartDefinition("主旋律3 / トロンボーン",
+      "trombones.tweaked.instrument.json", 16, -12, 0.22f),
+  new PartDefinition("主旋律4 / オルガン",
+      "organ.tweaked.instrument.json", 24, -12, 0.25f)
+};
+\end{lstlisting}
+
+次に，Arduino側で用意した楽譜データ構造の抜粋を示す．
+\begin{lstlisting}
+struct ScoreEvent {
+    uint16_t beatAt;          // パート開始からの拍番号
+    uint8_t noteNumber;       // MIDIノート番号。0は休符。
+    uint8_t velocity;         // 楽譜上の強さ。0〜127。
+    uint16_t durationQ8;      // 1/256拍。256 = 1拍。
+    uint8_t flags;            // NoteOn / NoteOff / 休符。
+    uint8_t subNote;          // 拍内の第2音。0は未使用。
+    uint8_t subVelocity;      // subNoteの強さ。
+    uint16_t subOffsetQ8;     // 拍頭からのずれ。128 = 半拍。
+    uint16_t subDurationQ8;   // subNoteの発音長。
+};
+\end{lstlisting}
+
+\end{document}
