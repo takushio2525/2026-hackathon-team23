@@ -54,7 +54,7 @@ pio run -d firmware/production/node_02 -t upload
 ```
 
 **注意**: `SERIAL_DEBUG=1` では楽器のバイナリ NOTE 送出が止まるため Processing 連携不可。
-MOP2 テストのみ `SERIAL_DEBUG=0` に戻す必要がある（後述）。
+（MOP2 は実機を使わないシミュレーション方式なので `SERIAL_DEBUG` の影響を受けない。後述）
 
 ### Step 1: ログ収集
 
@@ -111,25 +111,43 @@ python3 scripts/analyze.py logs/test_XXXXXXXX_XXXXXX.log \
 2. メトロノームに合わせて 60 秒間指揮を振る
 3. `--expected-bpm 120 --test-duration 60` で解析
 
-### MOP2: 音階の誤差 (平均 < 3.6 cent)
+### MOP2: 音階の誤差 (平均 < 3.6 cent) — 専用スクリプト (実機・録音 不要)
 
-**シリアルログでは自動計測不可。以下の手動テスト手順で実施する。**
+シリアルログには音高が乗らないため、**Processing の加算合成を Python で忠実に再現**して
+「現在の楽器 JSON + 現在の発音方法で鳴るはずの波形」を生成し、その基音を周波数解析して
+平均律の理論音高と比較する。録音経路を挟まないので、検出される誤差は 100% 音源データ
+(JSON) と合成式に由来する。
 
 | 項目 | 内容 |
 |---|---|
-| 方法 | Processing の音声出力を録音し周波数分析 |
-| 必要機材 | 楽器ノード 1 台 + PC (Processing) |
-| 判定 | 録音した音の基本周波数と理論音高の cent 差の平均 < 3.6 |
+| 方法 | `SynthVoice/InstrModel/AudioManager.pde` の合成式を移植 → 合成 → 基音推定 → 平均律と比較 |
+| 必要機材 | **なし** (JSON と楽譜から決定論的に再現。実機・Processing・録音とも不要) |
+| 入力 | `pc_app/production/orchestra_resynth/data/*.instrument.json` と `firmware/production/node_02/src/score_data.cpp` |
+| 実行 | `python3 scripts/mop2_pitch_error.py` (`--selftest` で推定器の検証のみ) |
+| 判定 | 全音の平均 cent 差 < 3.6 |
 
-テスト手順:
-1. 楽器ノードを `SERIAL_DEBUG=0` に戻してビルド・書き込み
-2. Processing (`pc_app/production/orchestra_resynth/`) を起動
-3. 指揮者を振って演奏を開始
-4. PC の音声出力を WAV で録音（macOS: QuickTime Player → 新規オーディオ収録 等）
-5. 録音した WAV を音高分析ソフト（Sonic Visualiser 等）で開き、各音の基本周波数を測定
-6. 楽譜の MIDI ノート番号から理論周波数を算出: `f = 440 × 2^((note - 69) / 12)`
-7. cent 差を計算: `cent = 1200 × log2(f_actual / f_theory)`
-8. 全音の平均 cent 差が 3.6 未満なら PASS
+```bash
+cd tools/verification
+.venv/bin/python scripts/mop2_pitch_error.py
+```
+
+出力: `results/mop2/<timestamp>.csv` + `_summary.txt` (どちらも .gitignore 対象) と
+`results/graphs/mop2_pitch_error_slide.png` (発表用)。結論は
+`results/mop2/evaluation.md` に記録してある。
+
+補足:
+
+- 対象は音高を持つ 4 楽器 (トランペット/ホルン/フルート/オルガン = node_02〜05)。
+  ドラム (node_06) は音高を持たないため対象外。
+- 基音推定は「基音帯域の解析信号の隣接サンプル位相差 → 振幅で重み付けした最小二乗」。
+  位相を unwrap して微分する素直な方法は、振幅が落ちた瞬間に位相スリップを起こして
+  数 cent の嘘をつくため使わない。
+- スクリプト先頭でセルフテスト (既知周波数の純音・既知デチューン・既知ビブラート) を必ず走らせ、
+  サブセント精度を確認してからでないと解析に進まない。
+- ビブラートのある楽器は「平均音高」と「変調の振れ幅」を分けて集計する
+  (振れ幅は音楽的な表現であって音階誤差ではない)。
+- 実音を録音した検証はしていない。Minim の D/A・出力デバイスのリサンプリングによる
+  上乗せは本スクリプトの対象外。
 
 ### MOP3: 楽譜との相違 (誤ノート発音数 0)
 
@@ -312,6 +330,10 @@ python scripts/mop_graphs.py --mop 1 4 8
 
 `results/graphs/` に各 MOP の PNG が出力される。
 各グラフには目標値ライン（赤破線）と PASS/FAIL 判定がタイトルに表示される。
+
+**MOP2 だけは `mop_graphs.py` の管轄外**（計測 CSV ではなく JSON と楽譜から直接合成するため）。
+`scripts/mop2_pitch_error.py` が解析とグラフ生成を自己完結で行い、
+`results/graphs/mop2_pitch_error_slide.png`（楽器別・スライド用）を出力する。
 
 MOP5 は 2 枚出力される:
 
