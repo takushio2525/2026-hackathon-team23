@@ -3,6 +3,10 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-11: **MOP5 発声遅延グラフのスライド用シンプル版を追加**（`mop_graphs.py` に
+  `graph_mop5_fire_delay_by_node_slide` 追加 → `results/graphs/mop5_fire_delay_by_node_slide.png`）。
+  16:9・大フォント・データと短い凡例のみ（説明文・判定ボックス・注記なし）。数値は summary と全一致、詳細版は無変更で併存。
+
 - 2026-07-11: **発声タイミング遅延（MOP5 発火 lateMs）の第三者向けグラフを作成**
   （`mop_graphs.py` に `graph_mop5_fire_delay_by_node` 追加 → `results/graphs/mop5_fire_delay_by_node.png`）。
   楽器 5 台のノード別 p95/中央値/最大 + 合格範囲 30ms 緑帯 + 判定 FAIL + 出典を 1 枚に集約。
