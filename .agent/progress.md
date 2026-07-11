@@ -3,6 +3,11 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-11: **MOP5 対策後再計測の評価レポートを作成**（`results/MOP5_countermeasure_eval_20260710.md`）。
+  受信改善は lookahead 220ms のみの効果でビーコン 50TU はバースト周期 204.8ms を縮めず無効、min フィルタは
+  設計どおり動作、発火 p95 47ms と MOP4 尾 46ms は「バースト位相 ~120〜165ms のループストール」が共通原因と
+  特定（実挙動・全ノード）。推奨 = 50TU 設定撤去 → 再計測（ストール解消なら発火 p95 ≈9ms で MOP5 PASS 圏）。
+
 - 2026-07-10: **MOP5 対処案 1/2/4 を production ファームに実装**（`35f70f0` lookahead 45→220ms /
   `6642646` SoftAP beacon 50TU 短縮試行・IDF4.4 に dtim_period 無しのため DTIM 明示は不可・拒否時フォールバック /
   `86c39f4` 楽器時計同期を min フィルタ化・clockSyncWindowMs=2000 新設）。通常 + MOP_TEST=4 で全 7 ノード
