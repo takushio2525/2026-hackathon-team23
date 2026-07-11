@@ -18,6 +18,8 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use('Agg')
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -294,6 +296,129 @@ def graph_mop5(csv_path):
     ax.grid(axis='y', alpha=0.3)
     fig.tight_layout()
     save_fig(fig, 'mop5_comm_delay.png')
+
+    if is_late_format:
+        graph_mop5_fire_delay_by_node(rows, csv_path)
+
+
+def graph_mop5_fire_delay_by_node(rows, csv_path):
+    """発声タイミングの遅延をノード別に示す発表用グラフ (予備知識なしで読める版)。
+
+    棒 = 発火 lateMs の p95 (MOP5 の判定統計量)、◆ = 中央値、― = 最大値。
+    合格範囲 (0〜30 ms) を緑帯で明示し、判定・計測条件・出典を図中に書き込む。
+    """
+    threshold_ms = 30
+    fire = [r for r in rows if r.get('type', '') == 'F']
+    if not fire:
+        print('  発火 (F) レコードなし、ノード別グラフはスキップ')
+        return
+
+    by_node = defaultdict(list)
+    for r in fire:
+        by_node[int(r['partId'])].append(float(r['lateMs']))
+
+    part_ids = sorted(by_node.keys())
+    p50s = [float(np.percentile(by_node[p], 50)) for p in part_ids]
+    p95s = [float(np.percentile(by_node[p], 95)) for p in part_ids]
+    maxs = [float(np.max(by_node[p])) for p in part_ids]
+
+    all_late = np.array([float(r['lateMs']) for r in fire])
+    total_p50 = float(np.percentile(all_late, 50))
+    total_p95 = float(np.percentile(all_late, 95))
+    total_max = float(np.max(all_late))
+    passed = total_p95 <= threshold_ms
+
+    color_band = '#16A34A'
+    color_max = '#374151'
+    bar_colors = [COLOR_PASS if v <= threshold_ms else COLOR_FAIL for v in p95s]
+
+    fig, ax = plt.subplots(figsize=(11.5, 7))
+    x = np.arange(len(part_ids))
+
+    # 合格範囲の緑帯 + 基準線 (ラベルは凡例で示す)
+    ax.axhspan(0, threshold_ms, facecolor=color_band, alpha=0.12, zorder=0)
+    ax.axhline(threshold_ms, color=color_band, linestyle='--', linewidth=2, zorder=1)
+
+    # 棒 = p95 (判定に使う値)
+    bars = ax.bar(x, p95s, width=0.55, color=bar_colors, alpha=0.85,
+                  edgecolor='white', zorder=2)
+    for xi, (bar, v) in enumerate(zip(bars, p95s)):
+        ax.text(xi, v + 1.2, f'p95: {v:.1f}', ha='center', va='bottom',
+                fontsize=11, fontweight='bold', color=bar_colors[xi])
+
+    # ― = 最大値 (単発の最悪値)
+    ax.scatter(x, maxs, marker='_', s=600, linewidths=2.5, color=color_max, zorder=4)
+    for xi, v in enumerate(maxs):
+        ax.text(xi, v + 1.2, f'最大 {v:.0f}', ha='center', va='bottom',
+                fontsize=9.5, color=color_max)
+
+    # ◆ = 中央値 (ふだんの遅れ)
+    ax.scatter(x, p50s, marker='D', s=70, facecolor='white',
+               edgecolor='#111827', linewidths=1.5, zorder=5)
+    for xi, v in enumerate(p50s):
+        ax.text(xi + 0.13, v, f'{v:.0f}', ha='left', va='center',
+                fontsize=9.5, color='#111827')
+
+    # 凡例 (読み方をそのまま文で書く)
+    legend_handles = [
+        mpatches.Patch(color=COLOR_FAIL, alpha=0.85,
+                       label='発音の遅れ p95 ＝ 判定に使う値（20 回中 19 回はこれ以内）'),
+        mlines.Line2D([], [], marker='D', markersize=9, linestyle='None',
+                      markerfacecolor='white', markeredgecolor='#111827',
+                      label='中央値（ふだんの遅れ）'),
+        mlines.Line2D([], [], marker='_', markersize=18, markeredgewidth=2.5,
+                      linestyle='None', color=color_max, label='最大値（単発の最悪値）'),
+        mpatches.Patch(facecolor=color_band, alpha=0.25, edgecolor=color_band,
+                       linestyle='--',
+                       label=f'合格範囲（基準: 遅れ {threshold_ms} ms 以内）'),
+    ]
+    # 凡例が「最大」ラベル (最大 67 ms + 文字高) と重ならないよう y 上限に余白を取る
+    ax.legend(handles=legend_handles, loc='upper left', fontsize=10,
+              labelspacing=0.4, borderpad=0.5, framealpha=0.95)
+
+    # 判定サマリボックス
+    verdict = 'PASS' if passed else 'FAIL（基準超過）'
+    stats_text = (
+        f'判定: {verdict}\n'
+        f'基準: 遅れの p95 ≤ {threshold_ms} ms\n'
+        f'全ノード集計 (n={len(all_late)} 発音):\n'
+        f'  中央値 {total_p50:.0f} ms / p95 {total_p95:.1f} ms / 最大 {total_max:.0f} ms'
+    )
+    ax.text(0.99, 0.97, stats_text, transform=ax.transAxes,
+            va='top', ha='right', fontsize=11,
+            bbox=dict(boxstyle='round,pad=0.6', facecolor='#FEF2F2' if not passed
+                      else '#EFF6FF', edgecolor=COLOR_FAIL if not passed
+                      else COLOR_PASS, alpha=0.95))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f'楽器{i + 1}\n(node_{p:02d})' for i, p in enumerate(part_ids)],
+                       fontsize=11)
+    ax.set_xlabel('楽器ノード（指揮者の拍指示を受信して発音する 5 台）', fontsize=12)
+    ax.set_ylabel('発音予定時刻からの遅れ (ms)', fontsize=12)
+    ax.set_ylim(0, 96)
+    ax.grid(axis='y', alpha=0.3, zorder=0)
+
+    fig.suptitle('MOP5 検証: 発声タイミングの遅延 — 発音は予定時刻からどれだけ遅れたか'
+                 f'　[判定 {verdict}]',
+                 fontsize=15, fontweight='bold', y=0.97,
+                 color=COLOR_PASS if passed else COLOR_FAIL)
+    ax.set_title('ふだんの遅れ（中央値 5〜8 ms）は基準内だが、まれな単発の遅れ'
+                 f'（最大 {total_max:.0f} ms）が p95 を押し上げ、基準 {threshold_ms} ms を超過した',
+                 fontsize=11.5, color='#374151', pad=12)
+
+    footnote = (
+        '※ 計測対象は楽器ノード 5 台（各 173 拍）。指揮者は発音予定時刻を送る側＝比較の基準であり、'
+        'PC（Processing）の音声出力遅延は本計測の対象外。\n'
+        '※ 超過の主因は楽器マイコン WiFi モジュール内部の周期ストール（単発・約 30〜60 ms）。'
+        '最終レポートでは指標を「発音予約の成立」（受信遅刻率 3.1%）へ再定義して受け入れ。\n'
+        f'データ出典: results/mop5/{csv_path.name}'
+        '（2026-07-11 最終構成: lookahead 220 ms・min フィルタ時計同期）'
+        '　詳細: results/MOP_REPORT_20260711.md'
+    )
+    fig.text(0.01, 0.01, footnote, fontsize=8.5, color='#6B7280', va='bottom')
+
+    fig.tight_layout(rect=(0, 0.09, 1, 0.95))
+    save_fig(fig, 'mop5_fire_delay_by_node.png')
 
 
 # ── MOP6: テンポ追従 ≤ 2拍 ──────────────────────────────

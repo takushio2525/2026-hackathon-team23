@@ -313,6 +313,15 @@ python scripts/mop_graphs.py --mop 1 4 8
 `results/graphs/` に各 MOP の PNG が出力される。
 各グラフには目標値ライン（赤破線）と PASS/FAIL 判定がタイトルに表示される。
 
+MOP5 は 2 枚出力される:
+
+- `mop5_comm_delay.png` — 発火遅刻 lateMs の全体ヒストグラム（分析用）
+- `mop5_fire_delay_by_node.png` — **発声タイミング遅延のノード別グラフ（発表用）**。
+  楽器 5 台それぞれの発音遅れ（p95 = 判定値・中央値・最大値）と合格範囲（≤30 ms 緑帯）、
+  判定・計測条件・データ出典を 1 枚に集約し、予備知識なしで読める体裁にしてある。
+  数値の根拠は `results/mop5/<最新>.csv` の発火 (F) レコードで、
+  `_summary.txt` のノード別統計と一致する（p95 は線形補間、`common.percentile` と同方式）。
+
 ## 制約・注意事項
 
 - `SERIAL_DEBUG=1` と `SERIAL_DEBUG=0` は排他。NOTE バイナリ送出と

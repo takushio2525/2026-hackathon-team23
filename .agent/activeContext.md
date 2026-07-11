@@ -19,6 +19,8 @@
 
 1. 最終レポート・振り返り（7/15）へ MOP_REPORT_20260711.md の内容を転記
    （スコープミスの教訓・統計量設計の反省・「届くのはバラバラ、鳴るのは同時」の軸）。
+   発表資料には `results/graphs/mop5_fire_delay_by_node.png`（発声遅延のノード別・
+   第三者向け 1 枚グラフ）が使える。好評なら他 MOP も同体裁でグラフ化する。
 2. 未コミットの node_02〜06 `platformio.ini`（SERIAL_DEBUG=1）は master 側で破棄予定。触らない。
 3. （中止済み・再開する場合のみ）ストール粒度の実測: 楽器 5 台を MOP_TEST=4 で書き込み →
    `mop5_loop_stall.py` で集計。手順は `tools/verification/README.md`。
