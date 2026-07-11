@@ -204,7 +204,13 @@ done
 補足:
 - ログ形式: 受信時 `M45R,<partId>,<beatNo>,<playAtMasterMs>,<deviceMs>,<offsetMs>,<localMasterMs>`、
   発火時 `M45F,...` (同一フィールド)。localMasterMs = deviceMs + offsetMs。
+- ストール検出: ループ 1 周が 10ms を超えると `M45S,<partId>,<deviceMs>,<gapMs>` を 1 行出す
+  (2026-07-11 追加。バースト位相同期の周期ストール調査用、
+  `results/MOP5_countermeasure_eval_20260710.md` §5(b)-2)。集計は
+  `python3 scripts/mop5_loop_stall.py logs/test_YYYYMMDD_HHMMSS.log`
+  (件数・gap 分布・バースト位相・発火遅刻との相関)。mop4/mop5 スクリプトは M45S を無視する。
 - 出力レート: 1 拍あたり 2 行 × 約 55 バイト (120 BPM で ~220 B/s/ノード)。
+  M45S はストール ~5 回/s × 約 25 バイトが加わる程度で、
   115200 bps に対し十分小さく、シリアル帯域は圧迫しない。
 - MOP_TEST > 0 では NOTE バイナリ送出が止まるため Processing 連携 (発音) は不可。
 - 集計スクリプトはライブ計測を持たない (旧ライブ計測は逐次ポーリングで

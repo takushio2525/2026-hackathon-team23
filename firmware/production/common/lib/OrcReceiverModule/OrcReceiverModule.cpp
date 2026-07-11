@@ -87,6 +87,31 @@ bool OrcReceiverModule::updateClockOffset(SystemData& data, uint32_t timestampMs
 }
 
 void OrcReceiverModule::updateInput(SystemData& data) {
+#if MOP_TEST == 4 || MOP_TEST == 5
+    // ループストール検出 (ハートビート): 本モジュールの updateInput は 3 フェーズループの
+    // 毎周期呼ばれる (名目 loopIntervalMs=2ms) ので、前回呼び出しからの間隔が閾値を超えたら
+    // 「ループが回っていなかった区間」として 1 行記録する。7/10-11 の再計測で、バースト到着から
+    // 位相 ~120〜165ms の区間で発火が消える周期ストール (発火 lateMs p95 47ms・MOP4 尾悪化の
+    // 共通原因) が観測されており、その粒度 (単一の長ブロックか短いブロックの連なりか) と正確な
+    // 窓位置を確定するための計測 (MOP5_countermeasure_eval_20260710.md §3.3/§5(b)-2)。
+    // 形式: M45S,<partId>,<deviceMs>,<gapMs>  (deviceMs = ストール明け = 今回呼び出しの millis())
+    // 閾値 10ms: 名目 2ms + 実測の健常ループ粒度 (発火 late p95 9ms) を上回る異常だけを拾い、
+    // シリアル帯域を守る (ストールは ~5 回/秒 なので 1 行 ~25B × 5 = 帯域の 1% 未満)。
+    {
+        static uint32_t sLastLoopMs = 0;
+        const uint32_t nowMs = millis();
+        if (sLastLoopMs != 0) {
+            const uint32_t gapMs = nowMs - sLastLoopMs;
+            if (gapMs >= 10) {
+                mop_test::mprintf("M45S,%u,%lu,%lu\n",
+                                  (unsigned)cfg_.partId,
+                                  (unsigned long)nowMs,
+                                  (unsigned long)gapMs);
+            }
+        }
+        sLastLoopMs = nowMs;
+    }
+#endif
     // 1. CTRL を受信していれば時計同期 + 状態取り込み
     if (data.orcNet.hasNewCtrl) {
         if (updateClockOffset(data, data.orcNet.lastCtrl.header.timestampMs)) {

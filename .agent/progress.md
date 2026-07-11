@@ -3,6 +3,11 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-11: **ループストール検出 M45S を実装**（OrcReceiverModule::updateInput、MOP_TEST=4/5 限定・
+  loop 1 周 ≥10ms で 1 行出力）＋ 簡易集計 `mop5_loop_stall.py` 新設・README 追記。50TU 撤去後ログで
+  ストール既存を確認（空白帯 [~117-131,~161-171] 同一）。通常 + MOP_TEST=4 全 7 ノード SUCCESS・
+  通常ビルドバイナリ一致。楽器 5 台の MOP_TEST=4 書き込み → 再計測はユーザー。
+
 - 2026-07-11: **SoftAP ビーコン 50TU 設定ブロックを撤去**（OrcNetModule.cpp、評価レポート §5 第一推奨）。
   効果ゼロ + ループストール誘発疑いのため。lookahead 220ms / min フィルタは維持。通常 + MOP_TEST=4 で
   production 全 7 ノードビルド SUCCESS。指揮者のみ再書き込み → 再計測はユーザー。
