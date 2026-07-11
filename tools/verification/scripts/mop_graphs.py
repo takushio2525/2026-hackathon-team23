@@ -424,9 +424,9 @@ def graph_mop5_fire_delay_by_node(rows, csv_path):
 
 
 def graph_mop5_fire_delay_by_node_slide(rows):
-    """発声タイミング遅延のスライド用シンプル版 (説明文なし・データのみ)。
+    """通信遅延 (MOP5) のスライド用シンプル版 (説明文なし・データのみ)。
 
-    詳細版と同じ統計量 (p95 棒・中央値◆・最大値―) を 16:9 横長・大きめ
+    ノード別の平均値 (青棒) と最大値 (赤マーク) を 16:9 横長・大きめ
     フォントで描く。解説は口頭で行う前提のため、サブタイトル・判定ボックス・
     注記・出典行は載せない。
     """
@@ -440,13 +440,12 @@ def graph_mop5_fire_delay_by_node_slide(rows):
         by_node[int(r['partId'])].append(float(r['lateMs']))
 
     part_ids = sorted(by_node.keys())
-    p50s = [float(np.percentile(by_node[p], 50)) for p in part_ids]
-    p95s = [float(np.percentile(by_node[p], 95)) for p in part_ids]
+    means = [float(np.mean(by_node[p])) for p in part_ids]
     maxs = [float(np.max(by_node[p])) for p in part_ids]
 
     color_band = '#16A34A'
-    color_max = '#374151'
-    bar_colors = [COLOR_PASS if v <= threshold_ms else COLOR_FAIL for v in p95s]
+    color_mean = COLOR_PASS   # 青 (緑帯 alpha 0.12 の上でも沈まない濃さ)
+    color_max = COLOR_FAIL    # 赤
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2))
     x = np.arange(len(part_ids))
@@ -454,35 +453,26 @@ def graph_mop5_fire_delay_by_node_slide(rows):
     ax.axhspan(0, threshold_ms, facecolor=color_band, alpha=0.12, zorder=0)
     ax.axhline(threshold_ms, color=color_band, linestyle='--', linewidth=2.5, zorder=1)
 
-    ax.bar(x, p95s, width=0.55, color=bar_colors, alpha=0.85,
+    ax.bar(x, means, width=0.55, color=color_mean, alpha=0.9,
            edgecolor='white', zorder=2)
-    for xi, v in enumerate(p95s):
+    for xi, v in enumerate(means):
         ax.text(xi, v + 1.2, f'{v:.1f}', ha='center', va='bottom',
-                fontsize=17, fontweight='bold', color=bar_colors[xi])
+                fontsize=17, fontweight='bold', color=color_mean)
 
     ax.scatter(x, maxs, marker='_', s=800, linewidths=3, color=color_max, zorder=4)
     for xi, v in enumerate(maxs):
         ax.text(xi, v + 1.2, f'{v:.0f}', ha='center', va='bottom',
                 fontsize=14, color=color_max)
 
-    ax.scatter(x, p50s, marker='D', s=110, facecolor='white',
-               edgecolor='#111827', linewidths=2, zorder=5)
-    for xi, v in enumerate(p50s):
-        ax.text(xi + 0.14, v, f'{v:.0f}', ha='left', va='center',
-                fontsize=14, color='#111827')
-
     legend_handles = [
-        mpatches.Patch(color=COLOR_FAIL, alpha=0.85, label='p95'),
-        mlines.Line2D([], [], marker='D', markersize=11, linestyle='None',
-                      markerfacecolor='white', markeredgecolor='#111827',
-                      label='中央値'),
+        mpatches.Patch(color=color_mean, alpha=0.9, label='平均値'),
         mlines.Line2D([], [], marker='_', markersize=22, markeredgewidth=3,
                       linestyle='None', color=color_max, label='最大値'),
         mpatches.Patch(facecolor=color_band, alpha=0.25, edgecolor=color_band,
                        linestyle='--', label=f'合格範囲 (≤ {threshold_ms} ms)'),
     ]
-    # 凡例は横 1 行で上部に置き、楽器1 の最大値ラベルとの重なりを避ける
-    ax.legend(handles=legend_handles, loc='upper center', ncol=4, fontsize=15,
+    # 凡例は横 1 行で上部に置き、最大値ラベルとの重なりを避ける
+    ax.legend(handles=legend_handles, loc='upper center', ncol=3, fontsize=15,
               columnspacing=1.2, borderpad=0.5, framealpha=0.95)
 
     ax.set_xticks(x)
@@ -493,7 +483,7 @@ def graph_mop5_fire_delay_by_node_slide(rows):
     ax.set_ylim(0, 88)
     ax.grid(axis='y', alpha=0.3, zorder=0)
 
-    ax.set_title('発声タイミングの遅延（ノード別）', fontsize=21,
+    ax.set_title('通信遅延（ノード別）', fontsize=21,
                  fontweight='bold', pad=14)
 
     fig.tight_layout()
