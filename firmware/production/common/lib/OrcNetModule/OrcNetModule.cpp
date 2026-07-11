@@ -4,12 +4,7 @@
 
 #include "OrcNetModule.h"
 #include "SystemData.h"  // 各ノードが提供 (build_flags = -I include)
-#include "SerialDebug.h"
 #include <string.h>
-
-#if defined(ARDUINO_ARCH_ESP32)
-#include <esp_wifi.h>  // SoftAp のビーコン間隔調整 (esp_wifi_get_config / esp_wifi_set_config)
-#endif
 
 bool OrcNetModule::init() {
     bool ok = (cfg_.mode == WifiMode::SoftAp) ? startSoftAp() : connectSta();
@@ -26,29 +21,10 @@ bool OrcNetModule::startSoftAp() {
     if (!WiFi.softAP(cfg_.ssid, cfg_.pass, cfg_.channel, 0, 6)) {
         return false;
     }
-    // SoftAP のマルチキャストは省電力 STA がいると DTIM ビーコンまでバッファされ、
-    // 既定ビーコン間隔 100TU (102.4ms) では実測 204.8ms (2 ビーコン) 周期のバースト
-    // 配送になる (tools/verification/results/MOP5_systematic_shift_analysis_20260710.md §3/§8 案2)。
-    // ビーコン間隔を 50TU に短縮してフラッシュ周期を ~51ms 程度へ縮める。
-    // 注意:
-    //   - この arduino-esp32 2.0.17 (IDF 4.4) の wifi_ap_config_t には dtim_period
-    //     フィールドが存在しない (IDF 5.x で追加) ため、DTIM=1 の明示設定は不可。
-    //   - ヘッダ記載のレンジは 100〜60000TU で、50 は範囲外として拒否される可能性が
-    //     ある。get/set のどちらが失敗しても既定 (100TU) のまま続行し、AP 起動自体は
-    //     成功扱いにする (演奏は従来どおり成立し、バースト周期だけ 204.8ms に戻る)。
-    //   - 効果 (バースト周期の短縮) は STA 側モジュールのリッスン間隔にも依存する
-    //     ため、実機の再計測ログで到着周期を確認すること。
-    {
-        wifi_config_t wcfg;
-        if (esp_wifi_get_config(WIFI_IF_AP, &wcfg) == ESP_OK) {
-            wcfg.ap.beacon_interval = 50;
-            const esp_err_t err = esp_wifi_set_config(WIFI_IF_AP, &wcfg);
-            DBG_PRINTF("[NET] softAP beacon_interval=50TU -> %s\n",
-                       (err == ESP_OK) ? "OK" : "REJECTED (100TU のまま)");
-        } else {
-            DBG_PRINTLN("[NET] esp_wifi_get_config failed (beacon 既定のまま)");
-        }
-    }
+    // ビーコン間隔はあえて既定 (100TU) のまま。かつて esp_wifi_set_config で 50TU に
+    // 短縮を試みたが、実測でバースト配送周期 204.8ms は 1ms も縮まず (効果ゼロ)、
+    // むしろ楽器ループの周期ストール (発火遅刻 p95 47ms) を誘発した疑いがあるため撤去した
+    // (tools/verification/results/MOP5_countermeasure_eval_20260710.md §2/§3/§5)。
     delay(100);
     // SoftAp 側は送信が主目的だが、自身でループバック確認するため受信も開く
     if (!udp_.beginMulticast(cfg_.multicastIp, cfg_.udpPort)) {

@@ -3,6 +3,10 @@
 > 毎ターン**追記**する（上書きしない）。50 件超で `progress-archive.md` への移送を提案。
 > 形式: `- YYYY-MM-DD: 一行サマリ（関連コミット）`
 
+- 2026-07-11: **SoftAP ビーコン 50TU 設定ブロックを撤去**（OrcNetModule.cpp、評価レポート §5 第一推奨）。
+  効果ゼロ + ループストール誘発疑いのため。lookahead 220ms / min フィルタは維持。通常 + MOP_TEST=4 で
+  production 全 7 ノードビルド SUCCESS。指揮者のみ再書き込み → 再計測はユーザー。
+
 - 2026-07-11: **MOP5 対策後再計測の評価レポートを作成**（`results/MOP5_countermeasure_eval_20260710.md`）。
   受信改善は lookahead 220ms のみの効果でビーコン 50TU はバースト周期 204.8ms を縮めず無効、min フィルタは
   設計どおり動作、発火 p95 47ms と MOP4 尾 46ms は「バースト位相 ~120〜165ms のループストール」が共通原因と
