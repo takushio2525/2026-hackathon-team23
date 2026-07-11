@@ -426,9 +426,9 @@ def graph_mop5_fire_delay_by_node(rows, csv_path):
 def graph_mop5_fire_delay_by_node_slide(rows):
     """通信遅延 (MOP5) のスライド用シンプル版 (説明文なし・データのみ)。
 
-    ノード別の平均値 (青棒) と最大値 (赤マーク) を 16:9 横長・大きめ
-    フォントで描く。解説は口頭で行う前提のため、サブタイトル・判定ボックス・
-    注記・出典行は載せない。
+    ノード別の平均値 (青棒)・中央値 (白抜き◇)・最大値 (赤マーク) を
+    16:9 横長・大きめフォントで描く。解説は口頭で行う前提のため、
+    サブタイトル・判定ボックス・注記・出典行は載せない。
     """
     threshold_ms = 30
     fire = [r for r in rows if r.get('type', '') == 'F']
@@ -441,11 +441,13 @@ def graph_mop5_fire_delay_by_node_slide(rows):
 
     part_ids = sorted(by_node.keys())
     means = [float(np.mean(by_node[p])) for p in part_ids]
+    p50s = [float(np.percentile(by_node[p], 50)) for p in part_ids]
     maxs = [float(np.max(by_node[p])) for p in part_ids]
 
     color_band = '#16A34A'
     color_mean = COLOR_PASS   # 青 (緑帯 alpha 0.12 の上でも沈まない濃さ)
     color_max = COLOR_FAIL    # 赤
+    color_p50 = '#111827'     # 中央値の縁と数値 (白抜き◇が青棒に埋もれない濃さ)
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2))
     x = np.arange(len(part_ids))
@@ -464,15 +466,26 @@ def graph_mop5_fire_delay_by_node_slide(rows):
         ax.text(xi, v + 1.2, f'{v:.0f}', ha='center', va='bottom',
                 fontsize=14, color=color_max)
 
+    # 中央値 5〜8 ms は青棒 (平均 10〜15 ms) の内側に来るため、白抜き◇＋濃い縁で
+    # 埋もれを防ぎ、数値は棒の右外側 (半幅 0.275 の外) に置いて平均ラベルと分離する
+    ax.scatter(x, p50s, marker='D', s=170, facecolor='white',
+               edgecolor=color_p50, linewidths=2, zorder=5)
+    for xi, v in enumerate(p50s):
+        ax.text(xi + 0.32, v, f'{v:.0f}', ha='left', va='center',
+                fontsize=14, color=color_p50)
+
     legend_handles = [
         mpatches.Patch(color=color_mean, alpha=0.9, label='平均値'),
+        mlines.Line2D([], [], marker='D', markersize=11, linestyle='None',
+                      markerfacecolor='white', markeredgecolor=color_p50,
+                      markeredgewidth=2, label='中央値'),
         mlines.Line2D([], [], marker='_', markersize=22, markeredgewidth=3,
                       linestyle='None', color=color_max, label='最大値'),
         mpatches.Patch(facecolor=color_band, alpha=0.25, edgecolor=color_band,
                        linestyle='--', label=f'合格範囲 (≤ {threshold_ms} ms)'),
     ]
     # 凡例は横 1 行で上部に置き、最大値ラベルとの重なりを避ける
-    ax.legend(handles=legend_handles, loc='upper center', ncol=3, fontsize=15,
+    ax.legend(handles=legend_handles, loc='upper center', ncol=4, fontsize=15,
               columnspacing=1.2, borderpad=0.5, framealpha=0.95)
 
     ax.set_xticks(x)
