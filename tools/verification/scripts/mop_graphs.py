@@ -519,25 +519,37 @@ def graph_mop5_fire_delay_by_node(rows, csv_path):
 
 
 def graph_mop5_fire_delay_by_node_slide(rows):
-    """通信遅延 (MOP5) のスライド用シンプル版 (説明文なし・データのみ)。
+    """ジッタ吸収の効果 (MOP5) のスライド用シンプル版 (説明文なし・データのみ)。
 
-    ノード別の平均値 (青棒)・中央値 (白抜き◇)・最大値 (赤マーク) を
-    16:9 横長・大きめフォントで描く。解説は口頭で行う前提のため、
+    「吸収なし = 受信した瞬間に鳴らした場合」と「吸収あり = 予約時刻まで待って
+    発音した実測」の 2 グループで、発音予定時刻とのズレを比較する。
+    - 吸収なし: R 行の |localMasterMs − playAtMasterMs|。SoftAP のバースト配送
+      (204.8ms 周期) で受信は予定より平均 ~100ms 手前に届くため、そのまま鳴らすと
+      ズレは巨大 (MOP_REPORT_20260711.md の marginMs 分析と符号反転で同値)
+    - 吸収あり: F 行の lateMs (発火は予定より遅れる側のみなので絶対値と同値)
+    符号 (早い/遅い) は絶対値に統一し、y 軸ラベルで明示する。
+    体裁は確立済みスライド版と同一: 平均値 (青棒)・中央値 (白抜き◇)・
+    最大値 (赤マーク)・合格範囲の緑帯を 16:9 横長・大きめフォントで描き、
     サブタイトル・判定ボックス・注記・出典行は載せない。
     """
     threshold_ms = 30
+    recv = [r for r in rows if r.get('type', '') == 'R']
     fire = [r for r in rows if r.get('type', '') == 'F']
-    if not fire:
+    if not recv or not fire:
         return
 
-    by_node = defaultdict(list)
-    for r in fire:
-        by_node[int(r['partId'])].append(float(r['lateMs']))
+    raw = np.abs([float(r['localMasterMs']) - float(r['playAtMasterMs'])
+                  for r in recv])
+    absorbed = np.array([float(r['lateMs']) for r in fire])
+    groups = [
+        ('ジッタ吸収なし\n（受信した瞬間に鳴らした場合）', raw),
+        ('ジッタ吸収あり\n（予約時刻まで待って発音・実測）', absorbed),
+    ]
 
-    part_ids = sorted(by_node.keys())
-    means = [float(np.mean(by_node[p])) for p in part_ids]
-    p50s = [float(np.percentile(by_node[p], 50)) for p in part_ids]
-    maxs = [float(np.max(by_node[p])) for p in part_ids]
+    labels = [label for label, _ in groups]
+    means = [float(np.mean(v)) for _, v in groups]
+    p50s = [float(np.percentile(v, 50)) for _, v in groups]
+    maxs = [float(np.max(v)) for _, v in groups]
 
     color_band = '#16A34A'
     color_mean = COLOR_PASS   # 青 (緑帯 alpha 0.12 の上でも沈まない濃さ)
@@ -545,28 +557,29 @@ def graph_mop5_fire_delay_by_node_slide(rows):
     color_p50 = '#111827'     # 中央値の縁と数値 (白抜き◇が青棒に埋もれない濃さ)
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2))
-    x = np.arange(len(part_ids))
+    x = np.arange(len(groups))
 
     ax.axhspan(0, threshold_ms, facecolor=color_band, alpha=0.12, zorder=0)
     ax.axhline(threshold_ms, color=color_band, linestyle='--', linewidth=2.5, zorder=1)
 
-    ax.bar(x, means, width=0.55, color=color_mean, alpha=0.9,
+    ax.bar(x, means, width=0.45, color=color_mean, alpha=0.9,
            edgecolor='white', zorder=2)
     for xi, v in enumerate(means):
-        ax.text(xi, v + 1.2, f'{v:.1f}', ha='center', va='bottom',
+        ax.text(xi, v + 3.5, f'{v:.1f}', ha='center', va='bottom',
                 fontsize=17, fontweight='bold', color=color_mean)
 
     ax.scatter(x, maxs, marker='_', s=800, linewidths=3, color=color_max, zorder=4)
     for xi, v in enumerate(maxs):
-        ax.text(xi, v + 1.2, f'{v:.0f}', ha='center', va='bottom',
+        ax.text(xi, v + 3.5, f'{v:.0f}', ha='center', va='bottom',
                 fontsize=14, color=color_max)
 
-    # 中央値 5〜8 ms は青棒 (平均 10〜15 ms) の内側に来るため、白抜き◇＋濃い縁で
-    # 埋もれを防ぎ、数値は棒の右外側 (半幅 0.275 の外) に置いて平均ラベルと分離する
+    # 吸収なしの中央値 99 ms は青棒 (平均 101.2 ms) の頂上付近に来るため、
+    # 白抜き◇＋濃い縁で埋もれを防ぎ、数値は棒の右外側 (半幅 0.225 の外) に
+    # 置いて平均ラベルと分離する
     ax.scatter(x, p50s, marker='D', s=170, facecolor='white',
                edgecolor=color_p50, linewidths=2, zorder=5)
     for xi, v in enumerate(p50s):
-        ax.text(xi + 0.32, v, f'{v:.0f}', ha='left', va='center',
+        ax.text(xi + 0.27, v, f'{v:.0f}', ha='left', va='center',
                 fontsize=14, color=color_p50)
 
     legend_handles = [
@@ -584,14 +597,13 @@ def graph_mop5_fire_delay_by_node_slide(rows):
               columnspacing=1.2, borderpad=0.5, framealpha=0.95)
 
     ax.set_xticks(x)
-    ax.set_xticklabels([f'楽器{i + 1}\n(node_{p:02d})' for i, p in enumerate(part_ids)],
-                       fontsize=15)
+    ax.set_xticklabels(labels, fontsize=16)
     ax.tick_params(axis='y', labelsize=14)
-    ax.set_ylabel('発音予定時刻からの遅れ (ms)', fontsize=17)
-    ax.set_ylim(0, 88)
+    ax.set_ylabel('発音予定時刻とのズレ（絶対値, ms）', fontsize=17)
+    ax.set_ylim(0, 260)
     ax.grid(axis='y', alpha=0.3, zorder=0)
 
-    ax.set_title('通信遅延（ノード別）', fontsize=21,
+    ax.set_title('ジッタ吸収の効果（発音タイミングのズレ）', fontsize=21,
                  fontweight='bold', pad=14)
 
     fig.tight_layout()
