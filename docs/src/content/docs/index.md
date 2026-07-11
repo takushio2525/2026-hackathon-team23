@@ -5,10 +5,14 @@ template: splash
 hero:
   tagline: 指揮棒を振ると、5台の楽器マイコンとPCが同期して「かえるのうた」を演奏する。
   actions:
+    - text: 発表の要点を見る
+      link: /presentation/overview/
+      icon: right-arrow
+      variant: primary
     - text: 現行仕様を見る
       link: /system/overview/
       icon: right-arrow
-      variant: primary
+      variant: minimal
     - text: 動かしてみる
       link: /intro/quickstart/
       icon: rocket
@@ -35,6 +39,7 @@ flowchart LR
 | 目的 | 読むページ |
 |---|---|
 | 何を作ったか知る | [プロジェクト概要](/intro/overview/) |
+| 成果発表の説明を準備する | [発表の要点](/presentation/overview/) |
 | システム全体を理解する | [現行システム](/system/overview/) |
 | 実機を動かす | [クイックスタート](/intro/quickstart/) |
 | コードを変更する | [開発ガイド](/guide/setup/) |

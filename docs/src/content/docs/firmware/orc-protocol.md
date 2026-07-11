@@ -106,7 +106,7 @@ struct BeatPayload {
 ```
 
 - `beatNo`は1始まりで進み、`uint16_t`のラップは符号付き差分で扱う
-- `playAtMasterMs`は現在時刻ではなく、**45 ms先の発音予約時刻**
+- `playAtMasterMs`は現在時刻ではなく、**220 ms先の発音予約時刻**
 - 同じペイロードを4回送るが、楽器は同じ`beatNo`を1発音にまとめる
 
 ## NOTEペイロード

@@ -9,7 +9,7 @@ sidebar:
 :::note[この章で分かること]
 - `solidOn` と `blinkIntervalMs` の 2 つだけで状態を表現する設計
 - XIAO ESP32-S3 の **active LOW LED** を `activeLow` フラグでどう扱うか
-- 状態機械（Idle / Calibrating / Conducting / Fallback など）とどう対応するか
+- 状態機械（Idle / Calibrating / Menu / Conducting / Result）とどう対応するか
 :::
 
 ## 実体
@@ -210,19 +210,20 @@ void updateLed(SystemData& data) {
 }
 ```
 
-LED の見え方で「今何を待っているか」「異常状態に入ったか」が一目で分かる。
+LED の見え方で「今何を待っているか」「どの操作を受け付けるか」が一目で分かる。
 
 | 見た目 | 状態 | 意味 |
 |---|---|---|
 | 1 Hz ゆっくり点滅 | Idle | 起動直後、WiFi 接続待ち |
 | 2 Hz 中速点滅 | Calibrating | 静止キャリブ中（2 秒間） |
 | 点灯固定 | Conducting | 拍検出稼働中 |
-| 5 Hz 高速点滅 | Fallback | IMU タイムアウト or WiFi 切断 |
 | 約1.7 Hz点滅 | Menu | モード選択中 |
 | 約8.3 Hz点滅 | Result | 採点結果を表示中 |
 
 ゲームの最初16拍は、Conductingでも目標100 BPMのガイドに合わせてLEDを点滅させる。
 16〜31拍でガイド強度を下げ、32拍以降は通常のConducting表示へ戻る。
+
+`Fallback`用の5 Hz点滅コードは状態値との互換性のため残っていますが、productionでは自動Fallback遷移を無効化しているため、通常の操作では表示されません。
 
 ### 楽器ノード
 

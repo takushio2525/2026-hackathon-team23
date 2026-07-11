@@ -21,13 +21,8 @@ stateDiagram-v2
     Calibrating --> Menu: 2秒静止
     Menu --> Conducting: 縦振りで決定
     Conducting --> Result: ゲーム56拍完了
+    Conducting --> Menu: 30秒間拍を検出しない
     Result --> Menu: 縦振り
-    Menu --> Fallback: IMU / Wi-Fi異常
-    Conducting --> Fallback: IMU / Wi-Fi異常
-    Result --> Fallback: IMU / Wi-Fi異常
-    Fallback --> Menu: 復旧
-    Fallback --> Conducting: 復旧
-    Fallback --> Result: 復旧
 ```
 
 状態遷移直後は600 msのデッドタイムを置き、遷移を起こした振りの戻りを次の操作として誤認しないようにします。
@@ -41,4 +36,5 @@ stateDiagram-v2
 | Menu | 約1.7 Hz点滅 |
 | Conducting | 点灯。ゲーム序盤はガイドテンポで点滅 |
 | Result | 高速点滅 |
-| Fallback | 5 Hz点滅 |
+
+`Fallback`はパケット互換性のため状態値として残っていますが、productionでは実機テスト時の演奏中断を避けるため、自動的にFallbackへ入る経路を無効化しています。

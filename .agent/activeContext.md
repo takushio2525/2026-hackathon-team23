@@ -5,37 +5,21 @@
 
 ## 現在の対象
 
-- **MOP 検証は総括フェーズへ移行**（ユーザー判断でストール深掘りは中止）。
-  最終レポート `tools/verification/results/MOP_REPORT_20260711.md` を作成済み:
-  - MOP4 = FAIL（実質達成・受け入れ）: p50 7ms（目標の 1/3）、尾 p95 48.6/最大 65ms は
-    デバイス内部の周期ストール由来・発生率 9.2% の単発。最大値判定の統計量設計の反省を記載。
-  - MOP5 = 指標再定義（受け入れ）: 「生の片道遅延 ≤30ms」は予約発音アーキと噛み合わない
-    初期のスコープミス。バースト配送（204.8ms 周期・仕様由来）で達成不能・計測不能。
-    「発音予約の成立」へ再定義し、対策後 受信遅刻率 45.4%→1.9〜3.1% を達成。
-  - 全体ストーリー「届くのはバラバラ、鳴るのは同時」＋原因特定→対策→実測改善を記載。
-  - M45S ストール検出計測（`9950f1c`）は完成状態のため「将来の調査手段」として存置。
+- **成果発表向けのdocs更新を完了**。既存のproduction解説を最終実装・最終MOP検証へ同期し、発表用の入口を追加した。
+  - 新設: `docs/src/content/docs/presentation/overview.md`（30秒説明・発表の流れ）と
+    `presentation/faq.md`（想定問答・根拠・限界・答え方）。サイドバーとトップから到達できる。
+  - 同期仕様: 45ms/時計EMAの旧説明を、220ms発音予約・2秒窓の最小遅延に近い時計同期へ更新。
+  - 検証: MOP4（中央値7ms、平均10.8ms、最大65ms、20ms以内90.8%）とMOP5（予約受信遅刻率45.4%→3.1%）を、限界も含めて更新。
+  - Fallbackの自動遷移がproductionでは無効である点も、状態遷移・指揮者・LEDの説明へ反映。
+  - `cd docs && npm run build` SUCCESS（86ページ）。
 
 ## 次の一手
 
-1. 最終レポート・振り返り（7/15）へ MOP_REPORT_20260711.md の内容を転記
-   （スコープミスの教訓・統計量設計の反省・「届くのはバラバラ、鳴るのは同時」の軸）。
-   発表資料のスライド用グラフは同色言語 2 枚が揃った状態（7/11 に見せ方を再構成）:
-   - MOP5: `results/graphs/mop5_fire_delay_by_node_slide.png`（ジッタ吸収なし vs あり の
-     2 グループ比較。吸収なし = R 行の |localMasterMs−playAtMasterMs|、平均 101.2/中央値 99/
-     最大 220ms。吸収あり = F 行 lateMs、平均 12.1/中央値 6/最大 67ms。絶対値で統一）
-   - MOP4: `results/graphs/mop4_sync_error_slide.png`（最終構成 173 拍の時系列で
-     各拍の最速 vs 最遅ノードの発音時刻差。平均 10.8 青破線・中央値 7 右外◇・最大 65 赤マーク）
-   体裁はユーザー指定で「平均値=青・中央値の白抜き◇・最大値の赤マーク・合格範囲の
-   緑帯・短いタイトルのみ・16:9 大フォント」（口頭解説前提、p95 なし）。
-   単体で読める詳細版は `mop5_fire_delay_by_node.png`（説明・判定・注記入り、p95 基準のまま）。
-   なお詳細版 `mop4_sync_error.png` は 7/9 データのまま未再生成（スクリプトを流すと
-   最新 CSV で再生成され差分が出る。更新するかはユーザー判断待ち）。
-2. 未コミットの node_02〜06 `platformio.ini`（SERIAL_DEBUG=1）は master 側で破棄予定。触らない。
-3. （中止済み・再開する場合のみ）ストール粒度の実測: 楽器 5 台を MOP_TEST=4 で書き込み →
-   `mop5_loop_stall.py` で集計。手順は `tools/verification/README.md`。
+1. 発表直前には[発表の要点](../docs/src/content/docs/presentation/overview.md)を読み、
+   [想定問答](../docs/src/content/docs/presentation/faq.md)の「短く答える」だけを確認する。
+2. 公開は未定。GitHub Pages等への公開設定・デプロイはユーザー判断待ち。
 
 ## 現フェーズで Read すべき設計書
 
-- 振り返り資料を書く場合: `tools/verification/results/MOP_REPORT_20260711.md`（最終総括）を軸に、
-  深掘りが要る箇所だけ `MOP5_systematic_shift_analysis_20260710.md` /
-  `MOP5_countermeasure_eval_20260710.md` を Read。
+- MOP数値の根拠: `tools/verification/results/MOP_REPORT_20260711.md`
+- 発表用の説明と質問対策: `docs/src/content/docs/presentation/`

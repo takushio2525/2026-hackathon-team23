@@ -25,11 +25,11 @@ struct OrcSenderConfig {
 };
 ```
 
-production値は50 ms、4回、45 msです。
+production値は50 ms、4回、220 msです。
 
 - CTRLは20 Hz。状態変化とBPM表示を十分滑らかにしつつ帯域を抑える
 - BEATは4連送。1発ごとの損失が独立確率`p`なら全損失は`p^4`
-- 45 ms先読み。4連送約8 msとWi-Fiジッタを吸収し、残りを待機時間にする
+- 220 ms先読み。SoftAPのマルチキャストが最大約205 ms遅れて届く実測に対し、予約時刻までに受信できる余裕を取る
 
 ## Data
 
@@ -62,7 +62,7 @@ data.beat.event
   → eventをclear
 ```
 
-`playAtMasterMs = masterNow + 45`はモジュール内で設定されます。ロジック側は拍発火だけを決めます。
+`playAtMasterMs = masterNow + 220`はモジュール内で設定されます。ロジック側は拍発火だけを決めます。
 
 ### CTRL
 
@@ -93,8 +93,7 @@ radio側のまとめ落ちを減らす狙いです。重複排除は受信側の
 
 ## 異常時
 
-Wi-Fiリンクが落ちている間もロジックは状態を更新できますが、OrcNetModuleは送信できません。
-Fallback復帰後は`forceCtrlSend`で最新状態を即時通知し、古いCTRLを再送しません。
+Wi-Fiリンクが落ちている間もロジックは状態を更新できますが、OrcNetModuleは送信できません。`forceCtrlSend`はMenu→Conductingなどの状態変化で最新CTRLを即時通知し、次の50 ms周期までPC画面を待たせないために使います。
 
 ## 変更時の注意
 

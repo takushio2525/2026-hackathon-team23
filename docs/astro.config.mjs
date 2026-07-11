@@ -101,6 +101,13 @@ if (document.readyState === 'loading') {
 					],
 				},
 				{
+					label: '成果発表',
+					items: [
+						{ label: '発表の要点', slug: 'presentation/overview' },
+						{ label: '想定問答と答え方', slug: 'presentation/faq' },
+					],
+				},
+				{
 					label: '現行システム',
 					items: [
 						{ label: 'システム全体', slug: 'system/overview' },

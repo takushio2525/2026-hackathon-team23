@@ -288,7 +288,7 @@ void OrcNetModule::flushSend(OrcNetData& net) {
 CTRL は 1 回送信、BEAT は `pendingBeatRedundancy`（= 4）回送信する。
 各 BEAT の間には `beatGapMs = 2` ms の待ちを入れ、同じ無線バーストとして
 まとめて失われにくくしている。4 発の送出には約 8 ms を使うため、
-`playAtMasterMs = masterNow + 45 ms` の先読み予算にも含めて考える。
+`playAtMasterMs = masterNow + 220 ms` の発音予約時間にも含めて考える。
 EMA の出力フェーズで毎ループ呼ばれるが、`hasPendingCtrl` / `hasPendingBeat` が
 立っているときだけ実際に送る。これらのフラグを立てるのは `OrcSenderModule`
 （次節で触れる）。

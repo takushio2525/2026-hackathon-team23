@@ -27,9 +27,8 @@ description: node_01の入力、状態、送信、ゲーム進行
 ## 送信
 
 - CTRL：50 msごと。BPM、velocity、状態、モード、カーソル、目標BPM、得点
-- BEAT：拍イベントごと。4連送し、45 ms先の`playAtMasterMs`を載せる
+- BEAT：拍イベントごと。4連送し、220 ms先の`playAtMasterMs`を載せる
 
-## Fallback
+## 演奏中の復帰
 
-IMUまたはWi-Fiの異常でFallbackへ入り、直前のMenu／Conducting／Resultを保存します。
-復旧後は保存した状態へ戻るため、常にMenuへ巻き戻るわけではありません。
+productionでは、IMUの一時的な瞬断で演奏が止まることを避けるため、自動Fallback遷移を無効化しています。30秒間拍を検出しない場合はMenuへ戻り、次の演奏を曲頭から始めます。`Fallback`の状態値は通信互換性のため残っていますが、通常の操作では到達しません。
