@@ -29,10 +29,12 @@
 1. 発表直前には[発表の要点](../docs/src/content/docs/presentation/overview.md)を読み、
    [想定問答](../docs/src/content/docs/presentation/faq.md)の「短く答える」だけを確認する。
 2. 公開は未定。GitHub Pages等への公開設定・デプロイはユーザー判断待ち。
-3. スライド用グラフは同体裁 3 枚が揃った状態（平均=青棒・中央値=白抜き◇・最大=赤マーク・
+3. スライド用グラフは同じ色の言語 3 枚が揃った状態（青系=平均/実データ・赤=最大・
    合格範囲=緑帯・短いタイトルのみ・16:9 大フォント）:
-   - MOP5 `results/graphs/mop5_fire_delay_by_node_slide.png`（ジッタ吸収なし vs あり）
-   - MOP4 `results/graphs/mop4_sync_error_slide.png`（各拍の最速 vs 最遅）
+   - MOP5 `results/graphs/mop5_fire_delay_by_node_slide.png`（ジッタ吸収なし vs あり。
+     平均=青棒・中央値=白抜き◇・最大=赤マーク）
+   - MOP4 `results/graphs/mop4_sync_error_slide.png`（各拍の最速 vs 最遅。視認性改善済み:
+     平均=青破線・中央値=濃色点線を右端外に名前付きラベル、最大=矢印付きラベル、凡例 2 項目）
    - MOP2 `results/graphs/mop2_pitch_error_slide.png`（楽器別の音階誤差。誤差ばらつきが
      小さいため中央値◇・最大赤マークは削除し「音階誤差」の青棒 1 本＋緑帯のみ）
 
