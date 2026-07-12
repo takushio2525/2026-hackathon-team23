@@ -33,7 +33,8 @@
    合格範囲=緑帯・短いタイトルのみ・16:9 大フォント）:
    - MOP5 `results/graphs/mop5_fire_delay_by_node_slide.png`（ジッタ吸収なし vs あり）
    - MOP4 `results/graphs/mop4_sync_error_slide.png`（各拍の最速 vs 最遅）
-   - MOP2 `results/graphs/mop2_pitch_error_slide.png`（楽器別の音階誤差）
+   - MOP2 `results/graphs/mop2_pitch_error_slide.png`（楽器別の音階誤差。誤差ばらつきが
+     小さいため中央値◇・最大赤マークは削除し「音階誤差」の青棒 1 本＋緑帯のみ）
 
 ## 現フェーズで Read すべき設計書
 
