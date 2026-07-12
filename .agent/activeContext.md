@@ -5,29 +5,27 @@
 
 ## 現在の対象
 
-- **塩澤の個人最終報告書を新規作成し完成**（`work/shiozawa/最終報告書/`、43 ページ）。
-  - 構成: はじめに / システム全体 / 担当部分の設計と実装（EMA・プロトコル・拍検出・
-    時計同期 min フィルタ・発音予約）/ 計画からの変更点と理由 / 評価（MOP 全 9 項目）/
-    生成 AI の利用と検証 / おわりに / 参考文献 10 件 / 付録（担当分中核ソース 4 本全文）。
-  - 数値の正本: `tools/verification/results/MOP_REPORT_20260711.md` と `mop2/evaluation.md`
-    に全一致。図はスライド用グラフ 3 枚 + system-overview を `fig/` へコピーして流用。
-  - ビルド: Docker (`ghcr.io/paperist/texlive-ja:debian`) latexmk で EXIT=0・
-    未定義参照 0・Overfull 0。**配布 pckgs.sty はヒラギノ/stix2/roboto 依存のため、
-    ローカルコピーのみ原ノ味 (haranoaji) 構成へ差し替え**（テンプレ原本は不変）。
-    付録ソースコピーは listings が処理できない「×」「§」を「x」「Sec.」へ置換（付録に明記）。
-  - チェックリスト全項目の確認結果: `work/shiozawa/最終報告書/チェックリスト確認.md`。
+- **塩澤の最終報告書のルーブリック評価が完了**（`work/shiozawa/最終報告書/ルーブリック評価.md`）。
+  - 総合 **90/100 点**（A×9・B×1、提出倍率 ×1 見込み）。
+  - 唯一の明確な失点: **文献 [6]（ref:onkai、3.6 cent の出典）が本文未引用**（項目 10 が B の 3 点）。
+    `チェックリスト確認.md` 2-7 の「全文献参照済み ✅」は誤記録と判明。
+  - 事実正確性スポットチェック 14 件: 数値の虚偽・誇張 0 件（MOP 正本・実コードと全一致）。
+  - 修正提案 8 件を優先度順に記載。上位 3 件（[6] 引用追加・「金管4声部」用語修正・
+    同期タイムライン図追加）で 93 点前後の見込み。
+  - **報告書本体（main.tex / main.pdf / チェックリスト確認.md）は無変更のまま**。
 
-- 発表用の docs（presentation/overview・faq）と MOP2 検証プログラムは前ターンまでに完了済み。
+- 報告書本体は前ターンで完成済み（43 ページ、ff720fd で push 済み）。
 
 ## 次の一手
 
-1. 最終報告書の提出（提出フォームへのアップロードはユーザー作業）。
-   他メンバーの個人報告書は各自作成。
-2. 発表直前には `docs/src/content/docs/presentation/` の要点・想定問答を確認する。
-3. docs の公開（GitHub Pages 等)はユーザー判断待ち。
+1. ルーブリック評価の修正提案を報告書へ反映するかはユーザー判断
+   （提案 1 の `\cite{ref:onkai}` 追加は 1 行・再ビルドのみで 91〜92 点）。
+2. 最終報告書の提出（提出フォームへのアップロードはユーザー作業。締切時刻は要確認）。
+3. 発表直前には `docs/src/content/docs/presentation/` の要点・想定問答を確認する。
 
 ## 現フェーズで Read すべき設計書
 
-- MOP数値の根拠: `tools/verification/results/MOP_REPORT_20260711.md`
+- ルーブリック評価と修正提案: `work/shiozawa/最終報告書/ルーブリック評価.md`
+- MOP 数値の根拠: `tools/verification/results/MOP_REPORT_20260711.md`
   （MOP2 だけは別記録: `tools/verification/results/mop2/evaluation.md`）
-- 最終報告書の本文・チェックリスト: `work/shiozawa/最終報告書/`
+- 最終報告書の本文: `work/shiozawa/最終報告書/main.tex`
