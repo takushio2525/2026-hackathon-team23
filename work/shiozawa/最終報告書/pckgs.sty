@@ -1,0 +1,42 @@
+% 配布テンプレート同梱の pckgs.sty を Docker (ghcr.io/paperist/texlive-ja) で
+% ビルド可能にするための最小修正版．配布版はヒラギノ (Mac 専用フォント) と
+% stix2/roboto (イメージ未収録パッケージ) に依存するため，フォント指定のみ
+% 差し替えた．文書レイアウト・パッケージ構成は配布版と同一．
+\usepackage{jlreq-deluxe}
+\usepackage[noalphabet,haranoaji]{pxchfon}% 配布版: hiragino-highsierra-pron
+\usepackage[T1]{fontenc}% 配布版: [T1,LGR] + stix2 + roboto + roboto-mono
+
+\usepackage[fleqn,tbtags]{mathtools} % 数式関連 (w/ amsmath)
+\usepackage[table,dvipdfmx]{xcolor}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{ascmac} %screen/itembox/shadebox環境が使用できる．
+\usepackage{pgfgantt}
+
+\usepackage[dvipdfmx]{hyperref}
+\hypersetup{%
+ bookmarksnumbered=true,%
+ colorlinks=true,%
+ linkcolor=black,
+ citecolor=blue,
+ urlcolor=blue}
+\usepackage[dvipdfmx]{pxjahyper} % (u)pLaTeXのときは必要
+\usepackage{listings,plistings}
+\lstset{%
+	aboveskip=0pt,
+	belowskip=0pt,
+	language=C++, % Arduinoのスケッチの関数も多くカバーできる．
+	morekeywords={ },
+	numbers=left,          % 行番号を左に表示
+	numberstyle=\small,    % 行番号のフォントサイズ
+	stepnumber=1,          % 行番号を何行おきに表示するか
+	numbersep=10pt,        % 行番号とコードの間の距離
+	backgroundcolor={},% 
+	basicstyle={\small\ttfamily},% 
+	keywordstyle=\color{blue}\bfseries,
+	commentstyle=\color{red},
+	frame=single,
+	breaklines=true}
+
+\newcommand{\mcbf}[1]{{\mcfamily\bfseries #1}}
+\newcommand{\gtbf}[1]{{\sffamily\bfseries #1}}
+\renewcommand\UrlFont{\color{blue}\rmfamily}
