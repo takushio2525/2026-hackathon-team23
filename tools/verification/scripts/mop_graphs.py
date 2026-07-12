@@ -223,9 +223,12 @@ def graph_mop4_sync_error_slide():
 
     各拍で最も早く発音したノードと最も遅く発音したノードの時刻差 (= 従来の
     同期誤差と同じ量) を、最終構成 (7/11) の全 173 拍の時系列 (青棒) で示す。
-    体裁は確立済みスライド版と同じ色の言語: 平均値 (青破線)・中央値 (白抜き◇)・
+    体裁は確立済みスライド版と同じ色の言語: 平均値 (青破線)・中央値 (濃色点線)・
     最大値 (赤マーク)・合格範囲の緑帯を 16:9 横長・大きめフォントで描き、
     解説は口頭で行う前提のためサブタイトル・判定ボックス・注記・出典行は載せない。
+    統計量 3 つは棒群と被らないよう「統計量名 + 数値」を線の右端外／最大棒の
+    真上に直接ラベルし、凡例は棒と合格範囲の 2 項目のみに絞る (直接ラベルと
+    凡例の二重表記を避けるため)。
     """
     threshold_ms = 20
     path = RESULTS_DIR / 'mop4' / '20260711_154006.csv'
@@ -261,39 +264,37 @@ def graph_mop4_sync_error_slide():
 
     ax.bar(x, errors, width=1.0, color=color_mean, alpha=0.9, zorder=2)
 
-    # 平均は水平破線。数値は線の左端寄り、中央値の◇ (右端外) と水平に分離する
+    # 平均は青破線、中央値は濃色点線の水平線。値が 3.8 ms しか離れておらず
+    # プロット内に数値を置くと棒や互いのラベルと被るため、両方とも
+    # 「統計量名 + 数値」を線の右端の軸外に直接ラベルする (clip_on=False)。
+    # 平均は線の上側・中央値は線の下側に寄せて縦方向にも分離する
     ax.axhline(mean_v, color=color_mean, linestyle='--', linewidth=2.5, zorder=3)
-    ax.text(2, mean_v + 1.2, f'{mean_v:.1f}', ha='left', va='bottom',
-            fontsize=17, fontweight='bold', color=color_mean)
+    ax.text(n + 1.5, mean_v + 0.4, f'平均 {mean_v:.1f}', ha='left', va='bottom',
+            fontsize=16, fontweight='bold', color=color_mean, clip_on=False)
 
-    # 最大値は該当拍に赤マーク
+    ax.axhline(p50_v, color=color_p50, linestyle=':', linewidth=2.5, zorder=3)
+    ax.text(n + 1.5, p50_v - 0.4, f'中央値 {p50_v:.0f}', ha='left', va='top',
+            fontsize=16, fontweight='bold', color=color_p50, clip_on=False)
+
+    # 最大値は該当拍に赤マークを置き、棒の密集地帯に埋もれないよう
+    # 数値ラベルは上の空き領域に置いて下向き矢印で該当棒を指す
     ax.scatter([max_i], [max_v], marker='_', s=800, linewidths=3,
                color=color_max, zorder=4)
-    ax.text(max_i, max_v + 1.8, f'{max_v:.0f}', ha='center', va='bottom',
-            fontsize=14, color=color_max)
+    ax.annotate(f'最大 {max_v:.0f}', xy=(max_i, max_v + 1.5),
+                xytext=(max_i, max_v + 9), ha='center', va='bottom',
+                fontsize=16, fontweight='bold', color=color_max,
+                arrowprops=dict(arrowstyle='-|>', color=color_max,
+                                linewidth=2.0))
 
-    # 中央値 7 ms は平均 10.8 ms と近く水平線 2 本では読み分けにくいため、
-    # 白抜き◇を軸の右外に置き数値を添える (clip_on=False で軸外に描く)
-    ax.scatter([n + 3], [p50_v], marker='D', s=170, facecolor='white',
-               edgecolor=color_p50, linewidths=2, zorder=5, clip_on=False)
-    ax.text(n + 7, p50_v, f'{p50_v:.0f}', ha='left', va='center',
-            fontsize=14, color=color_p50, clip_on=False)
-
+    # 平均・中央値・最大は上の直接ラベルで名前ごと示すため、
+    # 凡例は棒と合格範囲の 2 項目だけに絞って窮屈さを解消する
     legend_handles = [
         mpatches.Patch(color=color_mean, alpha=0.9, label='各拍の時刻差'),
-        mlines.Line2D([], [], linestyle='--', linewidth=2.5, color=color_mean,
-                      label='平均値'),
-        mlines.Line2D([], [], marker='D', markersize=11, linestyle='None',
-                      markerfacecolor='white', markeredgecolor=color_p50,
-                      markeredgewidth=2, label='中央値'),
-        mlines.Line2D([], [], marker='_', markersize=22, markeredgewidth=3,
-                      linestyle='None', color=color_max, label='最大値'),
         mpatches.Patch(facecolor=color_band, alpha=0.25, edgecolor=color_band,
                        linestyle='--', label=f'合格範囲 (≤ {threshold_ms} ms)'),
     ]
-    # 凡例は横 1 行で上部に置き、最大値ラベルとの重なりを避ける
-    ax.legend(handles=legend_handles, loc='upper center', ncol=5, fontsize=14,
-              columnspacing=1.0, borderpad=0.5, framealpha=0.95)
+    ax.legend(handles=legend_handles, loc='upper left', ncol=1, fontsize=15,
+              borderpad=0.6, framealpha=0.95)
 
     ax.set_xlim(-1, n)
     ax.tick_params(axis='both', labelsize=14)
