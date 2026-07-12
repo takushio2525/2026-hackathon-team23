@@ -38,7 +38,6 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -605,8 +604,9 @@ def summarize(rows):
 def graph_slide(stats, out_name='mop2_pitch_error_slide.png'):
     """楽器別の音階誤差 (スライド用シンプル版)。
 
-    体裁は MOP4/MOP5 のスライド版と同じ色の言語: 平均値 (青棒)・中央値 (白抜き◇)・
-    最大値 (赤マーク)・合格範囲の緑帯を 16:9 横長・大きめフォントで描き、
+    MOP2 は誤差が音高によらずほぼ一定 (= 系統オフセット) で中央値・最大が平均と
+    ほぼ同値のため、統計量を並べず「音階誤差」の青棒 1 本だけで見せる (ユーザー判断)。
+    合格範囲の緑帯・16:9 横長・大きめフォントは MOP4/MOP5 スライド版と共通。
     解説は口頭で行う前提のため説明文・判定ボックス・注記は載せない。
     """
     # mop_graphs.py の setup_font() と同じフォールバック順。macOS には Yu Gothic が無く
@@ -618,13 +618,9 @@ def graph_slide(stats, out_name='mop2_pitch_error_slide.png'):
 
     color_band = '#16A34A'
     color_mean = '#2563EB'
-    color_max = '#DC2626'
-    color_p50 = '#111827'
 
     labels = [f'{s["instrument"]}\n({s["node"]})' for s in stats]
     means = [s['mean_abs'] for s in stats]
-    medians = [s['median_abs'] for s in stats]
-    maxes = [s['max_abs'] for s in stats]
     x = np.arange(len(stats))
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2))
@@ -633,36 +629,18 @@ def graph_slide(stats, out_name='mop2_pitch_error_slide.png'):
 
     ax.bar(x, means, width=0.5, color=color_mean, alpha=0.9, zorder=2)
 
-    # この検証では音階誤差が音高によらずほぼ一定 (= 系統オフセット) なので平均・中央値・最大が
-    # 同じ高さに重なる。3 つを縦に積むと必ず衝突するので「中央値 ◇ | 棒 (平均) | 最大 ─」と
-    # 横に並べ、数値は各マーカーの真上に置いて隣の楽器のラベルとも当たらないようにする。
-    y_top = max(THRESHOLD_CENT * 1.35, max(maxes) * 1.6)
+    y_top = max(THRESHOLD_CENT * 1.35, max(means) * 1.6)
     dy = y_top * 0.042
-    for i, (mean_v, med_v, max_v) in enumerate(zip(means, medians, maxes)):
-        ax.scatter([i - 0.36], [med_v], marker='D', s=170, facecolor='white',
-                   edgecolor=color_p50, linewidths=2, zorder=5)
-        ax.text(i - 0.36, med_v + dy, f'{med_v:.2f}', ha='center', va='bottom',
-                fontsize=14, color=color_p50)
-
+    for i, mean_v in enumerate(means):
         ax.text(i, mean_v + dy, f'{mean_v:.2f}', ha='center', va='bottom',
                 fontsize=17, fontweight='bold', color=color_mean)
 
-        ax.scatter([i + 0.36], [max_v], marker='_', s=800, linewidths=3,
-                   color=color_max, zorder=4)
-        ax.text(i + 0.36, max_v + dy, f'{max_v:.2f}', ha='center', va='bottom',
-                fontsize=14, color=color_max)
-
     legend_handles = [
-        mpatches.Patch(color=color_mean, alpha=0.9, label='平均値'),
-        mlines.Line2D([], [], marker='D', markersize=11, linestyle='None',
-                      markerfacecolor='white', markeredgecolor=color_p50,
-                      markeredgewidth=2, label='中央値'),
-        mlines.Line2D([], [], marker='_', markersize=22, markeredgewidth=3,
-                      linestyle='None', color=color_max, label='最大値'),
+        mpatches.Patch(color=color_mean, alpha=0.9, label='音階誤差'),
         mpatches.Patch(facecolor=color_band, alpha=0.25, edgecolor=color_band,
                        linestyle='--', label=f'合格範囲 (< {THRESHOLD_CENT} cent)'),
     ]
-    ax.legend(handles=legend_handles, loc='upper center', ncol=4, fontsize=14,
+    ax.legend(handles=legend_handles, loc='upper center', ncol=2, fontsize=14,
               columnspacing=1.0, borderpad=0.5, framealpha=0.95)
 
     ax.set_xticks(x)
