@@ -1,0 +1,339 @@
+% ビルド: docker run --rm -v "$(pwd):/workspace" -w /workspace ghcr.io/paperist/texlive-ja:debian latexmk main.tex
+%         または uplatex + dvipdfmx (latexmk 経由)
+\documentclass[uplatex,dvipdfmx,a4paper,10pt]{jsarticle}
+
+% --- パッケージ ---
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[dvipdfmx,hidelinks]{hyperref}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{margin=18mm}
+
+% --- 色定義 ---
+\definecolor{qcolor}{HTML}{1A5276}
+\definecolor{acolor}{HTML}{2C3E50}
+\definecolor{secbg}{HTML}{E8F0FE}
+
+% --- Q&A マクロ ---
+\newcommand{\QA}[2]{%
+  \par\noindent\textbf{\textcolor{qcolor}{Q.~#1}}%
+  \par\noindent\textcolor{acolor}{A.~#2}\medskip%
+}
+
+% --- セクション背景 ---
+\usepackage[most]{tcolorbox}
+\tcbset{
+  cheatbox/.style={
+    colback=secbg, colframe=qcolor, boxrule=0.5pt,
+    left=4pt, right=4pt, top=2pt, bottom=2pt,
+    fonttitle=\bfseries\large, coltitle=white, colbacktitle=qcolor
+  }
+}
+
+\setlist[itemize]{nosep, leftmargin=1.5em}
+\setlist[enumerate]{nosep, leftmargin=1.5em}
+\pagestyle{plain}
+\parindent=0pt
+\parskip=4pt
+
+\begin{document}
+
+% ─── 表紙風タイトル ─────────────────────
+\begin{center}
+  {\LARGE\bfseries タクトーン 質疑応答チートシート}\\[6pt]
+  {\large チーム23 — Arduino オーケストラ}\\[3pt]
+  {\normalsize 2026-07-15 成果発表会 用}
+\end{center}
+\vspace{-6pt}
+\hrule height 0.8pt
+\vspace{8pt}
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{システム全体像}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\subsection{構成}
+
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+ノード & ハードウェア & 役割 \\
+\midrule
+指揮者 (node\_01) & XIAO ESP32-S3 Sense + GY-521 (MPU6050) & IMU ジェスチャ認識，SoftAP 起動，UDP で CTRL/BEAT 配信 \\
+楽器 (node\_02--05) & Arduino UNO R4 WiFi $\times 4$ & WiFi STA 接続，時計同期，楽譜進行，USB Serial で NOTE を PC へ送信 \\
+ドラム (node\_06) & Arduino UNO R4 WiFi $\times 1$ & 同上（ドラム譜） \\
+PC (各楽器に1台) & Mac + Processing 4 & Serial 受信 $\to$ 加算合成で発音，ゲーム UI \\
+\bottomrule
+\end{tabularx}
+
+\subsection{データフロー}
+
+\begin{enumerate}
+  \item 指揮者が IMU (5\,ms周期) でジェスチャを取得し，振り下ろしから拍を検出
+  \item 拍検出ごとに BEAT パケット (4連送) を UDP マルチキャスト (\texttt{239.0.0.1:5001}) で全楽器へ配信
+  \item CTRL パケットを 20\,Hz (50\,ms周期) で常時配信（BPM, velocity, 状態, ゲーム情報）
+  \item 楽器ノードは CTRL の \texttt{timestampMs} で時計同期し，\texttt{playAtMasterMs} の到達時刻で発音を予約
+  \item 発音時刻に楽譜から NOTE パケット (20\,B) を組み立て，USB Serial (115200\,bps) で PC へ送信
+  \item Processing が NOTE を受信し，JSON 楽器定義に基づく加算合成で発音
+\end{enumerate}
+
+\subsection{パケット仕様（共通 20 バイト固定）}
+
+\begin{tabularx}{\textwidth}{lllX}
+\toprule
+種別 & type & 方向 & ペイロード概要 \\
+\midrule
+CTRL & 1 & 指揮者$\to$全楽器(UDP) & bpmQ8 (BPM$\times$8), velocity, state, mode, navCursor, targetBpm, score \\
+BEAT & 2 & 指揮者$\to$全楽器(UDP) & beatNo, playAtMasterMs (発音予約時刻) \\
+NOTE & 3 & 楽器$\to$PC(USB Serial) & partId, noteNumber, velocity, gate, durationMs, instrumentId \\
+UI   & 4 & 楽器$\to$PC(USB Serial) & state, mode, navCursor, targetBpm, score, partId, bpmQ8 \\
+\bottomrule
+\end{tabularx}
+
+ヘッダ: magic \texttt{0x4F52} (ASCII ``OR''), version \texttt{0x01}, type, seq (単調増加), timestampMs (マスタ時刻) = 12\,B．ペイロード 8\,B．リトルエンディアン．\texttt{static\_assert} で 20\,B を保証．
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{Arduino — WiFi / UDP 通信}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\begin{tcolorbox}[cheatbox, title=実装要点]
+\begin{itemize}
+  \item \textbf{トポロジ}: 指揮者が SoftAP (SSID \texttt{OrchestraAP}, パスワード \texttt{orchestra2026}, ch\,6) を起動．楽器は STA で接続
+  \item \textbf{プロトコル}: UDP マルチキャスト \texttt{239.0.0.1:5001}．TCP は使わない（低遅延・ブロードキャスト不要のため）
+  \item \textbf{BEAT 連送}: 同一 BEAT を \textbf{4 連送} (\texttt{beatRedundancy=4})，各回 \textbf{2\,ms} 間隔 (\texttt{beatGapMs=2}) で送信．radio 状態を変化させてまとめ落ちを軽減
+  \item \textbf{CTRL 送信}: 20\,Hz (50\,ms間隔)．BEAT より後に送信（\texttt{playAtMasterMs} のマージンが薄いため BEAT 優先）
+  \item \textbf{発音予約}: \texttt{playAtMasterMs = masterNow + 220\,ms}．SoftAP の DTIM バッファリングによるバースト配送 ($\sim$204.8\,ms周期) を吸収するための余裕
+  \item \textbf{時計同期}: 楽器は CTRL の \texttt{timestampMs} を使い min フィルタ (窓長 2000\,ms) で offset を推定．窓内の最大 offset サンプル $=$ 最小配送遅延のサンプルを採用．スナップ閾値 1000\,ms で指揮者リセットに即追従
+  \item \textbf{WiFi 再接続}: STA 側は \texttt{isLinkUp()} が false になると 2000\,ms 間隔で自動再接続．復帰時に \texttt{udp\_.stop()} $\to$ \texttt{beginMulticast()} でマルチキャスト購読を貼り直す
+  \item \textbf{ライブラリ}: ESP32 は \texttt{WiFi.h} + \texttt{WiFiUdp.h}，UNO R4 は \texttt{WiFiS3.h} + \texttt{WiFiUdp.h}（\texttt{\#if defined(ARDUINO\_ARCH\_ESP32)} で分岐）
+\end{itemize}
+\end{tcolorbox}
+
+\QA{なぜ TCP ではなく UDP マルチキャストを選んだのか？}{
+1台の指揮者から複数台の楽器へ同時配信するため．TCP はコネクション管理のオーバーヘッドと再送遅延があり，リアルタイム音楽同期には不向き．UDP はパケットロスの可能性はあるが，BEAT 4連送で冗長化している．}
+
+\QA{パケットロスはどう対処している？}{
+BEAT は 4連送 (2\,ms間隔) で radio 状態を変えながら送り，まとめ落ちを軽減．楽器側は同一 \texttt{beatNo} の重複到着を検出し，初到着分だけ発音予約に使い，2個目以降は時計同期の追加サンプルとして利用．}
+
+\QA{時計同期の方式は NTP ベースか？}{
+NTP は使っていない．CTRL パケットの \texttt{timestampMs}（指揮者の \texttt{millis()} 値）と楽器の \texttt{millis()} の差分 (offset) を min フィルタで推定する独自方式．NTP の往復計測は不要で，片方向の配信だけで同期できる．min フィルタは窓内の最大 offset（= 配送遅延が最小だったサンプル）を採用することで，バッファリング遅延の影響を排除する．}
+
+\QA{220\,ms の遅延は体感で問題にならないか？}{
+120\,BPM で約半拍の固定遅延．全楽器に同一の遅延がかかるため，楽器同士の同期は保たれる．指揮者の振りと発音の間に一定のずれがあるが，実測で聴覚上の違和感は報告されていない．ビーコン間隔の最適化で 70\,ms 程度まで短縮できる見込み．}
+
+\QA{SoftAP のチャンネルは固定か？}{
+ch\,6 固定．2.4\,GHz の中間チャンネルで干渉が比較的少ない．本番環境 (教室) では他の AP との干渉があり得るが，SoftAP なので周囲の AP に合わせたチャンネル選択は行っていない．}
+
+\QA{同時接続台数の上限は？}{
+ESP32 SoftAP は最大 6 台 (設定値)．楽器 5 台で制限内．}
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{Arduino — IMU モーション検出}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\begin{tcolorbox}[cheatbox, title=実装要点]
+\begin{itemize}
+  \item \textbf{センサ}: GY-521 (MPU6050)，I2C 接続 (アドレス \texttt{0x68})，ピン D4(GPIO5)=SDA, D5(GPIO6)=SCL
+  \item \textbf{設定}: 加速度 $\pm$4\,g (感度 8192\,LSB/g)，ジャイロ $\pm$2000\,dps (16.4\,LSB/dps)
+  \item \textbf{サンプリング}: 5\,ms 周期 (200\,Hz)，14バイトバースト読み取り（加速度3軸 + 温度 + ジャイロ3軸）
+  \item \textbf{LPF}: IIR ローパスフィルタ $\alpha = 0.10$（時定数 $\approx$ 45\,ms）
+  \item \textbf{動加速度}: $\text{dynNorm} = |\vec{a}_\text{LPF}| - g_\text{calib}$．キャリブレーション時の静止加速度ノルム ($\approx 1$\,g) を引くことで姿勢非依存
+  \item \textbf{キャリブレーション}: 起動後 WiFi 接続完了で Calibrating に遷移．2秒間 (400サンプル) の加速度ノルム平均を静止ノルムとして保持
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{拍検出アルゴリズム（ゲート式ステートマシン + 早期発火）}
+
+\begin{enumerate}
+  \item \textbf{Idle}: dynNorm $\leq$ 1.20\,g で待機．積分は走らせない（ノイズ蓄積防止）
+  \item \textbf{Armed 突入}: dynNorm $>$ 1.20\,g で Armed に遷移．動加速度を二重積分して擬似経路長 \texttt{sPathLen} を計算開始
+  \item \textbf{早期発火}: sPathLen $\geq$ 0.20\,m に到達した瞬間に拍を発火（振り始めから $\sim$100\,ms）．1 Armed セッション中 1回限り．不応期 350\,ms (上限 $\approx$ 170\,BPM)
+  \item \textbf{発火後も Armed 維持}: Idle に戻さないことで「発火$\to$即Idle$\to$再Arm$\to$再発火」の連続発火ループを構造的に防止
+  \item \textbf{リリース判定} (デバウンス 40\,ms):
+    \begin{itemize}
+      \item (a) dynNorm $<$ 0.20\,g（絶対値: 完全停止）
+      \item (b) dynNorm $<$ ピーク $\times$ 0.40（相対値: ピークアウト後の減衰）
+      \item (c) Armed 開始から 800\,ms 経過（タイムアウト保険）
+    \end{itemize}
+  \item \textbf{テンポ推定}: 拍間隔の EMA ($\alpha = 0.30$)，範囲 40--240\,BPM にクランプ
+\end{enumerate}
+
+\QA{なぜ加速度のノルムで判定するのか？軸指定ではダメか？}{
+軸指定だとセンサの取り付け角度で誤検出・取りこぼしが起きた．ノルムは姿勢に依存しないスカラー量なので，どの向きで振っても安定して検出できる．ただし重力に直交する振りは過小評価される ($\sqrt{1+a^2}-1 < a$) という限界はある．}
+
+\QA{1.20\,g の閾値はどう決めたか？}{
+仕様書の 1.8\,g は重力込み前提で届かず，0.8\,g では小さい揺れで誤検出した．実機で調整して中間の 1.2\,g に決定．取りこぼし・誤検出が出たら 1.0--1.4 の範囲で再調整する想定．}
+
+\QA{なぜ早期発火（振り始めで発火）を採用したか？}{
+振り終わり（リリース時）に発火すると体感遅延が大きく，指揮者の振りと音がずれる．擬似経路長 (動加速度の二重積分) が 0.20\,m に達した時点で発火すると，振り始めから $\sim$100\,ms で音が出て体感的に同期する．}
+
+\QA{連続スイングで二重発火しないか？}{
+構造的に防止している．(1) 発火しても Armed を維持し Idle に戻さないので，同じ振り中に再Arm$\to$再発火するループが起きない．(2) 不応期 350\,ms で物理的に速い連打も抑制．(3) リリース判定にデバウンス 40\,ms を設けて一瞬の dynNorm の落ち込みによる誤リリースも防止．}
+
+\QA{ジャイロは使っているか？}{
+加速度のみで拍検出．ジャイロデータは取得しているが，現在のロジックでは判定に使っていない．メニューナビ（横/縦の振り分け）は加速度ベースの重力推定 + 振り方向分解で実現している．}
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{Processing — UI とシリアル通信}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\begin{tcolorbox}[cheatbox, title=実装要点]
+\begin{itemize}
+  \item \textbf{フレームワーク}: Processing 4 + Minim ライブラリ（加算合成オーディオ）
+  \item \textbf{描画フレームレート}: 90\,fps (\texttt{frameRate(90)})
+  \item \textbf{オーディオ}: ステレオ出力，サンプルレート 44100\,Hz，バッファ 512 サンプル
+  \item \textbf{シリアル}: USB Serial 115200\,bps．\texttt{serialEvent()} コールバック (Serial スレッド) でバイト受信 → magic バイト走査でフレーミング → 20\,B パケットを \texttt{ConcurrentLinkedQueue} に push
+  \item \textbf{パケット処理}: draw スレッドで毎フレーム \texttt{drainPackets()} → NOTE (type=3) なら発音トリガ，UI (type=4) なら画面状態を更新
+  \item \textbf{フレーミング}: magic バイト \texttt{0x52 0x4F} を走査し 2 バイト一致で \texttt{inFrame=true}，以降 18 バイト読んで 20\,B パケット完成
+  \item \textbf{役割自動判定}: UI パケット (type=4) を受信 $\to$ メイン操作 UI，NOTE のみ + \texttt{partId $\ne$ 0x02} $\to$ アナライザ
+  \item \textbf{マスターリセット検知}: UI パケットが 2000\,ms 途絶えたら \texttt{uiState=ST\_IDLE} に戻し全発音停止
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{画面構成}
+
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+画面 & 表示内容 \\
+\midrule
+PortSelect & シリアルポート一覧（USB フィルタ＋スクロール対応，クリックで開閉） \\
+Waiting & キャリブレーション中 / 待機中 / Fallback \\
+Menu & モード選択（自由演奏 / ゲーム），カーソル表示 \\
+FreePlay & 演奏画面（BPM 表示，パート別最終ノート，ログパネル） \\
+GamePlay & ゲーム演奏画面 + メトロノームガイド（フェードアウトする視覚＋音声ガイド） \\
+Result & ゲーム得点表示 (0--100 点) \\
+Analyzer & アナライザ画面（パート別最終ノート表示） \\
+\bottomrule
+\end{tabularx}
+
+\QA{なぜ Processing を採用したのか？}{
+Arduino UNO R4 WiFi 単体では音声合成の処理能力が足りない（44.1\,kHz サンプリングの加算合成は浮動小数点演算が大量に必要）．Processing は Java ベースで Minim ライブラリによる UGen ベースのリアルタイム音声合成が容易で，Serial ライブラリも標準搭載されている．}
+
+\QA{シリアル受信でデータが壊れたらどうなる？}{
+magic バイト走査 (\texttt{0x52 0x4F}) で毎回先頭を探索するため，途中のバイト欠損・ノイズが入っても次の magic から自動復帰する．version チェック (\texttt{0x01}) も行い，無効パケットは破棄する．}
+
+\QA{なぜ ConcurrentLinkedQueue を使っているか？}{
+Serial スレッド (Processing の \texttt{serialEvent}) と draw スレッドが別スレッドで動くため．ロックフリーのキューで競合を避け，描画スレッドが毎フレーム drain する構造で安全にパケットを受け渡す．}
+
+\QA{複数ポートを同時に開ける理由は？}{
+楽器は 5 台 $+$ ドラム 1 台で，各 PC が 1 台を担当する運用だが，デバッグ時には複数台を 1 台の PC に繋いでテストできる．ポートごとに \texttt{PortConn} オブジェクトで受信バッファを独立管理している．}
+
+\QA{frameRate 90 は高すぎないか？}{
+パケット受信は Serial スレッドなので frameRate は描画と音声管理の更新頻度．90\,fps にすることで \texttt{drainPackets()} の呼び出し間隔を $\sim$11\,ms に抑え，パケット滞留を減らしている．音声処理の発音タイミングにも影響する．}
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{音声解析・音色合成}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\begin{tcolorbox}[cheatbox, title=実装要点]
+\begin{itemize}
+  \item \textbf{合成方式}: \textbf{加算合成} (Additive Synthesis)．各楽器音を倍音の正弦波の重ね合わせで生成
+  \item \textbf{ピッチ}: MIDI ノート番号から基本周波数を算出: $f_0 = 440 \times 2^{(n-69)/12}$
+  \item \textbf{倍音}: 各倍音の周波数 $f_k = f_0 \times r_k \times \sqrt{1 + B \cdot k^2}$．$r_k$ は倍音比 (理想では $k$)，$B$ は非調和性係数 (inharmonicity)
+  \item \textbf{ビブラート}: ピッチ変調 $\text{pitchMul} = 2^{(d \times g \times \sin\phi_\text{vib}) / 1200}$ (cent 単位)．onset 遅延あり
+  \item \textbf{トレモロ}: 振幅変調 $s \times (1 - d/2 + d/2 \cdot \sin\phi_\text{trem})$
+  \item \textbf{エンベロープ}: ADSR (attack/decay/sustain/release) + JSON 定義のサンプルカーブ (sustaining 時はループ区間で反復)
+  \item \textbf{ノイズ}: 事前生成のノイズテーブルをエンベロープで変調し加算（アタックノイズの再現）
+  \item \textbf{音色定義}: \texttt{pc\_app/production/orchestra\_resynth/data/*.instrument.json}．ファイル名昇順の index が \texttt{instrumentId}
+  \item \textbf{ドラム}: 別エンジン (\texttt{DrumEngine.pde}) で打楽器専用の合成
+  \item \textbf{同時発音}: 最大 24 (\texttt{MAX\_POLYPHONY=24})，超過時は最古のボイスを強制リリース
+  \item \textbf{消音}: Processing 側が \texttt{durationMs} から自動消音．NoteOff は送らない（NoteOn のみ）
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{輪唱の実現方法}
+
+\begin{itemize}
+  \item 全楽器ノードが\textbf{同一の楽譜} (\texttt{score\_data.cpp}) を持つ
+  \item 声部ごとに \texttt{headRestBeats} を設定: node\_02=0, node\_03=8, node\_04=16, node\_05=24
+  \item 楽譜の進行は「指揮者の拍番号 $-$ 1 $-$ headRestBeats」で index を算出
+  \item headRestBeats 分の拍を休符として読み飛ばし，声部ごとにフレーズ単位でずれて入る
+  \item 周回は \texttt{CANON\_CYCLE\_BEATS=56} (曲長 32 + 最終声部遅延 24) のサイクル窓で管理
+  \item 曲: かえるのうた (C major, 32 拍 = 4 フレーズ)．4 声部が 8 拍ずつずれて重なる
+\end{itemize}
+
+\QA{なぜ加算合成を選んだのか？}{
+楽器の音色を物理的な特性 (倍音構造，非調和性，エンベロープ) から再合成できるため．サンプリング方式と違い，テンポに依存する音長やピッチの自由な制御が可能．JSON で音色パラメータを外部定義でき，楽器変更もファイル差し替えで済む．}
+
+\QA{音色の JSON はどこから来たか？}{
+\texttt{sound\_lab/} の \texttt{analyzer.py} で実際の楽器音の録音から分析・抽出した．基音検出 (pyin)，倍音抽出 (FFT/STFT)，ADSR フィッティング，残差ノイズ分離の 9 段パイプラインで JSON を自動生成．}
+
+\QA{音階の精度はどの程度か？}{
+MOP2 検証 (合成音の基音推定 vs 平均律) で全 24 音の平均 $|$誤差$|$ 0.74\,cent，最大 1.91\,cent．基準 3.6\,cent 未満を達成．誤差の主因は \texttt{harmonics[n=1].ratio $\ne$ 1.0} (ホルン $-1.91$, トランペット $-0.87$\,cent)．}
+
+\QA{同時発音 24 で足りるか？}{
+4 声部 $+$ ドラムが同時に鳴る最大ケースでも 5--6 音程度．durationMs 自動消音で不要なボイスは即リリースされるため，24 は十分な余裕がある．}
+
+\QA{非調和性 (inharmonicity) とは？}{
+実際の楽器の倍音は理論整数倍からずれる．ピアノの弦の剛性が典型例で $f_k = k \cdot f_0 \cdot \sqrt{1 + B \cdot k^2}$ で高次倍音ほど高くずれる．金管楽器は $B$ が非常に小さい (ほぼ調和的)．}
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{ログ取得・デバッグ}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\begin{tcolorbox}[cheatbox, title=実装要点]
+\begin{itemize}
+  \item \textbf{ファーム側}: \texttt{SerialDebug.h} マクロ (\texttt{DBG\_PRINTF} / \texttt{DBG\_PRINTLN})．\texttt{SERIAL\_DEBUG} ビルドフラグで ON/OFF
+    \begin{itemize}
+      \item 指揮者: \texttt{SERIAL\_DEBUG=1}（拍検出のデバッグ情報を 200\,ms ごとにダンプ）
+      \item 楽器: \texttt{SERIAL\_DEBUG=0}（USB Serial は NOTE バイナリパケット専用．テキスト混在を避ける）
+    \end{itemize}
+  \item \textbf{指揮者ダンプ}: 200\,ms 周期で時刻・状態・WiFi・IMU 値・dynNorm・ゲート状態・経路長・BPM・beatNo・シーケンス番号を 1 行出力
+  \item \textbf{イベントログ}: 状態遷移・WiFi 接続変化・拍検出の発生時に即時出力（\texttt{dumpEdges}）
+  \item \textbf{Processing 側}: 構造化ログ (\texttt{OrcLogger.pde}): \texttt{[HH:MM:SS.mmm] [ノードID] [カテゴリ] メッセージ} 形式で stdout + 画面リングバッファ (200行)
+    \begin{itemize}
+      \item カテゴリ: NOTE, UI, SERIAL, AUDIO, STATE, ERROR, SYSTEM, METRO
+    \end{itemize}
+  \item \textbf{MOP テスト}: \texttt{MopTest.h} で \texttt{MOP\_TEST} ビルドフラグ切替．MOP1 (拍検出精度)，MOP4 (同期誤差)，MOP5 (通信遅延)，MOP7 (起動時間)，MOP8 (CPU 使用率) を個別に計測出力
+  \item \textbf{シリアルログ収集}: \texttt{tools/verification/scripts/serial\_logger.py} で複数ポートを同時に開き，PC 側タイムスタンプ + ポート名を付与して保存．pyserial 使用
+  \item \textbf{MOP 分析}: \texttt{tools/verification/scripts/} 配下の Python スクリプト群でログを解析 → PASS/FAIL 判定 → グラフ PNG 出力
+\end{itemize}
+\end{tcolorbox}
+
+\QA{デバッグ出力の ON/OFF はどう切り替えるか？}{
+\texttt{platformio.ini} の \texttt{build\_flags} に \texttt{-DSERIAL\_DEBUG=1} を設定する．0 にするとマクロが空展開になり，コードサイズも実行時コストも 0 になる．楽器ノードは NOTE バイナリを Serial に流すため，デバッグ時以外は必ず 0 にする．}
+
+\QA{MOP (Measure of Performance) の計測方法は？}{
+ファームの \texttt{MOP\_TEST} フラグで計測コードをコンパイル時に選択する．例えば \texttt{MOP\_TEST=4} では楽器ノードが BEAT 受信$\to$発音時刻の \texttt{localMaster} レンジを出力し，\texttt{serial\_logger.py} で収集した後 \texttt{analyze.py} で集計する．通常ビルド (\texttt{MOP\_TEST=0}) では計測コードは一切コンパイルされない．}
+
+\QA{PC 側ログはファイルに保存されるか？}{
+Processing の \texttt{println()} は stdout に出力され，\texttt{processing-java --run} で起動した場合はターミナルに表示される．ファイル保存は \texttt{serial\_logger.py} 側で行う．Processing 画面内にもリングバッファ (200行) でログパネルを表示している．}
+
+\QA{ログからどんな問題を発見したか？}{
+MOP5 検証で「SoftAP のマルチキャストが省電力バッファで 204.8\,ms 周期のバースト配送になっている」ことを発見した．これは BEAT の \texttt{lookahead} (当時 45\,ms) が構造的に不足していることを意味し，220\,ms に引き上げた根拠になった．}
+
+\QA{CPU 使用率の計測はどうしている？}{
+\texttt{MOP\_TEST=8} で loop() 内の入力/ロジック/出力の 3 フェーズの \texttt{micros()} 差を毎ループ出力する．指揮者ノードの 3 フェーズ合計は 5\,ms 以内に収まっており，5\,ms 周期の IMU サンプリングに間に合う．}
+
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+\section{横断的な質問}
+% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+\QA{なぜこの構成（指揮者 + 楽器 + PC 分離）にしたか？}{
+(1) UNO R4 WiFi 単体では加算合成のリアルタイム演算ができない (44.1\,kHz $\times$ 倍音 20 本 $\times$ 同時発音数の浮動小数点演算量)．(2) 指揮者は WiFi AP を起動する必要があり，ESP32-S3 が必要．UNO R4 は STA のみ．(3) 役割を分離することでファームウェアの複雑性を下げ，各ノードが単一責務で動く Embedded-Module-Architecture (EMA) を実現した．}
+
+\QA{EMA (Embedded-Module-Architecture) とは何か？}{
+\texttt{loop()} を入力$\to$ロジック$\to$出力の 3 フェーズに分け，各フェーズを \texttt{IModule} の配列で回す設計パターン．モジュール間は \texttt{SystemData} 構造体だけを介してデータを受け渡し，直接の関数呼び出しを禁止する．これにより IMU/WiFi/LED 等を独立にテスト・差し替えできる．}
+
+\QA{苦労した点は？}{
+(1) SoftAP のマルチキャスト配送が DTIM バッファリングで 200\,ms 周期のバーストになる現象の特定と対策 (lookahead 220\,ms 化 + min フィルタ化)．(2) 拍検出の閾値調整 (1.8$\to$0.8$\to$1.2\,g の試行錯誤，二重発火防止のゲート構造)．(3) 4 声輪唱のサイクル窓ロジック (最終声部が 1 周を終えるまで先頭声部は次の周回を始めない制御)．}
+
+\QA{今後の展望は？}{
+(1) ビーコン間隔の最適化で固定遅延 220\,ms を 70\,ms 程度に短縮．(2) 楽器台数の拡張 (現行 5 台 $\to$ 6 台以上)．(3) ゲームモードの拡充 (複数曲選択，難易度設定)．(4) Processing から Web ベース (WebAudio) への移行検討．}
+
+\QA{費用・部品はいくらか？}{
+主要部品: XIAO ESP32-S3 Sense ($\sim$1200 円) $\times$ 1, Arduino UNO R4 WiFi ($\sim$3500 円) $\times$ 5, GY-521 ($\sim$300 円) $\times$ 1, ブレッドボード・ジャンパ線 (数百円)．PC は大学の Mac を使用．合計は約 2 万円前後．}
+
+\QA{生成 AI はどう使ったか？}{
+設計判断は著者が行い，AI (Claude) との対話を通じて共同でコードを書いた．EMA のアーキテクチャ決定，Arduino の制約に照らしたレビュー，拍検出の閾値候補の提案などに活用．最終的な判断と動作確認は人間が行い，誤りの責任は著者にある．}
+
+\QA{同期精度の MOP4 の実測値は？}{
+3 回実測 (延べ 560 拍 $\times$ 5 ノード) で中央値 7\,ms，平均 10.8\,ms，最大 65\,ms．設計目標 20\,ms 以内を中央値で達成．尾部の大きな値はループストール (SoftAP バースト位相に起因) で 9.2\% 程度発生．}
+
+\QA{MOP5 (通信遅延) はどうか？}{
+受信遅刻率を当初の 45.4\% から lookahead 220\,ms 化で 1.9--3.1\% まで改善．「発音予約が成立する」ことを指標のスコープとして再定義した．}
+
+\end{document}
