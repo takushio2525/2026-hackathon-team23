@@ -5,26 +5,20 @@
 
 ## 現在の対象
 
-- **塩澤の最終報告書は修正反映済み**（`work/shiozawa/最終報告書/`、コミット `1f6336b`）。
-  - ルーブリック評価（90/100）で確定した不備 2 件を修正: §4.4 末尾に文献 [6]
-    （`ref:onkai`、3.6 cent の出典）の `\cite` と由来 1 文を追加、§2.1 と図 1 の
-    「金管4声部／金管1〜4」を「4声部／声部1〜4」へ修正（図は drawio 再書き出し、
-    元ソース `fig/system-overview.drawio` も同ディレクトリにコミット）。
-  - チェックリスト確認.md 2-7 の誤記録（未引用のまま ✅）を実確認結果へ訂正。
-  - Docker latexmk クリーンビルド: エラー 0・未定義参照 0・Overfull 0・43 ページ。
-    全 10 bibitem の `\cite` 出現を grep で確認し未引用 0 件。
-  - 未実施の修正提案は 3〜7（同期タイムライン図・NTP 出典・リポ URL 明記・計測日注記・
-    関連技術比較）。実施すれば 93 点前後の見込み（ルーブリック評価.md §12 参照）。
+- **個人最終報告書をサンプル準拠へ全面改稿済み**（`work/shiozawa/最終報告書/`，コミット `c39497b`・`ff7c235`）。
+  - 章構成: はじめに→システム概要→実装→評価方法と結果→考察→おわりに→付録A（ソース）/B（関数別フローチャート）。
+  - 図22枚（実測グラフ12・説明図/FC 9・計画時ガント流用1）・表11・61ページ。
+  - MOP5 は「再定義」枠組みを廃し当初定義で未達報告 + 考察で原因・対策。エンタメアンケート43件の節を新設。
+  - Docker latexmk エラー0・未定義参照0・Overfull 0。全数値は results/ 正本と再集計一致。全12文献の実在・引用内容を Web で確認済み。
 
 ## 次の一手
 
-1. 修正提案 3〜7 を追加実施するかはユーザー判断。
-2. 最終報告書の提出（提出フォームへのアップロードはユーザー作業。締切時刻は要確認）。
-3. 発表直前には `docs/src/content/docs/presentation/` の要点・想定問答を確認する。
+1. 報告書の提出はユーザー作業（提出要領・締切の最終確認）。
+2. 追加の推敲要望（文量調整・図の差し替え）があれば対応。
+3. グラフ再生成は `fig/make_report_graphs.py`（venv: `tools/verification/.venv`）。
 
 ## 現フェーズで Read すべき設計書
 
-- ルーブリック評価と修正提案: `work/shiozawa/最終報告書/ルーブリック評価.md`
-- MOP 数値の根拠: `tools/verification/results/MOP_REPORT_20260711.md`
-  （MOP2 だけは別記録: `tools/verification/results/mop2/evaluation.md`）
-- 最終報告書の本文: `work/shiozawa/最終報告書/main.tex`
+- 報告書本文: `work/shiozawa/最終報告書/main.tex`
+- 数値の正本: `tools/verification/results/MOP_REPORT_20260711.md`・`results/mop2/evaluation.md`
+- アンケート: `work/shiozawa/最終報告書/data/entertainment_survey_team23.csv`
