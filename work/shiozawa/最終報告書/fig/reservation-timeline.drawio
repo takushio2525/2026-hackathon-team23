@@ -1,0 +1,50 @@
+<mxfile host="Claude">
+  <diagram id="reservation-timeline" name="発音予約と時計同期">
+    <mxGraphModel dx="1200" dy="500" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="500" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <!-- レーンラベル -->
+        <mxCell id="lane1" value="指揮者ノード&lt;br&gt;（マスタ時計）" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1" vertex="1" parent="1"><mxGeometry x="20" y="60" width="140" height="40" as="geometry"/></mxCell>
+        <mxCell id="lane2" value="楽器ノード A" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1" vertex="1" parent="1"><mxGeometry x="20" y="205" width="140" height="30" as="geometry"/></mxCell>
+        <mxCell id="lane3" value="楽器ノード B" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontStyle=1" vertex="1" parent="1"><mxGeometry x="20" y="325" width="140" height="30" as="geometry"/></mxCell>
+        <!-- レーン水平線 -->
+        <mxCell id="hl1" style="endArrow=none;html=1;strokeColor=#CCCCCC;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="80" as="sourcePoint"/><mxPoint x="1130" y="80" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="hl2" style="endArrow=none;html=1;strokeColor=#CCCCCC;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="220" as="sourcePoint"/><mxPoint x="1130" y="220" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="hl3" style="endArrow=none;html=1;strokeColor=#CCCCCC;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="340" as="sourcePoint"/><mxPoint x="1130" y="340" as="targetPoint"/></mxGeometry></mxCell>
+        <!-- 時間軸 -->
+        <mxCell id="taxis" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="170" y="420" as="sourcePoint"/><mxPoint x="1130" y="420" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="taxisl" value="時間" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;" vertex="1" parent="1"><mxGeometry x="1136" y="406" width="50" height="28" as="geometry"/></mxCell>
+        <!-- t0 縦点線 -->
+        <mxCell id="vt0" style="endArrow=none;html=1;dashed=1;strokeColor=#888888;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="230" y="50" as="sourcePoint"/><mxPoint x="230" y="420" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="vt0l" value="t₀" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;" vertex="1" parent="1"><mxGeometry x="210" y="422" width="40" height="24" as="geometry"/></mxCell>
+        <!-- 予約時刻 縦点線 -->
+        <mxCell id="vplay" style="endArrow=none;html=1;dashed=1;strokeColor=#B85450;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1010" y="50" as="sourcePoint"/><mxPoint x="1010" y="420" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="vplayl" value="t₀ + 220 ms（発音予約時刻）" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontColor=#B85450;fontStyle=1" vertex="1" parent="1"><mxGeometry x="900" y="422" width="230" height="24" as="geometry"/></mxCell>
+        <!-- 指揮者: 拍検出とBEAT送信 -->
+        <mxCell id="beatdot" style="ellipse;whiteSpace=wrap;html=1;fillColor=#6C8EBF;strokeColor=#6C8EBF;" vertex="1" parent="1"><mxGeometry x="223" y="73" width="14" height="14" as="geometry"/></mxCell>
+        <mxCell id="beatl" value="拍を検出（時刻 t₀）" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;" vertex="1" parent="1"><mxGeometry x="180" y="34" width="160" height="24" as="geometry"/></mxCell>
+        <mxCell id="send" value="BEAT を送信（予約時刻 t₀+220 ms を格納・4 連送）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="1"><mxGeometry x="250" y="94" width="220" height="44" as="geometry"/></mxCell>
+        <!-- 配送矢印 -->
+        <mxCell id="d1" value="" style="endArrow=block;html=1;strokeColor=#4A6FA5;strokeWidth=1.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="237" y="85" as="sourcePoint"/><mxPoint x="390" y="214" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="d1l" value="配送遅延 小" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#4A6FA5;" vertex="1" parent="1"><mxGeometry x="250" y="160" width="100" height="22" as="geometry"/></mxCell>
+        <mxCell id="d2" value="" style="endArrow=block;html=1;strokeColor=#4A6FA5;strokeWidth=1.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="237" y="85" as="sourcePoint"/><mxPoint x="850" y="334" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="d2l" value="配送遅延 大（バースト待ち）" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#4A6FA5;" vertex="1" parent="1"><mxGeometry x="530" y="245" width="200" height="22" as="geometry"/></mxCell>
+        <!-- 楽器A: 受信 → 待機 → 発火 -->
+        <mxCell id="ra" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="390" y="213" width="14" height="14" as="geometry"/></mxCell>
+        <mxCell id="ral" value="受信" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;" vertex="1" parent="1"><mxGeometry x="370" y="185" width="54" height="22" as="geometry"/></mxCell>
+        <mxCell id="wa" value="予約時刻まで待つ（時計同期でローカル時刻へ換算）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="420" y="198" width="574" height="44" as="geometry"/></mxCell>
+        <mxCell id="fa" style="ellipse;whiteSpace=wrap;html=1;fillColor=#B85450;strokeColor=#B85450;" vertex="1" parent="1"><mxGeometry x="1003" y="213" width="14" height="14" as="geometry"/></mxCell>
+        <!-- 楽器B: 受信 → 待機 → 発火 -->
+        <mxCell id="rb" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="850" y="333" width="14" height="14" as="geometry"/></mxCell>
+        <mxCell id="rbl" value="受信" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;" vertex="1" parent="1"><mxGeometry x="830" y="305" width="54" height="22" as="geometry"/></mxCell>
+        <mxCell id="wb" value="待つ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;dashed=1;" vertex="1" parent="1"><mxGeometry x="880" y="318" width="114" height="44" as="geometry"/></mxCell>
+        <mxCell id="fb" style="ellipse;whiteSpace=wrap;html=1;fillColor=#B85450;strokeColor=#B85450;" vertex="1" parent="1"><mxGeometry x="1003" y="333" width="14" height="14" as="geometry"/></mxCell>
+        <!-- 発音同時ラベル -->
+        <mxCell id="fire" value="発音（全楽器がマスタ時計基準の同時刻）" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#B85450;fontStyle=1" vertex="1" parent="1"><mxGeometry x="1024" y="262" width="150" height="60" as="geometry"/></mxCell>
+        <!-- 下部注記 -->
+        <mxCell id="note" value="配送遅延が拍ごと・楽器ごとにばらついても，予約時刻までに BEAT が届きさえすれば発音時刻は揃う" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="170" y="455" width="960" height="26" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

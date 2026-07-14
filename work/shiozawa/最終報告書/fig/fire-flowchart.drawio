@@ -1,0 +1,36 @@
+<mxfile host="Claude">
+  <diagram id="fire-flowchart" name="楽器ノード周期処理">
+    <mxGraphModel dx="760" dy="1100" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="760" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="start" value="loop 開始" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=13;" vertex="1" parent="1"><mxGeometry x="270" y="30" width="180" height="44" as="geometry"/></mxCell>
+        <mxCell id="in1" value="【入力】UDP 受信バッファから&lt;br&gt;全パケットを読む" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontSize=12;" vertex="1" parent="1"><mxGeometry x="220" y="108" width="280" height="54" as="geometry"/></mxCell>
+        <mxCell id="p1" value="ヘッダの送信時刻と受信時刻の差から&lt;br&gt;時計オフセットを更新（min フィルタ・窓 2 s）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontSize=12;" vertex="1" parent="1"><mxGeometry x="205" y="196" width="310" height="54" as="geometry"/></mxCell>
+        <mxCell id="d1" value="BEAT を&lt;br&gt;受信した?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="255" y="284" width="210" height="84" as="geometry"/></mxCell>
+        <mxCell id="p2" value="発音予約に登録&lt;br&gt;（同じ拍番号の重複受信は破棄）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontSize=12;" vertex="1" parent="1"><mxGeometry x="220" y="402" width="280" height="54" as="geometry"/></mxCell>
+        <mxCell id="d2" value="【ロジック】&lt;br&gt;有効な発音予約が&lt;br&gt;ある?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="245" y="490" width="230" height="96" as="geometry"/></mxCell>
+        <mxCell id="p3" value="予約時刻をローカル時刻へ換算&lt;br&gt;（推定オフセットを差し引く）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontSize=12;" vertex="1" parent="1"><mxGeometry x="220" y="620" width="280" height="54" as="geometry"/></mxCell>
+        <mxCell id="d3" value="予約時刻に&lt;br&gt;到達? (waitMs ≤ 0)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="1"><mxGeometry x="245" y="708" width="230" height="96" as="geometry"/></mxCell>
+        <mxCell id="p4" value="指揮者の拍番号から楽譜位置を算出し&lt;br&gt;NOTE（音高・強弱・音長）を生成" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontSize=12;" vertex="1" parent="1"><mxGeometry x="205" y="838" width="310" height="54" as="geometry"/></mxCell>
+        <mxCell id="out1" value="【出力】NOTE を USB シリアルへ送出・&lt;br&gt;LED 表示を更新" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontSize=12;" vertex="1" parent="1"><mxGeometry x="205" y="926" width="310" height="54" as="geometry"/></mxCell>
+        <!-- 縦の流れ -->
+        <mxCell id="f1" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="start" target="in1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f2" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="in1" target="p1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f3" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p1" target="d1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f4" value="YES" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="p2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f5" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p2" target="d2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f6" value="YES" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="p3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f7" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p3" target="d3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f8" value="YES" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d3" target="p4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f9" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p4" target="out1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <!-- NO バイパス -->
+        <mxCell id="b1" value="NO" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;curved=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="d1" target="d2"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="326"/><mxPoint x="560" y="538"/></Array></mxGeometry></mxCell>
+        <mxCell id="b2" value="NO" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;curved=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="d2" target="out1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="600" y="538"/><mxPoint x="600" y="953"/></Array></mxGeometry></mxCell>
+        <mxCell id="b3" value="NO（次周期で再評価）" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.3;curved=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="d3" target="out1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="756"/><mxPoint x="560" y="942"/></Array></mxGeometry></mxCell>
+        <!-- 戻り -->
+        <mxCell id="ret" value="2 ms 周期で繰り返す" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=1.3;fontSize=11;exitX=0;exitY=0.5;entryX=0;entryY=0.5;curved=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="out1" target="start"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="120" y="953"/><mxPoint x="120" y="52"/></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
