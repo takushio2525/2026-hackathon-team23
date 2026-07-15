@@ -1,20 +1,17 @@
 <mxfile host="Claude">
   <diagram id="beat-detection" name="拍検出の状態機械">
-    <mxGraphModel dx="1200" dy="420" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="420" math="0" shadow="0">
+    <mxGraphModel dx="1000" dy="340" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="340" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <!-- 状態ボックス -->
-        <mxCell id="idle" value="&lt;b&gt;待機&lt;/b&gt;&lt;br&gt;動加速度ノルム d[n] を監視" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=13;" vertex="1" parent="1"><mxGeometry x="40" y="120" width="250" height="70" as="geometry"/></mxCell>
-        <mxCell id="armed" value="&lt;b&gt;武装（Armed）&lt;/b&gt;&lt;br&gt;動加速度を二重積分し&lt;br&gt;腕の移動経路長 L を推定" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=13;" vertex="1" parent="1"><mxGeometry x="420" y="112" width="250" height="86" as="geometry"/></mxCell>
-        <mxCell id="fired" value="&lt;b&gt;拍を発火&lt;/b&gt;&lt;br&gt;BEAT を送信・テンポ更新&lt;br&gt;（1 回の振りにつき 1 拍のみ）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=13;" vertex="1" parent="1"><mxGeometry x="810" y="112" width="270" height="86" as="geometry"/></mxCell>
-        <!-- 遷移 -->
-        <mxCell id="e1" value="d[n] &amp;gt; 1.20 g&lt;br&gt;（強い動き出しを検知）" style="endArrow=block;html=1;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="idle" target="armed"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e2" value="L ≥ 0.20 m&lt;br&gt;（実際に腕が動いた）" style="endArrow=block;html=1;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="armed" target="fired"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e3" value="動きが収まる（d[n] &amp;lt; 0.20 g またはピークの 40% 未満が 40 ms 継続）&lt;br&gt;かつ不応期 350 ms 経過" style="endArrow=block;html=1;strokeColor=#4A6FA5;strokeWidth=1.5;fontSize=12;exitX=0.5;exitY=1;entryX=0.5;entryY=1;curved=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="fired" target="idle"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="945" y="290"/><mxPoint x="165" y="290"/></Array></mxGeometry></mxCell>
-        <mxCell id="e4" value="動きが収まってしまった場合は発火せず戻る" style="endArrow=block;html=1;dashed=1;strokeColor=#888888;strokeWidth=1.2;fontSize=11;fontColor=#666666;exitX=0.25;exitY=0;entryX=0.75;entryY=0;curved=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="armed" target="idle"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="482" y="60"/><mxPoint x="227" y="60"/></Array></mxGeometry></mxCell>
-        <!-- 前処理注記 -->
-        <mxCell id="pre" value="前処理: 3 軸加速度 → 1 次 IIR ローパス（α=0.10）→ 静止時ノルム g₀ を差し引いて動加速度 d[n] を得る" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#555555;" vertex="1" parent="1"><mxGeometry x="120" y="340" width="880" height="26" as="geometry"/></mxCell>
+        <mxCell id="idle" value="&lt;b&gt;待機&lt;/b&gt;&lt;br&gt;d[n] を監視" style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="30" y="100" width="200" height="60" as="geometry"/></mxCell>
+        <mxCell id="armed" value="&lt;b&gt;Armed&lt;/b&gt;&lt;br&gt;速度・経路長 L を積分" style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="370" y="100" width="200" height="60" as="geometry"/></mxCell>
+        <mxCell id="fired" value="&lt;b&gt;拍発火&lt;/b&gt;&lt;br&gt;BEAT送信・テンポ更新" style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="710" y="100" width="200" height="60" as="geometry"/></mxCell>
+        <mxCell id="e1" value="d[n] &amp;gt; 1.20 g" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="idle" target="armed"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="L ≥ 0.20 m" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="armed" target="fired"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="動きが収まり不応期 350 ms 経過" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="fired" target="idle"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="810" y="240"/><mxPoint x="130" y="240"/></Array></mxGeometry></mxCell>
+        <mxCell id="e4" value="振りが不十分" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;dashed=1;exitX=0.5;exitY=0;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="armed" target="idle"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="470" y="50"/><mxPoint x="130" y="50"/></Array></mxGeometry></mxCell>
+        <mxCell id="note" value="前処理: 3軸加速度 → IIRローパス（α=0.10）→ g₀を差引 → d[n]" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="100" y="286" width="740" height="24" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
