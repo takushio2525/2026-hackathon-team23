@@ -11,9 +11,9 @@
         <mxCell id="e23" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ph2" target="ph3"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="eloop" value="次周期へ（2 ms / 5 ms）" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=0;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="ph3" target="ph1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="870" y="22"/><mxPoint x="170" y="22"/></Array></mxGeometry></mxCell>
         <mxCell id="sd" value="&lt;b&gt;SystemData&lt;/b&gt;（モジュール間の唯一の共有構造体）" style="whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#000000;fontSize=12;" vertex="1" parent="1"><mxGeometry x="160" y="280" width="720" height="50" as="geometry"/></mxCell>
-        <mxCell id="rw1" value="書く" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.15;entryY=0;" edge="1" parent="1" source="ph1" target="sd"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rw1" value="書く" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.15;entryY=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="ph1" target="sd"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="rw2" value="読む・書く" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="ph2" target="sd"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="rw3" value="読む" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.85;entryY=0;" edge="1" parent="1" source="ph3" target="sd"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rw3" value="読む" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.85;entryY=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="ph3" target="sd"><mxGeometry relative="1" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

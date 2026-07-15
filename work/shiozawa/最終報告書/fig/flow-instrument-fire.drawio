@@ -24,7 +24,7 @@
         <!-- NO branches -->
         <mxCell id="f3" value="NO" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0;exitY=0.5;entryX=0;entryY=0.5;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="d1" target="end"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="100" y="118"/><mxPoint x="100" y="618"/></Array></mxGeometry></mxCell>
         <mxCell id="f6" value="NO（次周期で再評価）" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="d2" target="end"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="284"/><mxPoint x="560" y="618"/></Array></mxGeometry></mxCell>
-        <mxCell id="f9" value="NO" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="d3" target="p4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f9" value="NO" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="d3" target="p4"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="452"/></Array></mxGeometry></mxCell>
         <mxCell id="f11" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=1;entryY=0.5;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="p4" target="end"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="618"/></Array></mxGeometry></mxCell>
       </root>
     </mxGraphModel>
