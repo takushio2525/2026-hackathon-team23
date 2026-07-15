@@ -412,11 +412,12 @@ Processingによる音色合成・UIを担当し，報告者が設計した NOTE
 
 計画時のスケジュールを図\ref{fig:schedule}に示す．
 設計（WBS 110〜120，全員で分担し報告者はアーキテクチャ・通信設計を担当）・製造
-（210〜260，報告者は共通層・指揮者・楽器ノードを担当）・テスト（310〜330，報告者）・
-発表準備（510〜520）の4フェーズ構成である．実績はおおむねこの計画に沿ったが，成果発表会が台風の
-影響で7月1日から7月8日へ延期されたことに伴い，最終週に性能検証の再実施と同期対策
-（\ref{sec:prelim-sync}節・\ref{sec:disc-counter}節）を追加で行った点が計画との相違
-である．
+（210〜250，報告者は共通層・指揮者・楽器ノードを担当）・テスト（310〜330，報告者）の
+3フェーズ構成であり，ストレッチ項目（WBS 400）を余裕時に実施する計画であった．
+実績はおおむねこの計画に沿ったが，成果発表会が台風の
+影響で7月1日から7月8日へ延期されたことに伴い，計画期間外の最終週に性能検証の再実施と
+同期対策（\ref{sec:prelim-sync}節・\ref{sec:disc-counter}節）を追加で行った点が
+計画との相違である．
 
 \begin{figure}[tbp]
   \newsavebox{\ganttbox}%
@@ -433,8 +434,8 @@ Processingによる音色合成・UIを担当し，報告者が設計した NOTE
     bar height=0.7,
     group right shift=0,
     group top shift=.6,
-    group height=.3]{1}{30}
-    \gantttitle{10 Weeks（5/1〜7/8）}{30} \\
+    group height=.3]{1}{24}
+    \gantttitle{8 Weeks（5/1〜6/24）}{24} \\
     \gantttitle{W1}{3}
     \gantttitle{W2}{3}
     \gantttitle{W3}{3}
@@ -442,30 +443,24 @@ Processingによる音色合成・UIを担当し，報告者が設計した NOTE
     \gantttitle{W5}{3}
     \gantttitle{W6}{3}
     \gantttitle{W7}{3}
-    \gantttitle{W8}{3}
-    \gantttitle{W9}{3}
-    \gantttitle{W10}{3} \\
+    \gantttitle{W8}{3} \\
     \ganttbar[bar/.append style={fill=blue!30}]{全体設計（111-113）/ 全員}{1}{5} \\
-    \ganttbar[bar/.append style={fill=blue!30}]{アーキ・通信設計（114-120）/ 塩澤}{2}{8} \\
-    \ganttbar[bar/.append style={fill=blue!30}]{楽譜基本設計（116）/ 齋藤}{2}{8} \\
-    \ganttbar[bar/.append style={fill=blue!30}]{音色基本設計（117）/ 梅澤}{2}{8} \\
-    \ganttbar[bar/.append style={fill=green!40}]{共通層・指揮者・楽器（210-230）/ 塩澤}{5}{20} \\
-    \ganttbar[bar/.append style={fill=green!40}]{楽譜データ（240）/ 齋藤}{8}{20} \\
-    \ganttbar[bar/.append style={fill=green!40}]{PC音色合成・UI（250）/ 梅澤}{8}{20} \\
-    \ganttbar[bar/.append style={fill=green!40}]{ゲーム機能（260）/ 塩澤・梅澤}{11}{20} \\
-    \ganttbar[bar/.append style={fill=orange!40}]{テスト（310-320）/ 塩澤}{17}{24} \\
-    \ganttbar[bar/.append style={fill=orange!40}]{性能検証（330）/ 塩澤}{20}{30} \\
-    \ganttbar[bar/.append style={fill=gray!40}]{発表準備・報告書（510-520）/ 全員}{24}{30}
-    \ganttlink{elem0}{elem4}
-    \ganttlink{elem1}{elem4}
-    \ganttlink{elem4}{elem8}
-    \ganttlink{elem8}{elem10}
+    \ganttbar[bar/.append style={fill=blue!30}]{アーキ・通信設計（114-115）/ 塩澤}{1}{5} \\
+    \ganttbar[bar/.append style={fill=blue!30}]{楽譜基本設計（116）/ 齋藤}{1}{5} \\
+    \ganttbar[bar/.append style={fill=blue!30}]{音色基本設計（117）/ 梅澤}{1}{5} \\
+    \ganttbar[bar/.append style={fill=blue!30}]{詳細設計（121-129）/ 塩澤・梅澤・齋藤}{6}{8} \\
+    \ganttbar[bar/.append style={fill=green!40}]{共通層・指揮者・楽器（210-230）/ 塩澤}{9}{17} \\
+    \ganttbar[bar/.append style={fill=green!40}]{楽譜データ（240）/ 齋藤}{9}{17} \\
+    \ganttbar[bar/.append style={fill=green!40}]{PC音色合成・UI（250）/ 梅澤}{9}{17} \\
+    \ganttbar[bar/.append style={fill=orange!40}]{単体・結合テスト（310-320）/ 塩澤}{17}{24} \\
+    \ganttbar[bar/.append style={fill=orange!40}]{性能検証（330）/ 塩澤}{17}{24} \\
+    \ganttbar[bar/.append style={fill=gray!20,draw=gray,dashed}]{ストレッチ（400）/ 塩澤}{22}{24}
   \end{ganttchart}%
   \end{lrbox}%
   \begin{center}
   \resizebox{\linewidth}{!}{\usebox{\ganttbox}}
   \end{center}
-  \caption{計画時のスケジュール（WBS 110〜520，2026年5月1日〜7月8日）}
+  \caption{計画時のスケジュール（WBS 110〜400，2026年5月1日〜6月24日）}
   \label{fig:schedule}
 \end{figure}
 
