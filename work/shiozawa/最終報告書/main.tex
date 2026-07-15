@@ -404,18 +404,26 @@ Processingによる音色合成・UIを担当し，報告者が設計した NOTE
   \label{fig:flowchart}
 \end{figure}
 
-計画時のスケジュールを図\ref{fig:schedule}に示す．設計（WBS 110〜120，全員で分担し
-報告者はアーキテクチャ・通信設計を担当）・製造（210〜260，報告者は共通層・指揮者・
-楽器ノードを担当）・テスト（310〜330，報告者）・発表準備の4フェーズ構成である．
-実績はおおむねこの計画に沿ったが，成果発表会が台風の影響で7月1日から7月8日へ延期
-されたことに伴い，最終週に性能検証の再実施と同期対策（\ref{sec:prelim-sync}節・
-\ref{sec:disc-counter}節）を追加で行った点が計画との相違である．
+計画時のスケジュールを図\ref{fig:schedule-design}・図\ref{fig:schedule-impl}に示す．
+設計（WBS 110〜120，全員で分担し報告者はアーキテクチャ・通信設計を担当）・製造
+（210〜260，報告者は共通層・指揮者・楽器ノードを担当）・テスト（310〜330，報告者）・
+発表準備の4フェーズ構成である．実績はおおむねこの計画に沿ったが，成果発表会が台風の
+影響で7月1日から7月8日へ延期されたことに伴い，最終週に性能検証の再実施と同期対策
+（\ref{sec:prelim-sync}節・\ref{sec:disc-counter}節）を追加で行った点が計画との相違
+である．
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\linewidth]{fig/gantt.png}
-  \caption{計画時のスケジュール（WBSタスク別，2026年5月1日〜6月24日＋ストレッチ）}
-  \label{fig:schedule}
+  \includegraphics[width=\linewidth]{fig/gantt-design.png}
+  \caption{計画時のスケジュール（a）設計フェーズ（WBS 110〜120，2026年5月1日〜5月19日）}
+  \label{fig:schedule-design}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{fig/gantt-impl-test.png}
+  \caption{計画時のスケジュール（b）製造・テストフェーズ（WBS 210〜400，5月20日〜6月24日＋ストレッチ）}
+  \label{fig:schedule-impl}
 \end{figure}
 
 \subsection{報告者の担当範囲と技術的課題}\label{sec:tasks}
