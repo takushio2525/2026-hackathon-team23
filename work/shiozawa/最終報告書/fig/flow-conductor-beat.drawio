@@ -29,7 +29,7 @@
         <mxCell id="f14" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p5" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
         <!-- Calibration NO branch -->
         <mxCell id="f2" value="NO" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d0" target="p0"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="f2b" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=1;entryY=0.5;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="p0" target="end"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="640" y="716"/></Array></mxGeometry></mxCell>
+        <mxCell id="f2b" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;exitX=1;exitY=0.5;entryX=1;entryY=0.5;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="p0" target="end"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="790" y="118"/><mxPoint x="790" y="716"/></Array></mxGeometry></mxCell>
         <!-- Not Armed branch -->
         <mxCell id="f5" value="NO" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d1" target="d2"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="f7" value="YES" style="endArrow=block;endFill=1;html=1;strokeColor=#000000;strokeWidth=1;fontSize=11;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="p2"><mxGeometry relative="1" as="geometry"/></mxCell>

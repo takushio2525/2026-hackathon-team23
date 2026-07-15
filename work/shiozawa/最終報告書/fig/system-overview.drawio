@@ -25,8 +25,8 @@
         <mxCell id="eu4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#000000;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="i4" target="p4"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="eu5" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#000000;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="i5" target="p5"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="eu6" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#000000;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="i6" target="p6"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="lw" value="WiFi UDP&lt;br&gt;CTRL / BEAT" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="300" y="168" width="90" height="36" as="geometry"/></mxCell>
-        <mxCell id="lu" value="USB Serial&lt;br&gt;NOTE" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="665" y="168" width="90" height="36" as="geometry"/></mxCell>
+        <mxCell id="lw" value="WiFi UDP&lt;br&gt;CTRL / BEAT" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="300" y="348" width="90" height="36" as="geometry"/></mxCell>
+        <mxCell id="lu" value="USB Serial&lt;br&gt;NOTE" style="text;html=1;align=center;verticalAlign=middle;fontSize=11;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="665" y="348" width="90" height="36" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
